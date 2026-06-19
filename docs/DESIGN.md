@@ -1,6 +1,6 @@
 # Design Guidelines
 
-> **Note:** The UI now follows the Tape design system. See `docs/redesign/tape/README.md` for the full visual contract (tokens, typography, elevation rules, and component inventory).
+> **Note:** The UI now follows the **Quiet** design system. See `docs/redesign/quiet/README.md` for the current visual contract (tokens, typography, spacing, and component inventory). The earlier Tape direction has been superseded.
 
 The UI should feel like a modern fintech dashboard: dense, professional, scannable, and useful for repeated review.
 

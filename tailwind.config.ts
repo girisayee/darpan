@@ -23,16 +23,6 @@ const config: Config = {
         neg:                "rgb(var(--neg) / <alpha-value>)",
         warn:               "rgb(var(--warn) / <alpha-value>)",
 
-        /* ── Transient aliases (keep lingering classes rendering until R2/R3) ── */
-        brand:                "rgb(var(--accent) / <alpha-value>)",
-        primary:              "rgb(var(--accent) / <alpha-value>)",
-        "primary-foreground": "rgb(var(--bg) / <alpha-value>)",
-        card:                 "rgb(var(--surface) / <alpha-value>)",
-        border:               "rgb(var(--hairline) / <alpha-value>)",
-        muted:                "rgb(var(--surface-inset) / <alpha-value>)",
-        success:              "rgb(var(--pos) / <alpha-value>)",
-        danger:               "rgb(var(--neg) / <alpha-value>)",
-        warning:              "rgb(var(--warn) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

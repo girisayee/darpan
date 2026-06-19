@@ -297,7 +297,7 @@ function CapitalTab({ result, onSelectEvent }: { result: CalculationResult; onSe
       <section className="rounded-lg border border-hairline bg-surface p-4">
         <div className="flex items-baseline justify-between">
           <h3 className="font-sans text-[13px] font-medium text-foreground">Monthly realized ROI</h3>
-          <span className="font-mono text-[11px] text-muted-foreground">{latest?.year ?? ""}</span>
+          <span className="font-sans text-[11px] tabular-nums text-muted-foreground">{latest?.year ?? ""}</span>
         </div>
         <div className="mt-3">
           <MonthlyRoiChart result={result} />
@@ -326,14 +326,14 @@ function OptionsTab({ result, optionType, onSelectEvent }: { result: Calculation
         <KpiCard label="Premium Collected" value={formatCurrency(lifecycles.reduce((sum, row) => sum + row.premiumReceived, 0))} helper="Gross opening premiums" tooltip="Total premium received from opening option sales." tone="positive" />
         <KpiCard label="Buy-to-Close Cost" value={formatCurrency(lifecycles.reduce((sum, row) => sum + row.closeCost, 0))} helper="Costs to close positions" tooltip="Total debit paid to close option positions." tone="negative" />
         <KpiCard label={optionType === "call" ? "Covered Call ROI" : "Return on Collateral"} value={formatPercent(weightedRoi(events))} helper="P&L / known capital" tooltip="Net realized option-cycle P&L divided by capital or collateral." tone={tone(weightedRoi(events) ?? 0)} />
-        {/* Exposure tile — brand-accented label to emphasize live capital/collateral */}
-        <section className="bg-surface border border-brand/30 rounded-[10px] p-3">
+        {/* Exposure tile — calm accent to emphasize live capital/collateral */}
+        <section className="bg-surface border border-accent/20 rounded-[10px] p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="w-full">
-              <div className="text-[10px] font-medium uppercase tracking-[.12em] text-brand">
-                {optionType === "call" ? "Current CC Capital" : "Current CSP Collateral"}
+              <div className="text-[12px] font-medium text-muted-foreground">
+                {optionType === "call" ? "Current CC capital" : "Current CSP collateral"}
               </div>
-              <div className="mt-2 font-mono text-xl font-medium tabular-nums text-foreground">
+              <div className="mt-2 font-sans text-xl font-medium tabular-nums text-foreground">
                 {formatCurrency(currentCapital)}
               </div>
             </div>
@@ -350,12 +350,6 @@ function OptionsTab({ result, optionType, onSelectEvent }: { result: Calculation
         empty="No open option cycles in this tab."
         showCurrentExposure
         showLiveChip
-      />
-      {/* All cycles */}
-      <OptionCycleTable
-        title={optionType === "call" ? "All Covered Call Cycles" : "All Cash-Secured Put Cycles"}
-        rows={lifecycles}
-        empty="No option cycles yet."
       />
       {/* Results — tape-styled heading, shared EventsTable unchanged */}
       <section className="space-y-2">
@@ -492,7 +486,7 @@ function TradesTab({
           </button>
         </div>
       )}
-      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3 py-2 focus-within:ring-2 focus-within:ring-brand/40">
+      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3 py-2 focus-within:ring-2 focus-within:ring-accent/40">
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
           value={search}
@@ -533,7 +527,7 @@ function ImportTab({ existing, onSave }: { existing: TradeTransaction[]; onSave:
         <textarea
           value={raw}
           onChange={(event) => setRaw(event.target.value)}
-          className="mt-4 h-80 w-full resize-none rounded-md border border-hairline bg-surface p-3 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="mt-4 h-80 w-full resize-none rounded-md border border-hairline bg-surface p-3 font-sans text-xs tabular-nums text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40"
           placeholder="Paste Robinhood transaction CSV here"
         />
       </section>
@@ -578,23 +572,23 @@ function SettingsTab({
         <Toggle label="Annualized return" checked={settings.annualizedReturn} onChange={(checked) => onChange({ ...settings, annualizedReturn: checked })} />
         <label className="grid gap-1">
           <span className="font-sans text-[11.5px] text-muted-foreground">Annual realized P&amp;L goal</span>
-          <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-brand/40">
-            <span className="font-mono text-[12px] tabular-nums text-muted-foreground">$</span>
+          <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
+            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">$</span>
             <input
               type="number"
               min="0"
               step="1000"
               value={settings.annualRealizedPnlGoal}
               onChange={(event) => onChange({ ...settings, annualRealizedPnlGoal: Math.max(0, Number(event.target.value) || 0) })}
-              className="h-10 w-full bg-transparent px-2 font-mono text-[13px] tabular-nums text-foreground outline-none"
+              className="h-10 w-full bg-transparent px-2 font-sans text-[13px] tabular-nums text-foreground outline-none"
             />
           </div>
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
             Monthly pace: {formatCurrency(settings.annualRealizedPnlGoal / 12)}
           </span>
         </label>
         <div className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-muted-foreground">
-          Imported trade data is stored in the local SQLite database at <span className="font-mono text-[11px]">data/positioniq.sqlite</span>.
+          Imported trade data is stored in the local SQLite database at <span className="font-sans text-[11px] tabular-nums">data/positioniq.sqlite</span>.
         </div>
       </SettingsPanel>
       <SettingsPanel title="Cost Basis">
@@ -606,8 +600,8 @@ function SettingsTab({
               .filter(([symbol]) => symbol !== "PAYPAL")
               .map(([symbol, basis]) => (
                 <div key={symbol} className="flex items-center justify-between rounded-md border border-hairline bg-surface px-3 py-2">
-                  <span className="font-mono text-[11px] font-semibold text-foreground">{symbol}</span>
-                  <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{formatCurrency(basis, { maximumFractionDigits: 2 })}/share</span>
+                  <span className="font-sans text-[11px] font-medium text-foreground">{symbol}</span>
+                  <span className="font-sans text-[11px] tabular-nums text-muted-foreground">{formatCurrency(basis, { maximumFractionDigits: 2 })}/share</span>
                 </div>
               ))}
           </div>
@@ -617,8 +611,8 @@ function SettingsTab({
           <div className="mt-2 grid gap-2">
             {settings.manualZeroBasisLots.map((lot) => (
               <div key={`${lot.symbol}-${lot.quantity}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-3 py-2">
-                <span className="font-mono text-[11px] font-semibold text-foreground">{lot.symbol}</span>
-                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{formatNumber(lot.quantity, 5)} shares at $0 basis</span>
+                <span className="font-sans text-[11px] font-medium text-foreground">{lot.symbol}</span>
+                <span className="font-sans text-[11px] tabular-nums text-muted-foreground">{formatNumber(lot.quantity, 5)} shares at $0 basis</span>
                 {lot.note && <span className="w-full font-sans text-[11px] text-muted-foreground">{lot.note}</span>}
               </div>
             ))}
@@ -858,7 +852,7 @@ function Insights({ result, onReviewTrades }: { result: CalculationResult; onRev
 
 function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-md border border-hairline bg-surface px-3 font-sans text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-md border border-hairline bg-surface px-3 font-sans text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
       {children}
     </select>
   );
@@ -873,7 +867,7 @@ function IconButton({ label: buttonLabel, icon, onClick, disabled, danger }: { l
       title={buttonLabel}
       aria-label={buttonLabel}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-surface px-3 font-sans text-[12px] font-medium text-foreground transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-surface px-3 font-sans text-[12px] font-medium text-foreground transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50",
         danger && "border-neg/30 text-neg hover:bg-neg/10"
       )}
     >
@@ -896,7 +890,7 @@ function Toggle({ label: toggleLabel, checked, onChange }: { label: string; chec
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 transition-colors hover:bg-surface-inset">
       <span className="font-sans text-[12.5px] text-foreground">{toggleLabel}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-brand focus-visible:ring-2 focus-visible:ring-brand/40" />
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-accent focus-visible:ring-2 focus-visible:ring-accent/40" />
     </label>
   );
 }
@@ -910,9 +904,9 @@ function Segmented({ value, values, onChange }: { value: string; values: string[
           type="button"
           onClick={() => onChange(item)}
           className={cn(
-            "rounded px-3 py-2 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+            "rounded px-3 py-2 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
             value === item
-              ? "bg-brand/15 text-brand"
+              ? "bg-accent/15 text-accent"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -953,11 +947,11 @@ function downloadBackup(transactions: TradeTransaction[], settings: AppSettings)
 }
 
 function signedMoney(value: number) {
-  return <span className={cn(value > 0 && "text-success", value < 0 && "text-danger")}>{formatCurrency(value)}</span>;
+  return <span className={cn(value > 0 && "text-pos", value < 0 && "text-neg")}>{formatCurrency(value)}</span>;
 }
 
 function signedPercent(value: number | null) {
-  return <span className={cn((value ?? 0) > 0 && "text-success", (value ?? 0) < 0 && "text-danger")}>{formatPercent(value)}</span>;
+  return <span className={cn((value ?? 0) > 0 && "text-pos", (value ?? 0) < 0 && "text-neg")}>{formatPercent(value)}</span>;
 }
 
 function tone(value: number): "positive" | "negative" | "neutral" {

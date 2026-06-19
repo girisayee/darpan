@@ -14,8 +14,8 @@ const KIND_MAP: Record<StatusKind, { label: string; classes: string }> = {
   ok:          { label: "OK",         classes: "bg-pos/10 text-pos" },
   expired:     { label: "Expired",    classes: "bg-pos/10 text-pos" },
   unresolved:  { label: "Unresolved", classes: "bg-warn/15 text-warn" },
-  assigned:    { label: "Assigned",   classes: "bg-muted/15 text-muted-foreground" },
-  closed:      { label: "Closed",     classes: "bg-muted/15 text-muted-foreground" },
+  assigned:    { label: "Assigned",   classes: "bg-surface-inset text-muted-foreground" },
+  closed:      { label: "Closed",     classes: "bg-surface-inset text-muted-foreground" },
   "zero-basis":{ label: "Zero Basis", classes: "bg-neg/10 text-neg" },
 };
 
