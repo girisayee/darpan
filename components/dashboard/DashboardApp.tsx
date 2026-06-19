@@ -219,6 +219,13 @@ function OverviewTab({
   const ytdPnl = result.aggregates.currentYearRealizedPnl;
   const ytdRoi = result.aggregates.ytdRoi ?? 0;
 
+  // Mirror the null-check inside Insights to avoid rendering an orphaned divider
+  const hasInsights =
+    result.aggregates.symbolBreakdown.some((row) => row.pnl < 0 && row.trades > 1) ||
+    result.optionLifecycles.some((c) => c.status === "open" && c.expirationDate <= addDaysIso(new Date(), 14)) ||
+    result.unresolvedTransactions.length > 0 ||
+    result.duplicateTransactionIds.length > 0;
+
   return (
     <div className="space-y-0">
       {/* ── Hero ── */}
@@ -228,6 +235,7 @@ function OverviewTab({
           value={formatCurrency(result.aggregates.totalRealizedPnl)}
           tone={tone(result.aggregates.totalRealizedPnl)}
           ytdBadge={ytdRoi !== 0 ? `${ytdRoi > 0 ? "▲" : "▼"} ${formatPercent(Math.abs(ytdRoi))} YTD` : undefined}
+          ytdBadgeTone={ytdRoi >= 0 ? "positive" : "negative"}
           subLine={`${formatNumber(result.realizedEvents.length)} closed · ${formatPercent(result.aggregates.winRate)} win rate · ${formatCurrency(result.aggregates.averageDeployedCapital)} avg deployed`}
         />
       </div>
@@ -276,13 +284,15 @@ function OverviewTab({
         />
       </div>
 
-      {/* ── Hairline ── */}
-      <div className="h-px bg-hairline" />
-
-      {/* ── Insights ── */}
-      <div className="py-5">
-        <Insights result={result} onReviewTrades={onReviewTrades} />
-      </div>
+      {/* ── Insights (divider suppressed when empty) ── */}
+      {hasInsights && (
+        <>
+          <div className="h-px bg-hairline" />
+          <div className="py-5">
+            <Insights result={result} onReviewTrades={onReviewTrades} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
