@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MonthlyRoiChart } from "@/components/charts/DashboardCharts";
+import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
 import { HeroReadout } from "@/components/dashboard/HeroReadout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatStrip } from "@/components/dashboard/StatStrip";
@@ -1143,58 +1144,6 @@ function InsightCard({
     </article>
   );
 }
-
-function DetailDrawer({ event, onClose, transactions }: { event: RealizedPnLEvent | null; onClose: () => void; transactions: TradeTransaction[] }) {
-  if (!event) return null;
-  const linked = transactions.filter((transaction) => event.linkedTransactionIds.includes(transaction.id));
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/35" onClick={onClose}>
-      <aside className="scrollbar-thin h-full w-full max-w-xl overflow-auto bg-card p-5 shadow-2xl" onClick={(click) => click.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-primary">How this was calculated</p>
-            <h2 className="mt-1 text-2xl font-semibold">{event.symbol} {label(event.strategy)}</h2>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-md border p-2 hover:bg-muted">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <Metric label="Proceeds" value={formatCurrency(event.grossProceeds)} />
-          <Metric label="Cost Basis" value={formatCurrency(event.costBasis)} />
-          <Metric label="Premium" value={signedMoney(event.optionPremium)} />
-          <Metric label="Fees" value={formatCurrency(event.fees)} />
-          <Metric label="Capital Deployed" value={formatCurrency(event.capitalDeployed)} />
-          <Metric label="ROI Formula" value={`${formatCurrency(event.realizedPnl)} / ${formatCurrency(event.capitalDeployed)}`} />
-          <Metric label="Final Realized P&L" value={signedMoney(event.realizedPnl)} />
-          <Metric label="ROI %" value={signedPercent(event.roiPercent)} />
-        </div>
-        <section className="mt-5 rounded-lg border p-4">
-          <h3 className="font-semibold">Explanation</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{event.explanation}</p>
-        </section>
-        <section className="mt-5 rounded-lg border p-4">
-          <h3 className="font-semibold">Linked Transactions</h3>
-          <div className="mt-2 space-y-2">
-            {linked.map((transaction) => (
-              <div key={transaction.id} className="rounded-md bg-muted/50 p-3 text-sm">
-                <div className="font-medium">{transaction.tradeDate} · {transaction.symbol} · {label(transaction.action)}</div>
-                <div className="text-muted-foreground">{transaction.rawDescription}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="mt-5 rounded-lg border p-4">
-          <h3 className="font-semibold">Warnings</h3>
-          <div className="mt-2 space-y-2 text-sm text-muted-foreground">
-            {event.warnings.length ? event.warnings.map((warning) => <div key={warning}>{warning}</div>) : <div>None</div>}
-          </div>
-        </section>
-      </aside>
-    </div>
-  );
-}
-
 
 function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (
