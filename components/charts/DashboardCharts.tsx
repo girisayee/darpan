@@ -13,17 +13,16 @@ import {
 import type { CalculationResult } from "@/types/trading";
 import { formatPercent } from "@/lib/utils/format";
 
-// Tape palette — consumed via CSS variables so both themes work automatically.
+// Quiet palette — consumed via CSS variables so both themes work automatically.
 // recharts props only accept string colors, so we use the rgb(var(…)) form.
 const C_POS       = "rgb(var(--pos))";
 const C_NEG       = "rgb(var(--neg))";
 const C_HAIRLINE  = "rgb(var(--hairline))";
-const C_MUTED     = "rgb(var(--text-muted))";
-const C_DIM       = "rgb(var(--text-dim))";
+const C_MUTED     = "rgb(var(--muted))";
 const C_SURFACE   = "rgb(var(--surface))";
 
 const TICK_STYLE = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-sans)",
   fontSize: 11,
   fill: C_MUTED
 } as const;
@@ -37,13 +36,13 @@ const TOOLTIP_CONTENT_STYLE: React.CSSProperties = {
 };
 
 const TOOLTIP_ITEM_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-sans)",
   fontSize: 12,
-  color: C_DIM
+  color: C_MUTED
 };
 
 const TOOLTIP_LABEL_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
+  fontFamily: "var(--font-sans)",
   fontSize: 11,
   color: C_MUTED,
   marginBottom: 4

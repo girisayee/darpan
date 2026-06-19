@@ -62,7 +62,7 @@ export function DataTable<T>({
                   <button
                     type="button"
                     className={cn(
-                      "inline-flex items-center gap-1 text-[9.5px] font-medium uppercase tracking-[.05em] text-muted-foreground",
+                      "inline-flex items-center gap-1 text-[11.5px] font-normal normal-case tracking-normal text-muted-foreground",
                       column.align === "right" && "flex-row-reverse"
                     )}
                     onClick={() =>
@@ -86,7 +86,7 @@ export function DataTable<T>({
               key={rowIndex}
               className={cn(
                 "border-b border-hairline-soft last:border-0 transition-colors duration-[120ms]",
-                onRowClick && "cursor-pointer hover:bg-brand/[0.04]"
+                onRowClick && "cursor-pointer hover:bg-accent/[0.04]"
               )}
               onClick={() => onRowClick?.(row)}
             >
@@ -96,7 +96,7 @@ export function DataTable<T>({
                   className={cn(
                     "px-3 py-2.5 align-top",
                     column.align === "right"
-                      ? "text-right font-mono tabular-nums text-dim"
+                      ? "text-right tabular-nums text-dim"
                       : "font-sans"
                   )}
                 >

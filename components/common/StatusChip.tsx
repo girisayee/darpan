@@ -10,12 +10,12 @@ export type StatusKind =
   | "zero-basis";
 
 const KIND_MAP: Record<StatusKind, { label: string; classes: string }> = {
-  open:        { label: "Open",       classes: "bg-brand/10 text-brand" },
+  open:        { label: "Open",       classes: "bg-accent/10 text-accent" },
   ok:          { label: "OK",         classes: "bg-pos/10 text-pos" },
   expired:     { label: "Expired",    classes: "bg-pos/10 text-pos" },
   unresolved:  { label: "Unresolved", classes: "bg-warn/15 text-warn" },
-  assigned:    { label: "Assigned",   classes: "bg-dim/15 text-dim" },
-  closed:      { label: "Closed",     classes: "bg-dim/15 text-dim" },
+  assigned:    { label: "Assigned",   classes: "bg-muted/15 text-muted-foreground" },
+  closed:      { label: "Closed",     classes: "bg-muted/15 text-muted-foreground" },
   "zero-basis":{ label: "Zero Basis", classes: "bg-neg/10 text-neg" },
 };
 

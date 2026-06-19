@@ -39,9 +39,9 @@ function strategyLabel(strategy: string) {
 
 function MetaCell({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
   return (
-    <div className="rounded-[10px] border border-hairline bg-surface px-3 py-2.5">
-      <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 font-mono text-[12.5px] tabular-nums text-foreground", valueClass)}>
+    <div className="px-3 py-2.5">
+      <div className="font-sans text-[11px] font-normal text-muted-foreground">{label}</div>
+      <div className={cn("mt-0.5 font-sans text-[12.5px] font-medium tabular-nums text-foreground", valueClass)}>
         {value}
       </div>
     </div>
@@ -182,17 +182,17 @@ export function DetailDrawer({
           >
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-sans text-[16px] font-bold text-foreground">
+                <span className="font-sans text-[16px] font-medium text-foreground">
                   {event.symbol}
                 </span>
-                {/* Strategy chip — brand-tinted pill, safe kind mapping */}
+                {/* Strategy chip — accent-tinted pill, safe kind mapping */}
                 <span
-                  className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-brand"
+                  className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent"
                 >
                   {strategyLabel(event.strategy)}
                 </span>
               </div>
-              <div className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
+              <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
                 Closed {event.date}
                 {event.quantity ? ` · ${formatNumber(event.quantity)} shares` : ""}
               </div>
@@ -202,7 +202,7 @@ export function DetailDrawer({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               <X className="h-4 w-4" />
             </button>
@@ -216,7 +216,7 @@ export function DetailDrawer({
               </div>
               <div
                 className={cn(
-                  "font-mono text-[32px] font-bold tabular-nums mt-1",
+                  "font-sans text-[30px] font-medium tabular-nums mt-1",
                   toneClass(realizedPnl)
                 )}
               >
@@ -229,7 +229,7 @@ export function DetailDrawer({
               </div>
               <div
                 className={cn(
-                  "font-mono text-[18px] tabular-nums mt-1",
+                  "font-sans text-[18px] font-medium tabular-nums mt-1",
                   toneClass(roiPercent)
                 )}
               >
@@ -248,7 +248,7 @@ export function DetailDrawer({
             {/* Gross proceeds */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
               <span className="text-dim">Gross proceeds</span>
-              <span className={cn("font-mono tabular-nums", toneClass(grossProceeds))}>
+              <span className={cn("font-sans tabular-nums font-medium", toneClass(grossProceeds))}>
                 {signedCurrency(grossProceeds)}
               </span>
             </div>
@@ -260,14 +260,14 @@ export function DetailDrawer({
                   ? ` (${event.explanation.match(/\b(FIFO|LIFO|AVERAGE)\b/i)![0]})`
                   : ""}
               </span>
-              <span className="font-mono tabular-nums text-neg">
+              <span className="font-sans tabular-nums font-medium text-neg">
                 {costBasis !== 0 ? `−${formatCurrency(Math.abs(costBasis), { maximumFractionDigits: 2 })}` : "$0.00"}
               </span>
             </div>
             {/* Fees */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
               <span className="text-dim">Fees</span>
-              <span className="font-mono tabular-nums text-muted-foreground">
+              <span className="font-sans tabular-nums font-medium text-muted-foreground">
                 {fees !== 0
                   ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}`
                   : "$0.00"}
@@ -278,7 +278,7 @@ export function DetailDrawer({
               <span className="text-foreground font-medium">Realized P&amp;L</span>
               <span
                 className={cn(
-                  "font-mono tabular-nums font-bold",
+                  "font-sans tabular-nums font-medium",
                   toneClass(realizedPnl)
                 )}
               >
@@ -288,7 +288,7 @@ export function DetailDrawer({
           </div>
 
           {/* ── 3×2 meta grid ── */}
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
             <MetaCell
               label="Opened"
               value={openDate ?? "N/A"}
@@ -337,11 +337,11 @@ export function DetailDrawer({
 
           {/* ── Basis-allocation note ── */}
           {hasBasisNote && (
-            <div className="mt-3.5 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-brand bg-surface px-3 py-2.5">
+            <div className="mt-3.5 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
               <div className="font-sans text-[12px] font-medium text-foreground">
                 Basis allocation
               </div>
-              <div className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground leading-relaxed">
+              <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground leading-relaxed">
                 {event.explanation}
               </div>
             </div>
