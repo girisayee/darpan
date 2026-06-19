@@ -10,12 +10,10 @@ import {
   FileDown,
   FileUp,
   Gauge,
-  GripVertical,
   Lightbulb,
   RefreshCcw,
   Search,
   Settings,
-  SlidersHorizontal,
   Sparkles,
   Target,
   TrendingDown,
@@ -64,17 +62,6 @@ type PrimaryTab = (typeof tabs)[number];
 type Tab = PrimaryTab | "Import" | "Settings";
 type TradeIssueFilter = "unresolved" | "duplicates" | null;
 
-const overviewSections = [
-  { id: "snapshot", title: "Performance Snapshot", description: "Fast read on realized P&L, ROI, capital, and win rate." },
-  { id: "metrics", title: "Metric Matrix", description: "Core realized P&L, strategy, symbol, and capital KPIs." },
-  { id: "insights", title: "Insights", description: "Operational signals that are not repeated in the metric matrix." }
-] as const;
-
-type OverviewSectionId = (typeof overviewSections)[number]["id"];
-type OverviewLayoutItem = { id: OverviewSectionId; visible: boolean };
-const overviewLayoutKey = "positioniq.overview-layout.v1";
-const legacyOverviewLayoutKey = "realizededge.overview-layout.v1";
-const defaultOverviewLayout: OverviewLayoutItem[] = overviewSections.map((section) => ({ id: section.id, visible: true }));
 
 export function DashboardApp() {
   const store = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerSnapshot);
@@ -197,8 +184,6 @@ function OverviewTab({
   settings: AppSettings;
   onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void;
 }) {
-  const [layout, setLayout] = useState<OverviewLayoutItem[]>(() => loadOverviewLayout());
-  const [draggedSection, setDraggedSection] = useState<OverviewSectionId | null>(null);
   const strategyStats = displayStrategyBreakdown(result);
   const bestStrategy = strategyStats[0];
   const worstStrategy = [...strategyStats].sort((a, b) => a.pnl - b.pnl)[0];
@@ -222,71 +207,15 @@ function OverviewTab({
     ["Closed Trades", formatNumber(result.realizedEvents.length), "Total realized P&L events", 0]
   ] as const;
 
-  function commitLayout(next: OverviewLayoutItem[]) {
-    setLayout(next);
-    saveOverviewLayout(next);
-  }
-
-  function moveSection(sourceId: OverviewSectionId, targetId: OverviewSectionId) {
-    if (sourceId === targetId) return;
-    const visible = layout.filter((section) => section.visible);
-    const hidden = layout.filter((section) => !section.visible);
-    const sourceIndex = visible.findIndex((section) => section.id === sourceId);
-    const targetIndex = visible.findIndex((section) => section.id === targetId);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-    const nextVisible = [...visible];
-    const [moved] = nextVisible.splice(sourceIndex, 1);
-    nextVisible.splice(targetIndex, 0, moved);
-    commitLayout([...nextVisible, ...hidden]);
-  }
-
-  function setSectionVisible(sectionId: OverviewSectionId, visible: boolean) {
-    commitLayout(layout.map((section) => (section.id === sectionId ? { ...section, visible } : section)));
-  }
-
-  const hiddenSections = layout.filter((section) => !section.visible);
-  const visibleSections = layout.filter((section) => section.visible);
-
-  const renderSection = (sectionId: OverviewSectionId) => {
-    if (sectionId === "snapshot") return <PerformanceSnapshot result={result} annualGoal={settings.annualRealizedPnlGoal} />;
-    if (sectionId === "metrics") {
-      return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          {kpis.map(([title, value, helper, numeric]) => (
-            <KpiCard key={title} label={title} value={value} helper={helper} tooltip={helper} tone={tone(numeric)} />
-          ))}
-        </div>
-      );
-    }
-    if (sectionId === "insights") return <Insights result={result} onReviewTrades={onReviewTrades} />;
-    return null;
-  };
-
   return (
-    <div className="space-y-5">
-      <LayoutToolbar
-        hiddenSections={hiddenSections.map((section) => section.id)}
-        onRestore={setSectionVisible}
-        onReset={() => commitLayout(defaultOverviewLayout)}
-      />
-      {visibleSections.map((section) => (
-        <DashboardSection
-          key={section.id}
-          sectionId={section.id}
-          draggedSection={draggedSection}
-          onDragStart={setDraggedSection}
-          onDragEnd={() => setDraggedSection(null)}
-          onDrop={moveSection}
-          onClose={() => setSectionVisible(section.id, false)}
-        >
-          {renderSection(section.id)}
-        </DashboardSection>
-      ))}
-      {!visibleSections.length && (
-        <section className="rounded-lg border border-dashed bg-card/70 p-8 text-center text-sm text-muted-foreground">
-          All overview sections are hidden.
-        </section>
-      )}
+    <div className="space-y-3">
+      <PerformanceSnapshot result={result} annualGoal={settings.annualRealizedPnlGoal} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        {kpis.map(([title, value, helper, numeric]) => (
+          <KpiCard key={title} label={title} value={value} helper={helper} tooltip={helper} tone={tone(numeric)} />
+        ))}
+      </div>
+      <Insights result={result} onReviewTrades={onReviewTrades} />
     </div>
   );
 }
@@ -421,119 +350,6 @@ function SnapshotTile({
   );
 }
 
-function LayoutToolbar({
-  hiddenSections,
-  onRestore,
-  onReset
-}: {
-  hiddenSections: OverviewSectionId[];
-  onRestore: (sectionId: OverviewSectionId, visible: boolean) => void;
-  onReset: () => void;
-}) {
-  return (
-    <section className="flex flex-col gap-3 rounded-lg border bg-card/85 p-3 shadow-panel backdrop-blur md:flex-row md:items-center md:justify-between">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <span className="rounded-md border bg-background p-2 text-primary">
-          <SlidersHorizontal className="h-4 w-4" />
-        </span>
-        <span>Customize Overview</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {hiddenSections.map((sectionId) => (
-          <button
-            key={sectionId}
-            type="button"
-            onClick={() => onRestore(sectionId, true)}
-            className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground"
-          >
-            <SectionIcon sectionId={sectionId} className="h-3.5 w-3.5" />
-            {sectionTitle(sectionId)}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={onReset}
-          className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground"
-        >
-          <RefreshCcw className="h-3.5 w-3.5" />
-          Reset
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function DashboardSection({
-  sectionId,
-  draggedSection,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  onClose,
-  children
-}: {
-  sectionId: OverviewSectionId;
-  draggedSection: OverviewSectionId | null;
-  onDragStart: (sectionId: OverviewSectionId) => void;
-  onDragEnd: () => void;
-  onDrop: (sourceId: OverviewSectionId, targetId: OverviewSectionId) => void;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const metadata = overviewSections.find((section) => section.id === sectionId);
-  const isDragTarget = draggedSection !== null && draggedSection !== sectionId;
-  return (
-    <section
-      onDragOver={(event) => {
-        if (draggedSection) event.preventDefault();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        const sourceId = event.dataTransfer.getData("text/plain") as OverviewSectionId;
-        onDrop(sourceId || draggedSection || sectionId, sectionId);
-      }}
-      className={cn(
-        "rounded-lg border border-transparent transition",
-        draggedSection === sectionId && "opacity-50",
-        isDragTarget && "hover:border-primary/40 hover:bg-primary/5"
-      )}
-    >
-      <div className="mb-3 flex flex-col gap-3 rounded-lg border bg-card/90 px-3 py-3 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <span
-            draggable
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", sectionId);
-              onDragStart(sectionId);
-            }}
-            onDragEnd={onDragEnd}
-            title="Drag section"
-            className="cursor-grab rounded-md border bg-background p-2 text-muted-foreground active:cursor-grabbing"
-          >
-            <GripVertical className="h-4 w-4" />
-          </span>
-          <span className="rounded-md border bg-primary/10 p-2 text-primary">
-            <SectionIcon sectionId={sectionId} className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-base font-semibold text-foreground">{metadata?.title ?? sectionId}</h2>
-            <p className="text-sm text-muted-foreground">{metadata?.description}</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          title="Hide section"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:border-danger/35 hover:bg-danger/10 hover:text-danger"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function CapitalTab({ result, settings, onSelectEvent }: { result: CalculationResult; settings: AppSettings; onSelectEvent: (event: RealizedPnLEvent) => void }) {
   const latest = result.monthlyReturns.at(-1);
@@ -1274,24 +1090,6 @@ function filterResult(result: CalculationResult, filters: { symbol: string; stra
   return { ...recalculated, realizedEvents: nextEvents };
 }
 
-function loadOverviewLayout(): OverviewLayoutItem[] {
-  if (typeof window === "undefined") return defaultOverviewLayout;
-  const raw = window.localStorage.getItem(overviewLayoutKey) ?? window.localStorage.getItem(legacyOverviewLayoutKey);
-  if (!raw) return defaultOverviewLayout;
-  try {
-    const parsed = JSON.parse(raw) as OverviewLayoutItem[];
-    const validIds = new Set<OverviewSectionId>(overviewSections.map((section) => section.id));
-    const cleaned = parsed.filter((item) => validIds.has(item.id)).map((item) => ({ id: item.id, visible: item.visible !== false }));
-    const missing = defaultOverviewLayout.filter((item) => !cleaned.some((cleanedItem) => cleanedItem.id === item.id));
-    return [...cleaned, ...missing];
-  } catch {
-    return defaultOverviewLayout;
-  }
-}
-
-function saveOverviewLayout(layout: OverviewLayoutItem[]) {
-  window.localStorage.setItem(overviewLayoutKey, JSON.stringify(layout));
-}
 
 function downloadBackup(transactions: TradeTransaction[], settings: AppSettings) {
   const blob = new Blob([JSON.stringify(createBackup(transactions, settings), null, 2)], { type: "application/json" });
@@ -1327,19 +1125,6 @@ function label(value: string | null | undefined) {
     .join(" ");
 }
 
-function sectionTitle(sectionId: OverviewSectionId) {
-  return overviewSections.find((section) => section.id === sectionId)?.title ?? label(sectionId);
-}
-
-function SectionIcon({ sectionId, className }: { sectionId: OverviewSectionId; className?: string }) {
-  const icons: Record<OverviewSectionId, React.ElementType> = {
-    snapshot: Gauge,
-    metrics: CircleDollarSign,
-    insights: Lightbulb
-  };
-  const Icon = icons[sectionId];
-  return <Icon className={className} />;
-}
 
 function weightedRoi(events: RealizedPnLEvent[]) {
   const pnl = events.reduce((sum, row) => sum + row.realizedPnl, 0);
