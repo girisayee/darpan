@@ -22,15 +22,15 @@ export function KpiCard({
   const tooltipId = useId();
   const Icon = tone === "positive" ? TrendingUp : tone === "negative" ? TrendingDown : Info;
   return (
-    <section className="rounded-lg border bg-card/95 p-4 shadow-panel transition hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg">
+    <section className="bg-surface border border-hairline rounded-[10px] p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[.12em] text-muted-foreground">
             {label}
             <span className="group/tooltip relative inline-flex">
               <button
                 type="button"
-                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
                 aria-label={`About ${label}: ${tooltip}`}
                 aria-describedby={tooltipId}
                 title={tooltip}
@@ -40,7 +40,7 @@ export function KpiCard({
               <span
                 id={tooltipId}
                 role="tooltip"
-                className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-64 -translate-x-1/2 rounded-md border bg-foreground px-3 py-2 text-xs font-medium normal-case leading-5 text-background opacity-0 shadow-lg transition group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100"
+                className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-64 -translate-x-1/2 rounded-md border border-hairline bg-foreground px-3 py-2 text-xs font-medium normal-case leading-5 text-background opacity-0 transition group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100"
               >
                 {tooltip}
               </span>
@@ -48,9 +48,9 @@ export function KpiCard({
           </div>
           <div
             className={cn(
-              "mt-2 text-2xl font-semibold tabular-nums",
-              tone === "positive" && "text-success",
-              tone === "negative" && "text-danger",
+              "mt-2 text-xl font-mono font-medium tabular-nums",
+              tone === "positive" && "text-pos",
+              tone === "negative" && "text-neg",
               tone === "neutral" && "text-foreground"
             )}
           >
@@ -59,16 +59,19 @@ export function KpiCard({
         </div>
         <span
           className={cn(
-            "rounded-md border p-2",
-            tone === "positive" && "border-success/25 bg-success/10 text-success",
-            tone === "negative" && "border-danger/25 bg-danger/10 text-danger",
-            tone === "neutral" && "border-border bg-muted text-muted-foreground"
+            "rounded-lg border p-2",
+            tone === "positive" && "border-pos/25 bg-pos/10 text-pos",
+            tone === "negative" && "border-neg/25 bg-neg/10 text-neg",
+            tone === "neutral" && "border-hairline bg-surface-inset text-muted-foreground"
           )}
         >
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-2 text-sm leading-5 text-muted-foreground">{helper}</p>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{helper}</p>
     </section>
   );
 }
+
+// Tape design-system alias
+export const Readout = KpiCard;
