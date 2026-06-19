@@ -2,6 +2,7 @@
 
 import { periodFromPreset, type Preset } from "@/lib/filters/period";
 import { formatCurrency, formatNumber } from "@/lib/utils/format";
+import { cn } from "@/lib/utils/cn";
 
 // ── Month label map ──────────────────────────────────────────────────────────
 const MONTH_LABELS: Record<string, string> = {
@@ -69,36 +70,63 @@ function deriveActivePreset(
 ): Preset | null {
   const now = new Date().getFullYear();
   if (year === "ALL" && month === "ALL") return "ALL";
-  if (month !== "ALL") return null; // explicit month → no preset active
-  if (year === String(now)) return "THIS_YEAR"; // YTD and THIS_YEAR both → same state; highlight THIS_YEAR
+  if (month !== "ALL") return null;
+  if (year === String(now)) return "THIS_YEAR";
   if (year === String(now - 1)) return "LAST_YEAR";
   return null;
 }
 
-function activeChips(
+function activeFilterNote(
   year: string,
   month: string,
   symbol: string,
   strategy: string,
   account: string
-): { key: string; label: string }[] {
-  const chips: { key: string; label: string }[] = [];
+): string | null {
+  const parts: string[] = [];
   if (year !== "ALL" && month !== "ALL") {
-    // Combined: "Jun 2026"
-    chips.push({
-      key: "year+month",
-      label: `${MONTH_LABELS[month] ?? month} ${year}`,
-    });
+    parts.push(`${MONTH_LABELS[month] ?? month} ${year}`);
   } else {
-    if (year !== "ALL") chips.push({ key: "year", label: year });
-    if (month !== "ALL")
-      chips.push({ key: "month", label: MONTH_LABELS[month] ?? month });
+    if (year !== "ALL") parts.push(year);
+    if (month !== "ALL") parts.push(MONTH_LABELS[month] ?? month);
   }
-  if (symbol !== "ALL") chips.push({ key: "symbol", label: symbol });
-  if (strategy !== "ALL")
-    chips.push({ key: "strategy", label: STRATEGY_LABELS[strategy] ?? strategy });
-  if (account !== "ALL") chips.push({ key: "account", label: account });
-  return chips;
+  if (symbol !== "ALL") parts.push(symbol);
+  if (strategy !== "ALL") parts.push(STRATEGY_LABELS[strategy] ?? strategy);
+  if (account !== "ALL") parts.push(account);
+  return parts.length > 0 ? `· ${parts.join(" · ")}` : null;
+}
+
+// ── Quiet select wrapper ─────────────────────────────────────────────────────
+function FilterSelect({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <label className="sr-only" htmlFor={id}>{label}</label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "font-sans text-[13px] text-foreground border border-hairline rounded-[8px] px-[10px] py-[6px]",
+          "bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          "cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+        )}
+      >
+        {children}
+      </select>
+    </>
+  );
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -118,140 +146,52 @@ export function FilterBar({
   const now = new Date().getFullYear();
   const activePreset = deriveActivePreset(year, month);
 
-  // Steps only through actual calendar years (not "ALL")
-  const calendarYears = years.filter((y) => y !== "ALL");
-  const currentIndex = calendarYears.indexOf(year);
-
-  const canStepBack = currentIndex > 0;
-  const canStepForward = currentIndex < calendarYears.length - 1;
-
-  function stepYear(dir: -1 | 1) {
-    if (dir === -1 && canStepBack) {
-      onChange({ year: calendarYears[currentIndex - 1] });
-    }
-    if (dir === 1 && canStepForward) {
-      onChange({ year: calendarYears[currentIndex + 1] });
-    }
-  }
-
   function handlePreset(preset: Preset) {
     onChange(periodFromPreset(preset, now));
   }
 
-  function removeChip(key: string) {
-    if (key === "year+month") {
-      onChange({ year: "ALL", month: "ALL" });
-    } else if (key === "year") {
-      onChange({ year: "ALL" });
-    } else if (key === "month") {
-      onChange({ month: "ALL" });
-    } else if (key === "symbol") {
-      onChange({ symbol: "ALL" });
-    } else if (key === "strategy") {
-      onChange({ strategy: "ALL" });
-    } else if (key === "account") {
-      onChange({ account: "ALL" });
-    }
-  }
-
-  const chips = activeChips(year, month, symbol, strategy, account);
+  const filterNote = activeFilterNote(year, month, symbol, strategy, account);
 
   return (
     <div
-      className="rounded-lg border border-hairline bg-surface p-[13px_15px]"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2"
       role="search"
       aria-label="Period and filter controls"
     >
-      {/* ── Row 1: Year stepper + Month rail ──────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-[14px]">
-        {/* Year stepper */}
-        <div>
-          <div className="text-[10px] uppercase tracking-[.12em] text-muted-foreground mb-[5px]">
-            Year
-          </div>
-          <div className="inline-flex items-center gap-[10px] rounded-[8px] border border-hairline px-[10px] py-[5px]">
-            <button
-              type="button"
-              onClick={() => stepYear(-1)}
-              disabled={!canStepBack}
-              aria-label="Previous year"
-              className={[
-                "text-[13px] leading-none text-dim transition-colors",
-                canStepBack
-                  ? "hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded-sm"
-                  : "opacity-30 cursor-default",
-              ].join(" ")}
-            >
-              ‹
-            </button>
-            <span className="font-mono text-[13px] text-foreground tabular-nums">
-              {year === "ALL" ? "All" : year}
-            </span>
-            <button
-              type="button"
-              onClick={() => stepYear(1)}
-              disabled={!canStepForward}
-              aria-label="Next year"
-              className={[
-                "text-[13px] leading-none text-dim transition-colors",
-                canStepForward
-                  ? "hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded-sm"
-                  : "opacity-30 cursor-default",
-              ].join(" ")}
-            >
-              ›
-            </button>
-          </div>
-        </div>
-
-        {/* Month rail */}
-        <div className="flex-1 min-w-[300px]">
-          <div className="text-[10px] uppercase tracking-[.12em] text-muted-foreground mb-[5px]">
-            Month
-          </div>
-          <div
-            className="grid gap-[3px]"
-            style={{ gridTemplateColumns: "repeat(13, 1fr)" }}
-            role="group"
-            aria-label="Month filter"
-          >
-            {MONTH_VALUES.map((mv) => {
-              const isActive = mv === month;
-              const label = mv === "ALL" ? "All" : (MONTH_LABELS[mv] ?? mv);
-              return (
-                <button
-                  key={mv}
-                  type="button"
-                  onClick={() =>
-                    onChange({ month: mv === "ALL" ? "ALL" : mv })
-                  }
-                  aria-pressed={isActive}
-                  aria-label={label}
-                  className={[
-                    "font-mono text-[11px] rounded-[999px] px-[4px] py-[3px] text-center transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
-                    isActive
-                      ? "bg-brand/15 text-brand"
-                      : "text-dim hover:bg-surface-inset hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 2: Presets + Entity selects ───────────────────────────── */}
-      <div
-        className="flex flex-wrap items-center gap-[8px] mt-[13px] pt-[12px] border-t border-hairline-soft"
+      {/* ── Year dropdown ─────────────────────────────────────────────── */}
+      <FilterSelect
+        id="filterbar-year"
+        label="Year"
+        value={year}
+        onChange={(v) => onChange({ year: v })}
       >
-        <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground mr-[2px]">
-          Quick
-        </span>
+        <option value="ALL">All years</option>
+        {years
+          .filter((y) => y !== "ALL")
+          .map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+      </FilterSelect>
 
-        {/* Preset pills */}
+      {/* ── Month dropdown ────────────────────────────────────────────── */}
+      <FilterSelect
+        id="filterbar-month"
+        label="Month"
+        value={month}
+        onChange={(v) => onChange({ month: v })}
+      >
+        {MONTH_VALUES.map((mv) => (
+          <option key={mv} value={mv}>
+            {mv === "ALL" ? "All months" : (MONTH_LABELS[mv] ?? mv)}
+          </option>
+        ))}
+      </FilterSelect>
+
+      {/* ── Divider ───────────────────────────────────────────────────── */}
+      <span className="w-px h-4 bg-hairline shrink-0" aria-hidden="true" />
+
+      {/* ── Preset text links ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
         {PRESETS.map(({ label, value }) => {
           const isActive = activePreset === value;
           return (
@@ -260,125 +200,75 @@ export function FilterBar({
               type="button"
               onClick={() => handlePreset(value)}
               aria-pressed={isActive}
-              className={[
-                "rounded-[999px] border px-[9px] py-[3px] text-[11px] transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+              className={cn(
+                "font-sans text-[13px] transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded-sm",
                 isActive
-                  ? "border-brand/50 text-brand bg-brand/10"
-                  : "border-hairline text-dim hover:border-brand/30 hover:text-foreground",
-              ].join(" ")}
+                  ? "text-accent font-[500]"
+                  : "text-muted-foreground hover:text-foreground font-[400]"
+              )}
             >
               {label}
             </button>
           );
         })}
-
-        {/* Divider */}
-        <span
-          className="w-px h-[18px] bg-hairline mx-[4px] shrink-0"
-          aria-hidden="true"
-        />
-
-        {/* Symbol select */}
-        <label className="sr-only" htmlFor="filterbar-symbol">Symbol</label>
-        <select
-          id="filterbar-symbol"
-          value={symbol}
-          onChange={(e) => onChange({ symbol: e.target.value })}
-          className={[
-            "text-[11px] text-dim border border-hairline rounded-[8px] px-[9px] py-[5px]",
-            "bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
-            "cursor-pointer",
-          ].join(" ")}
-        >
-          <option value="ALL">Symbol: All</option>
-          {symbols
-            .filter((s) => s !== "ALL")
-            .map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-        </select>
-
-        {/* Strategy select */}
-        <label className="sr-only" htmlFor="filterbar-strategy">Strategy</label>
-        <select
-          id="filterbar-strategy"
-          value={strategy}
-          onChange={(e) => onChange({ strategy: e.target.value })}
-          className={[
-            "text-[11px] text-dim border border-hairline rounded-[8px] px-[9px] py-[5px]",
-            "bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
-            "cursor-pointer",
-          ].join(" ")}
-        >
-          {STRATEGY_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              Strategy: {STRATEGY_LABELS[s]}
-            </option>
-          ))}
-        </select>
-
-        {/* Account select */}
-        <label className="sr-only" htmlFor="filterbar-account">Account</label>
-        <select
-          id="filterbar-account"
-          value={account}
-          onChange={(e) => onChange({ account: e.target.value })}
-          className={[
-            "text-[11px] text-dim border border-hairline rounded-[8px] px-[9px] py-[5px]",
-            "bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
-            "cursor-pointer",
-          ].join(" ")}
-        >
-          <option value="ALL">Account: All</option>
-          {accounts
-            .filter((a) => a !== "ALL")
-            .map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-        </select>
       </div>
 
-      {/* ── Row 3: Active chips + live summary ───────────────────────── */}
-      {(chips.length > 0 || summaryCount !== undefined) && (
-        <div className="flex flex-wrap items-center gap-[7px] mt-[12px]">
-          {chips.length > 0 && (
-            <>
-              <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground mr-[2px]">
-                Active
-              </span>
-              {chips.map(({ key, label }) => (
-                <span
-                  key={key}
-                  className="inline-flex items-center gap-[4px] rounded-[999px] border border-brand/40 bg-brand/10 text-brand text-[10px] px-[8px] py-[2px]"
-                >
-                  {label}
-                  <button
-                    type="button"
-                    onClick={() => removeChip(key)}
-                    aria-label={`Remove ${label} filter`}
-                    className={[
-                      "leading-none text-[10px] opacity-70 hover:opacity-100 transition-opacity",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 rounded-sm",
-                    ].join(" ")}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </>
-          )}
-          {/* Live summary */}
+      {/* ── Divider ───────────────────────────────────────────────────── */}
+      <span className="w-px h-4 bg-hairline shrink-0" aria-hidden="true" />
+
+      {/* ── Entity dropdowns ──────────────────────────────────────────── */}
+      <FilterSelect
+        id="filterbar-symbol"
+        label="Symbol"
+        value={symbol}
+        onChange={(v) => onChange({ symbol: v })}
+      >
+        <option value="ALL">Symbol: All</option>
+        {symbols
+          .filter((s) => s !== "ALL")
+          .map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+      </FilterSelect>
+
+      <FilterSelect
+        id="filterbar-strategy"
+        label="Strategy"
+        value={strategy}
+        onChange={(v) => onChange({ strategy: v })}
+      >
+        {STRATEGY_OPTIONS.map((s) => (
+          <option key={s} value={s}>
+            Strategy: {STRATEGY_LABELS[s]}
+          </option>
+        ))}
+      </FilterSelect>
+
+      <FilterSelect
+        id="filterbar-account"
+        label="Account"
+        value={account}
+        onChange={(v) => onChange({ account: v })}
+      >
+        <option value="ALL">Account: All</option>
+        {accounts
+          .filter((a) => a !== "ALL")
+          .map((a) => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+      </FilterSelect>
+
+      {/* ── Active filter note + live summary ─────────────────────────── */}
+      {(filterNote || summaryCount !== undefined) && (
+        <span className="ml-auto font-sans text-[12px] text-muted-foreground tabular-nums shrink-0">
+          {filterNote && <span>{filterNote}</span>}
           {summaryCount !== undefined && summaryPnl !== undefined && (
-            <span className="ml-auto font-mono text-[11px] text-dim tabular-nums">
-              {`→ ${formatNumber(summaryCount)} closed · ${summaryPnl >= 0 ? "+" : ""}${formatCurrency(summaryPnl)} realized`}
+            <span className="ml-2">
+              {formatNumber(summaryCount)} closed · {summaryPnl >= 0 ? "+" : ""}{formatCurrency(summaryPnl)}
             </span>
           )}
-        </div>
+        </span>
       )}
     </div>
   );

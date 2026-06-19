@@ -2,16 +2,9 @@
 
 import { FileDown, Moon, Settings, Sun, Upload } from "lucide-react";
 import type { Theme } from "@/lib/theme/use-theme";
-import { TickerRail } from "@/components/shell/TickerRail";
 import { cn } from "@/lib/utils/cn";
 
-interface Mover {
-  symbol: string;
-  pnl: number;
-}
-
 interface AppHeaderProps {
-  movers: Mover[];
   theme: Theme;
   onToggleTheme: () => void;
   onImport: () => void;
@@ -35,10 +28,10 @@ function IconButton({
       title={buttonLabel}
       aria-label={buttonLabel}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-[8px] border border-hairline",
-        "bg-surface text-muted-foreground transition-colors",
-        "hover:border-brand/40 hover:text-foreground",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        "inline-flex h-8 w-8 items-center justify-center rounded-[8px]",
+        "text-muted-foreground transition-colors",
+        "hover:text-foreground",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       )}
     >
       {icon}
@@ -47,7 +40,6 @@ function IconButton({
 }
 
 export function AppHeader({
-  movers,
   theme,
   onToggleTheme,
   onImport,
@@ -55,27 +47,17 @@ export function AppHeader({
   onExport,
 }: AppHeaderProps) {
   return (
-    <header className="flex items-center gap-3 rounded-[14px] border border-hairline bg-surface px-4 py-3">
-      {/* Gold wordmark square */}
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-brand text-[11px] font-bold text-[#0C1118] select-none"
-        aria-hidden="true"
-      >
-        PI
-      </div>
-
-      {/* Product name */}
-      <span className="font-sans text-[13px] font-semibold tracking-[.06em] text-foreground uppercase shrink-0">
-        POSITIONIQ
+    <header className="flex items-center gap-4 border-b border-hairline px-4 py-3">
+      {/* Wordmark */}
+      <span className="font-sans text-[15px] font-semibold tracking-tight text-foreground shrink-0 select-none">
+        PositionIQ
       </span>
 
-      {/* Ticker rail — grows to fill remaining space */}
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <TickerRail movers={movers} />
-      </div>
+      {/* Spacer */}
+      <div className="flex-1" aria-hidden="true" />
 
       {/* Icon buttons */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0">
         <IconButton
           label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           onClick={onToggleTheme}

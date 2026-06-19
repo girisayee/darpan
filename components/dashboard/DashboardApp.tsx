@@ -36,7 +36,6 @@ import {
   parseBackup
 } from "@/lib/storage/local-store";
 import { clearStore, getServerSnapshot, getStoreSnapshot, loadStore, saveStore, subscribeStore } from "@/lib/storage/server-store-client";
-import { topMovers } from "@/lib/selectors/top-movers";
 import { useTheme } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
@@ -112,7 +111,6 @@ export function DashboardApp() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
       <AppHeader
-        movers={topMovers(baseResult)}
         theme={theme}
         onToggleTheme={toggle}
         onImport={() => setActiveTab("Import")}

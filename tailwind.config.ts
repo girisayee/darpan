@@ -39,15 +39,8 @@ const config: Config = {
         mono: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       borderRadius: { md: "8px", lg: "12px", xl: "14px" },
-      keyframes: {
-        "ticker-rail": {
-          "0%":   { transform: "translateX(0%)" },
-          "100%": { transform: "translateX(-50%)" },
-        },
-      },
-      animation: {
-        "ticker-rail": "ticker-rail 28s linear infinite",
-      },
+      keyframes: {},
+      animation: {},
     },
   },
   plugins: [],

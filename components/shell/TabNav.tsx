@@ -28,11 +28,11 @@ export function TabNav({ tabs, active, onSelect }: TabNavProps) {
               onClick={() => onSelect(tab)}
               className={cn(
                 "relative shrink-0 whitespace-nowrap px-4 py-[10px]",
-                "font-sans text-[13px] font-medium transition-colors duration-[140ms]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:rounded-sm",
+                "font-sans transition-colors duration-[140ms]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:rounded-sm",
                 isActive
-                  ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-brand after:rounded-t-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-[13.5px] font-[500] text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-[1.5px] after:bg-accent after:rounded-t-sm"
+                  : "text-[13.5px] font-[400] text-muted-foreground hover:text-foreground"
               )}
             >
               {tab}
