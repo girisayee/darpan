@@ -12,7 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MonthlyRoiChart } from "@/components/charts/DashboardCharts";
 import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
-import { HeroReadout } from "@/components/dashboard/HeroReadout";
+import { GoalSpotlight } from "@/components/dashboard/GoalSpotlight";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatStrip } from "@/components/dashboard/StatStrip";
 import { AppHeader } from "@/components/shell/AppHeader";
@@ -23,6 +23,7 @@ import { Column, DataTable } from "@/components/tables/DataTable";
 import { calculateDashboard } from "@/lib/calculations/engine";
 import { parseRobinhoodInput, type ImportPreview } from "@/lib/import/robinhood";
 import { sampleTransactions } from "@/lib/sample-data/sample-transactions";
+import { goalPace } from "@/lib/selectors/goal-pace";
 import {
   createBackup,
   parseBackup
@@ -176,15 +177,27 @@ function OverviewTab({
   settings: AppSettings;
   onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void;
 }) {
-  const [showMoreKpis, setShowMoreKpis] = useState(false);
   const strategyStats = displayStrategyBreakdown(result);
   const bestStrategy = strategyStats[0];
   const worstStrategy = [...strategyStats].sort((a, b) => a.pnl - b.pnl)[0];
   const latest = result.monthlyReturns.at(-1);
 
-  // All KPIs — curated 5 shown in strip, rest revealed via "More metrics →"
+  // Goal-pace inputs
+  const annualGoal = settings.annualRealizedPnlGoal;
+  const monthlyRealized = result.monthlyReturns.map((m) => m.realizedPnl);
+  const monthIndex = result.monthlyReturns.length > 0 ? result.monthlyReturns.length - 1 : 0;
+  const pace = goalPace({ annualGoal, monthlyRealized, monthIndex });
+
+  const monthlyTarget = annualGoal / 12;
+  const monthlyActual = result.monthlyReturns.at(-1)?.realizedPnl ?? 0;
+  const currentYear = latest?.year ?? new Date().getFullYear();
+  const currentMonthIndex = latest ? latest.month - 1 : new Date().getMonth();
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthLabel = MONTH_NAMES[currentMonthIndex] ?? "—";
+
+  // All KPIs — all visible in the full metric grid (no toggle)
   const allKpis = [
-    { label: "Total P&L", value: formatCurrency(result.aggregates.totalRealizedPnl), helper: "Closed realized events", tooltip: "All-time total realized P&L across all closed events.", numeric: result.aggregates.totalRealizedPnl },
+    { label: "Net P&L", value: formatCurrency(result.aggregates.totalRealizedPnl), helper: "All-time realized P&L", tooltip: "All-time total realized P&L across all closed events.", numeric: result.aggregates.totalRealizedPnl },
     { label: "Tax year P&L", value: formatCurrency(result.aggregates.currentYearRealizedPnl), helper: "Calendar-year realized P&L", tooltip: "Current calendar-year realized P&L.", numeric: result.aggregates.currentYearRealizedPnl },
     { label: "Monthly ROI", value: formatPercent(latest?.realizedRoiPercent), helper: "Latest month: P&L / avg deployed capital", tooltip: "Monthly realized P&L divided by average deployed capital.", numeric: latest?.realizedRoiPercent ?? 0 },
     { label: "YTD ROI", value: formatPercent(result.aggregates.ytdRoi), helper: "YTD P&L / YTD avg deployed capital", tooltip: "YTD realized P&L divided by average deployed capital.", numeric: result.aggregates.ytdRoi ?? 0 },
@@ -203,22 +216,6 @@ function OverviewTab({
     { label: "Closed trades", value: formatNumber(result.realizedEvents.length), helper: "Total realized P&L events", tooltip: "Count of all realized P&L events in the current view.", numeric: 0 },
   ];
 
-  // Curated 5 shown in StatStrip metric row
-  const stripItems = [
-    { label: "Monthly ROI", value: formatPercent(latest?.realizedRoiPercent), tone: tone(latest?.realizedRoiPercent ?? 0) },
-    { label: "Options premium", value: formatCurrency(result.aggregates.totalOptionsPremium), tone: tone(result.aggregates.totalOptionsPremium) },
-    { label: "Stock P&L", value: formatCurrency(result.aggregates.totalStockTradingPnl), tone: tone(result.aggregates.totalStockTradingPnl) },
-    { label: "Avg deployed", value: formatCurrency(result.aggregates.averageDeployedCapital), tone: "neutral" as const },
-    { label: "Best symbol", value: result.aggregates.bestSymbol ?? "N/A", tone: "neutral" as const },
-  ];
-  // Remaining KPIs revealed in the expanded grid
-  const moreCount = allKpis.length - stripItems.length;
-
-  const annualGoal = settings.annualRealizedPnlGoal;
-  const monthlyGoal = annualGoal / 12;
-  const ytdPnl = result.aggregates.currentYearRealizedPnl;
-  const ytdRoi = result.aggregates.ytdRoi ?? 0;
-
   // Mirror the null-check inside Insights to avoid rendering an orphaned divider
   const hasInsights =
     result.aggregates.symbolBreakdown.some((row) => row.pnl < 0 && row.trades > 1) ||
@@ -228,60 +225,43 @@ function OverviewTab({
 
   return (
     <div className="space-y-0">
-      {/* ── Hero ── */}
+      {/* ── Goal-hero Spotlight (intentional dark block in both themes) ── */}
       <div className="py-5">
-        <HeroReadout
-          label="Net realized P&L · all time"
-          value={formatCurrency(result.aggregates.totalRealizedPnl)}
-          tone={tone(result.aggregates.totalRealizedPnl)}
-          ytdBadge={ytdRoi !== 0 ? `${ytdRoi > 0 ? "▲" : "▼"} ${formatPercent(Math.abs(ytdRoi))} YTD` : undefined}
-          ytdBadgeTone={ytdRoi >= 0 ? "positive" : "negative"}
-          subLine={`${formatNumber(result.realizedEvents.length)} closed · ${formatPercent(result.aggregates.winRate)} win rate · ${formatCurrency(result.aggregates.averageDeployedCapital)} avg deployed`}
+        <GoalSpotlight
+          pace={pace}
+          year={currentYear}
+          annualGoal={annualGoal}
+          monthlyActual={monthlyActual}
+          monthlyTarget={monthlyTarget}
+          monthLabel={monthLabel}
+          monthIndex={currentMonthIndex}
         />
       </div>
 
       {/* ── Hairline ── */}
       <div className="h-px bg-hairline" />
 
-      {/* ── Metric row ── */}
-      <div className="py-5">
-        <StatStrip
-          items={stripItems}
-          moreCount={moreCount}
-          onMore={() => setShowMoreKpis((v) => !v)}
-          showingMore={showMoreKpis}
-        />
-      </div>
-
-      {/* ── Expanded KPI grid ── */}
-      {showMoreKpis && (
-        <>
-          <div className="h-px bg-hairline" />
-          <div className="grid gap-x-10 gap-y-6 py-5 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
-            {allKpis.map((kpi) => (
-              <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tooltip={kpi.tooltip} tone={tone(kpi.numeric)} />
-            ))}
+      {/* ── Full metric grid — ALL KPIs visible, no toggle ── */}
+      <div
+        className="py-5"
+        style={{ display: "grid", gap: "12px", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
+      >
+        {allKpis.map((kpi) => (
+          <div
+            key={kpi.label}
+            className="rounded-xl border border-hairline bg-surface p-3.5"
+          >
+            <div className="text-[12px] text-muted-foreground">{kpi.label}</div>
+            <div
+              className={[
+                "mt-1 text-[19px] font-medium tabular-nums leading-snug",
+                kpi.numeric > 0 ? "text-pos" : kpi.numeric < 0 ? "text-neg" : "text-foreground",
+              ].join(" ")}
+            >
+              {kpi.value}
+            </div>
           </div>
-        </>
-      )}
-
-      {/* ── Hairline ── */}
-      <div className="h-px bg-hairline" />
-
-      {/* ── Goal rows ── */}
-      <div className="flex flex-col gap-3 py-5 sm:flex-row sm:gap-10">
-        <GoalBar
-          title="YTD goal"
-          target={annualGoal}
-          actual={ytdPnl}
-          valueLabel={`${formatCurrency(ytdPnl)} of ${formatCurrency(annualGoal)}`}
-        />
-        <GoalBar
-          title="Monthly target"
-          target={monthlyGoal}
-          actual={latest?.realizedPnl ?? 0}
-          valueLabel={`${formatCurrency(latest?.realizedPnl ?? 0)} of ${formatCurrency(monthlyGoal)}`}
-        />
+        ))}
       </div>
 
       {/* ── Insights (divider suppressed when empty) ── */}
@@ -293,38 +273,6 @@ function OverviewTab({
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-/** Quiet slim inline goal bar — no card, 3px track */
-function GoalBar({
-  title,
-  target,
-  actual,
-  valueLabel
-}: {
-  title: string;
-  target: number;
-  actual: number;
-  valueLabel: string;
-}) {
-  const progress = target > 0 ? Math.max(0, Math.min(100, (actual / target) * 100)) : 0;
-  const fillClass =
-    actual < 0
-      ? "bg-neg"
-      : actual >= target
-        ? "bg-pos"
-        : "bg-accent";
-  return (
-    <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-[12px] text-muted-foreground">{title}</span>
-        <span className="text-[12px] tabular-nums text-muted-foreground">{valueLabel}</span>
-      </div>
-      <div className="h-[3px] overflow-hidden rounded-full bg-hairline">
-        <div className={cn("h-full rounded-full transition-all", fillClass)} style={{ width: `${progress}%` }} />
-      </div>
     </div>
   );
 }
