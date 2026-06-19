@@ -10,24 +10,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        card: "hsl(var(--card))",
-        muted: "hsl(var(--muted))",
-        "muted-foreground": "hsl(var(--muted-foreground))",
-        primary: "hsl(var(--primary))",
-        "primary-foreground": "hsl(var(--primary-foreground))",
-        success: "hsl(var(--success))",
-        danger: "hsl(var(--danger))",
-        warning: "hsl(var(--warning))"
+        /* ── New design-system tokens ── */
+        background:       "var(--bg)",
+        surface:          "var(--surface)",
+        "surface-inset":  "var(--surface-inset)",
+        hairline:         "var(--hairline)",
+        "hairline-soft":  "var(--hairline-soft)",
+        foreground:       "var(--text)",
+        "muted-foreground": "var(--text-muted)",
+        dim:              "var(--text-dim)",
+        brand:            "var(--brand)",
+        pos:              "var(--pos)",
+        neg:              "var(--neg)",
+        warn:             "var(--warn)",
+
+        /* ── Legacy aliases (keep existing components compiling) ── */
+        card:               "var(--surface)",
+        border:             "var(--hairline)",
+        primary:            "var(--brand)",
+        "primary-foreground": "var(--bg)",
+        success:            "var(--pos)",
+        danger:             "var(--neg)",
+        warning:            "var(--warn)",
+        muted:              "var(--surface-inset)",
       },
-      boxShadow: {
-        panel: "0 18px 50px rgba(15, 23, 42, 0.08)"
-      }
-    }
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+      },
+      borderRadius: { md: "8px", lg: "12px", xl: "14px" },
+    },
   },
-  plugins: []
+  plugins: [],
 };
 
 export default config;

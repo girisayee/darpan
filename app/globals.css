@@ -2,45 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dark theme (default) ──────────────────────────────────────── */
 :root {
-  --background: 210 24% 97%;
-  --foreground: 220 35% 12%;
-  --card: 0 0% 100%;
-  --muted: 210 20% 92%;
-  --muted-foreground: 215 15% 42%;
-  --border: 214 25% 88%;
-  --primary: 201 90% 28%;
-  --primary-foreground: 0 0% 100%;
-  --success: 153 58% 35%;
-  --danger: 348 70% 44%;
-  --warning: 38 92% 45%;
+  --bg:              #0C1118;
+  --surface:         #121A24;
+  --surface-inset:   #0C1118;
+  --hairline:        #1F2A37;
+  --hairline-soft:   #16202B;
+  --text:            #E6EDF3;
+  --text-muted:      #76879B;
+  --text-dim:        #9FB0C2;
+  --brand:           #F2B43B;
+  --pos:             #34D399;
+  --neg:             #F87171;
+  --warn:            #FBBF24;
 }
 
-.dark {
-  --background: 220 22% 9%;
-  --foreground: 210 30% 96%;
-  --card: 220 21% 13%;
-  --muted: 220 18% 18%;
-  --muted-foreground: 215 15% 68%;
-  --border: 220 18% 23%;
-  --primary: 194 77% 46%;
-  --primary-foreground: 218 35% 9%;
-  --success: 151 54% 48%;
-  --danger: 350 75% 62%;
-  --warning: 40 96% 56%;
+/* ── Light theme ───────────────────────────────────────────────── */
+.light {
+  --bg:              #F4F6F8;
+  --surface:         #FFFFFF;
+  --surface-inset:   #EEF1F4;
+  --hairline:        #E2E7EC;
+  --hairline-soft:   #EDF0F3;
+  --text:            #0C1118;
+  --text-muted:      #5C6B7A;
+  --text-dim:        #3A4654;
+  --brand:           #B7791F;
+  --pos:             #157F4F;
+  --neg:             #D64545;
+  --warn:            #B45309;
 }
 
 * {
-  border-color: hsl(var(--border));
+  border-color: var(--hairline);
 }
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(14, 116, 144, 0.16), transparent 34rem),
-    radial-gradient(circle at top right, rgba(21, 128, 61, 0.1), transparent 30rem),
-    linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
-  color: hsl(var(--foreground));
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
@@ -55,7 +56,7 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: hsl(var(--card));
+  background: var(--surface);
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -64,6 +65,6 @@ textarea {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: var(--hairline);
   border-radius: 999px;
 }
