@@ -5,23 +5,24 @@ import {
   ArrowRight,
   Brain,
   CalendarDays,
+  ChevronUp,
   CircleDollarSign,
   Download,
   FileDown,
   FileUp,
   Gauge,
-  Lightbulb,
   RefreshCcw,
   Search,
   Settings,
-  Sparkles,
   Target,
   TrendingDown,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { OverviewCharts } from "@/components/charts/DashboardCharts";
+import { HeroReadout } from "@/components/dashboard/HeroReadout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { StatStrip } from "@/components/dashboard/StatStrip";
 import { AppHeader } from "@/components/shell/AppHeader";
 import { FilterBar } from "@/components/shell/FilterBar";
 import { TabNav } from "@/components/shell/TabNav";
@@ -184,169 +185,191 @@ function OverviewTab({
   settings: AppSettings;
   onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void;
 }) {
+  const [showMoreKpis, setShowMoreKpis] = useState(false);
   const strategyStats = displayStrategyBreakdown(result);
   const bestStrategy = strategyStats[0];
   const worstStrategy = [...strategyStats].sort((a, b) => a.pnl - b.pnl)[0];
-  const kpis = [
-    ["Total Realized P&L", formatCurrency(result.aggregates.totalRealizedPnl), "Closed realized events", result.aggregates.totalRealizedPnl],
-    ["Current Tax Year", formatCurrency(result.aggregates.currentYearRealizedPnl), "Calendar-year realized P&L", result.aggregates.currentYearRealizedPnl],
-    ["Monthly ROI %", formatPercent(result.monthlyReturns.at(-1)?.realizedRoiPercent), "Latest month: P&L / average deployed capital", result.monthlyReturns.at(-1)?.realizedRoiPercent ?? 0],
-    ["YTD ROI %", formatPercent(result.aggregates.ytdRoi), "YTD P&L / YTD average deployed capital", result.aggregates.ytdRoi ?? 0],
-    ["Average Monthly ROI", formatPercent(result.aggregates.averageMonthlyRoi), "Average of months where capital is known", result.aggregates.averageMonthlyRoi ?? 0],
-    ["Average Deployed Capital", formatCurrency(result.aggregates.averageDeployedCapital), "Average monthly capital-days denominator", 0],
-    ["Peak Deployed Capital", formatCurrency(result.aggregates.peakDeployedCapital), "Highest daily deployed capital", 0],
-    ["Options Premium Realized", formatCurrency(result.aggregates.totalOptionsPremium), "Closed option premium P&L", result.aggregates.totalOptionsPremium],
-    ["Stock Trading P&L", formatCurrency(result.aggregates.totalStockTradingPnl), "Realized stock sales", result.aggregates.totalStockTradingPnl],
-    ["Win Rate", formatPercent(result.aggregates.winRate), "Winning realized events / total events", result.aggregates.winRate ?? 0],
-    ["Average Win", formatCurrency(result.aggregates.averageWin), "Average profitable event", result.aggregates.averageWin ?? 0],
-    ["Average Loss", formatCurrency(result.aggregates.averageLoss), "Average losing event", result.aggregates.averageLoss ?? 0],
-    ["Best Symbol", result.aggregates.bestSymbol ?? "N/A", "Highest symbol P&L", 0],
-    ["Worst Symbol", result.aggregates.worstSymbol ?? "N/A", "Lowest symbol P&L", 0],
-    ["Best Strategy", label(bestStrategy?.strategy), "Highest strategy P&L", 0],
-    ["Worst Strategy", label(worstStrategy?.strategy), "Lowest strategy P&L", 0],
-    ["Closed Trades", formatNumber(result.realizedEvents.length), "Total realized P&L events", 0]
-  ] as const;
+  const latest = result.monthlyReturns.at(-1);
+
+  // All KPIs — curated 4 shown in strip, rest revealed via "+N more"
+  const allKpis = [
+    { label: "Total P&L", value: formatCurrency(result.aggregates.totalRealizedPnl), helper: "Closed realized events", tooltip: "All-time total realized P&L across all closed events.", numeric: result.aggregates.totalRealizedPnl },
+    { label: "Tax Year P&L", value: formatCurrency(result.aggregates.currentYearRealizedPnl), helper: "Calendar-year realized P&L", tooltip: "Current calendar-year realized P&L.", numeric: result.aggregates.currentYearRealizedPnl },
+    { label: "Monthly ROI", value: formatPercent(latest?.realizedRoiPercent), helper: "Latest month: P&L / avg deployed capital", tooltip: "Monthly realized P&L divided by average deployed capital.", numeric: latest?.realizedRoiPercent ?? 0 },
+    { label: "YTD ROI", value: formatPercent(result.aggregates.ytdRoi), helper: "YTD P&L / YTD avg deployed capital", tooltip: "YTD realized P&L divided by average deployed capital.", numeric: result.aggregates.ytdRoi ?? 0 },
+    { label: "Avg Monthly ROI", value: formatPercent(result.aggregates.averageMonthlyRoi), helper: "Average of months with known capital", tooltip: "Only months with known capital are included.", numeric: result.aggregates.averageMonthlyRoi ?? 0 },
+    { label: "Avg Deployed", value: formatCurrency(result.aggregates.averageDeployedCapital), helper: "Avg monthly capital-days denominator", tooltip: "Average deployed capital uses daily capital exposure.", numeric: 0 },
+    { label: "Peak Deployed", value: formatCurrency(result.aggregates.peakDeployedCapital), helper: "Highest daily deployed capital", tooltip: "Highest deployed capital observed in a month.", numeric: 0 },
+    { label: "Options Premium", value: formatCurrency(result.aggregates.totalOptionsPremium), helper: "Closed option premium P&L", tooltip: "Net realized option premium from all closed cycles.", numeric: result.aggregates.totalOptionsPremium },
+    { label: "Stock P&L", value: formatCurrency(result.aggregates.totalStockTradingPnl), helper: "Realized stock sales", tooltip: "Realized P&L from stock sales (swings and assignments).", numeric: result.aggregates.totalStockTradingPnl },
+    { label: "Win Rate", value: formatPercent(result.aggregates.winRate), helper: "Winning events / total events", tooltip: "Fraction of realized events that closed profitable.", numeric: result.aggregates.winRate ?? 0 },
+    { label: "Avg Win", value: formatCurrency(result.aggregates.averageWin), helper: "Average profitable event", tooltip: "Mean P&L of all winning realized events.", numeric: result.aggregates.averageWin ?? 0 },
+    { label: "Avg Loss", value: formatCurrency(result.aggregates.averageLoss), helper: "Average losing event", tooltip: "Mean P&L of all losing realized events.", numeric: result.aggregates.averageLoss ?? 0 },
+    { label: "Best Symbol", value: result.aggregates.bestSymbol ?? "N/A", helper: "Highest symbol P&L", tooltip: "Symbol with the largest cumulative realized P&L.", numeric: 0 },
+    { label: "Worst Symbol", value: result.aggregates.worstSymbol ?? "N/A", helper: "Lowest symbol P&L", tooltip: "Symbol with the smallest (most negative) cumulative realized P&L.", numeric: 0 },
+    { label: "Best Strategy", value: label(bestStrategy?.strategy), helper: "Highest strategy P&L", tooltip: "Strategy group with the largest cumulative realized P&L.", numeric: 0 },
+    { label: "Worst Strategy", value: label(worstStrategy?.strategy), helper: "Lowest strategy P&L", tooltip: "Strategy group with the smallest cumulative realized P&L.", numeric: 0 },
+    { label: "Closed Trades", value: formatNumber(result.realizedEvents.length), helper: "Total realized P&L events", tooltip: "Count of all realized P&L events in the current view.", numeric: 0 },
+  ];
+
+  // Curated 4 shown in StatStrip
+  const stripItems = [
+    { label: "Avg Win", value: formatCurrency(result.aggregates.averageWin), tone: tone(result.aggregates.averageWin ?? 0) },
+    { label: "Avg Loss", value: formatCurrency(result.aggregates.averageLoss), tone: tone(result.aggregates.averageLoss ?? 0) },
+    { label: "Best Symbol", value: result.aggregates.bestSymbol ?? "N/A", tone: "neutral" as const },
+    { label: "Best Strategy", value: label(bestStrategy?.strategy), tone: "neutral" as const },
+  ];
+  const moreKpis = allKpis; // All KPIs revealed in the expanded grid
+  const moreCount = moreKpis.length;
+
+  // Sparkline: cumulative realized P&L per month
+  const spark = result.monthlyReturns.map((m) => m.realizedPnl);
+  // Cumulative
+  const cumulativeSpark = spark.reduce<number[]>((acc, v) => {
+    acc.push((acc.at(-1) ?? 0) + v);
+    return acc;
+  }, []);
+
+  const annualGoal = settings.annualRealizedPnlGoal;
+  const monthlyGoal = annualGoal / 12;
 
   return (
     <div className="space-y-3">
-      <PerformanceSnapshot result={result} annualGoal={settings.annualRealizedPnlGoal} />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        {kpis.map(([title, value, helper, numeric]) => (
-          <KpiCard key={title} label={title} value={value} helper={helper} tooltip={helper} tone={tone(numeric)} />
-        ))}
+      {/* ── Hero row: HeroReadout + 2×2 Instrument Cluster ── */}
+      <div className="grid gap-3 lg:grid-cols-[1.45fr_1fr]">
+        <HeroReadout
+          label="Net realized P&L · all time"
+          value={formatCurrency(result.aggregates.totalRealizedPnl)}
+          tone={tone(result.aggregates.totalRealizedPnl)}
+          spark={cumulativeSpark.length >= 2 ? cumulativeSpark : undefined}
+          pills={[
+            `${formatNumber(result.realizedEvents.length)} closed`,
+            `${formatPercent(result.aggregates.winRate)} win`,
+            `${formatCurrency(result.aggregates.averageDeployedCapital)} deployed`,
+          ]}
+        />
+        {/* 2×2 Instrument Cluster */}
+        <div className="grid grid-cols-2 gap-2">
+          <KpiCard
+            label="YTD ROI"
+            value={formatPercent(result.aggregates.ytdRoi)}
+            helper="YTD P&L / avg deployed capital"
+            tooltip="YTD realized P&L divided by average deployed capital."
+            tone={tone(result.aggregates.ytdRoi ?? 0)}
+          />
+          <KpiCard
+            label="Monthly ROI"
+            value={formatPercent(latest?.realizedRoiPercent)}
+            helper="Latest month realized ROI"
+            tooltip="Monthly realized P&L divided by average deployed capital."
+            tone={tone(latest?.realizedRoiPercent ?? 0)}
+          />
+          <KpiCard
+            label="Options Premium"
+            value={formatCurrency(result.aggregates.totalOptionsPremium)}
+            helper="Closed option premium P&L"
+            tooltip="Net realized option premium from all closed cycles."
+            tone={tone(result.aggregates.totalOptionsPremium)}
+          />
+          <KpiCard
+            label="Stock P&L"
+            value={formatCurrency(result.aggregates.totalStockTradingPnl)}
+            helper="Realized stock sales"
+            tooltip="Realized P&L from stock sales."
+            tone={tone(result.aggregates.totalStockTradingPnl)}
+          />
+        </div>
       </div>
+
+      {/* ── Goal Bars ── */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <GoalBar
+          title="YTD goal"
+          targetLabel={formatCurrency(annualGoal)}
+          target={annualGoal}
+          actual={result.aggregates.currentYearRealizedPnl}
+          helper={`${formatCurrency(Math.max(0, annualGoal - result.aggregates.currentYearRealizedPnl))} to target`}
+        />
+        <GoalBar
+          title="Monthly target"
+          targetLabel={formatCurrency(monthlyGoal)}
+          target={monthlyGoal}
+          actual={latest?.realizedPnl ?? 0}
+          helper={`${formatCurrency(latest?.realizedPnl ?? 0)} of ${formatCurrency(monthlyGoal)} this month`}
+        />
+      </div>
+
+      {/* ── Curated StatStrip + expanded KPI grid ── */}
+      <StatStrip
+        items={stripItems}
+        moreCount={moreCount}
+        onMore={() => setShowMoreKpis((v) => !v)}
+      />
+      {showMoreKpis && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          {moreKpis.map((kpi) => (
+            <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tooltip={kpi.tooltip} tone={tone(kpi.numeric)} />
+          ))}
+          <div className="col-span-full flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowMoreKpis(false)}
+              className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-3 py-1.5 font-sans text-[12px] text-brand hover:bg-surface-inset"
+            >
+              <ChevronUp className="h-3.5 w-3.5" /> Collapse
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Insights (two-card layout) ── */}
       <Insights result={result} onReviewTrades={onReviewTrades} />
     </div>
   );
 }
 
-function PerformanceSnapshot({ result, annualGoal }: { result: CalculationResult; annualGoal: number }) {
-  const latest = result.monthlyReturns.at(-1);
-  const bestSymbol = result.aggregates.symbolBreakdown[0];
-  const bestStrategy = displayStrategyBreakdown(result)[0];
-  const pnlTone = tone(result.aggregates.totalRealizedPnl);
-  const monthlyGoal = annualGoal / 12;
-  return (
-    <section className="space-y-3">
-      <div className="grid gap-3 lg:grid-cols-2">
-        <GoalProgressCard
-          title="YTD Goal"
-          target={annualGoal}
-          actual={result.aggregates.currentYearRealizedPnl}
-          helper={`${formatCurrency(Math.max(0, annualGoal - result.aggregates.currentYearRealizedPnl))} remaining to ${formatCurrency(annualGoal)}`}
-          icon={Target}
-        />
-        <GoalProgressCard
-          title="Monthly Target"
-          target={monthlyGoal}
-          actual={latest?.realizedPnl ?? 0}
-          helper={`${formatCurrency(monthlyGoal)} monthly pace toward ${formatCurrency(annualGoal)}`}
-          icon={CalendarDays}
-        />
-      </div>
-      <section className="overflow-hidden rounded-lg border bg-card shadow-panel">
-      <div className="grid gap-px bg-border lg:grid-cols-[minmax(0,1.45fr)_repeat(4,minmax(0,1fr))]">
-        <div
-          className={cn(
-            "bg-card p-5",
-            pnlTone === "positive" && "bg-[linear-gradient(135deg,rgba(21,128,61,0.14),hsl(var(--card))_48%)]",
-            pnlTone === "negative" && "bg-[linear-gradient(135deg,rgba(190,18,60,0.12),hsl(var(--card))_48%)]"
-          )}
-        >
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Net Realized P&L</div>
-          <div className={cn("mt-3 text-4xl font-semibold tabular-nums", pnlTone === "positive" && "text-success", pnlTone === "negative" && "text-danger")}>
-            {formatCurrency(result.aggregates.totalRealizedPnl)}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border bg-background px-2.5 py-1">{formatNumber(result.realizedEvents.length)} closed events</span>
-            <span className="rounded-full border bg-background px-2.5 py-1">{formatPercent(result.aggregates.winRate)} win rate</span>
-            <span className="rounded-full border bg-background px-2.5 py-1">{formatCurrency(result.aggregates.averageDeployedCapital)} avg deployed</span>
-          </div>
-        </div>
-        <SnapshotTile label="Latest Monthly ROI" value={formatPercent(latest?.realizedRoiPercent)} detail="Realized P&L / average capital" valueTone={tone(latest?.realizedRoiPercent ?? 0)} />
-        <SnapshotTile label="YTD ROI" value={formatPercent(result.aggregates.ytdRoi)} detail="Current-year capital return" valueTone={tone(result.aggregates.ytdRoi ?? 0)} />
-        <SnapshotTile label="Best Symbol" value={bestSymbol?.symbol ?? "N/A"} detail={bestSymbol ? signedMoney(bestSymbol.pnl) : "No closed trades"} valueTone={tone(bestSymbol?.pnl ?? 0)} />
-        <SnapshotTile label="Best Strategy" value={label(bestStrategy?.strategy)} detail={bestStrategy ? signedMoney(bestStrategy.pnl) : "No strategy data"} valueTone={tone(bestStrategy?.pnl ?? 0)} />
-      </div>
-      </section>
-    </section>
-  );
-}
-
-function GoalProgressCard({
+/** Tape-styled flat goal bar — no shadow, surface-inset track, semantic fill */
+function GoalBar({
   title,
+  targetLabel,
   target,
   actual,
-  helper,
-  icon: Icon
+  helper
 }: {
   title: string;
+  targetLabel: string;
   target: number;
   actual: number;
   helper: string;
-  icon: React.ElementType;
 }) {
   const progress = target > 0 ? Math.max(0, Math.min(100, (actual / target) * 100)) : 0;
-  const remaining = target - actual;
+  const fillClass =
+    actual < 0
+      ? "bg-neg"
+      : actual >= target
+        ? "bg-pos"
+        : "bg-brand";
+  const pctClass =
+    actual < 0
+      ? "text-neg"
+      : actual >= target
+        ? "text-pos"
+        : "text-foreground";
   return (
-    <section className="rounded-lg border bg-card p-4 shadow-panel">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span className="rounded-md border bg-primary/10 p-1.5 text-primary">
-              <Icon className="h-3.5 w-3.5" />
-            </span>
-            {title}
-          </div>
-          <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
-            <span className={cn("text-3xl font-semibold tabular-nums", actual >= 0 ? "text-success" : "text-danger")}>{formatCurrency(actual)}</span>
-            <span className="pb-1 text-sm text-muted-foreground">of {formatCurrency(target)}</span>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-semibold tabular-nums">{formatPercent(progress, 1)}</div>
-          <div className="text-xs text-muted-foreground">complete</div>
-        </div>
+    <section className="rounded-xl border border-hairline bg-surface p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">
+          {title} · {targetLabel}
+        </span>
+        <span className={cn("font-mono text-[12px] font-medium tabular-nums", pctClass)}>
+          {formatNumber(progress, 0)}%
+        </span>
       </div>
-      <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn("h-full rounded-full", actual >= target ? "bg-success" : actual < 0 ? "bg-danger" : "bg-primary")}
-          style={{ width: `${progress}%` }}
-        />
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-inset">
+        <div className={cn("h-full rounded-full transition-all", fillClass)} style={{ width: `${progress}%` }} />
       </div>
-      <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm text-muted-foreground">
-        <span>{helper}</span>
-        <span>{remaining <= 0 ? `${formatCurrency(Math.abs(remaining))} ahead` : `${formatCurrency(remaining)} left`}</span>
-      </div>
+      <div className="mt-2 font-mono text-[11px] tabular-nums text-text-muted">{helper}</div>
     </section>
-  );
-}
-
-function SnapshotTile({
-  label: tileLabel,
-  value,
-  detail,
-  valueTone
-}: {
-  label: string;
-  value: React.ReactNode;
-  detail: React.ReactNode;
-  valueTone: "positive" | "negative" | "neutral";
-}) {
-  return (
-    <div className="bg-card p-5">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tileLabel}</div>
-      <div
-        className={cn(
-          "mt-3 min-h-9 text-2xl font-semibold tabular-nums",
-          valueTone === "positive" && "text-success",
-          valueTone === "negative" && "text-danger"
-        )}
-      >
-        {value}
-      </div>
-      <div className="mt-2 text-sm text-muted-foreground">{detail}</div>
-    </div>
   );
 }
 
@@ -847,37 +870,72 @@ function Insights({ result, onReviewTrades }: { result: CalculationResult; onRev
       icon: Gauge
     }
   ];
-  const signalCount = workingInsights.length + attentionInsights.length;
+  // Compose the two featured insight cards (Tape mockup style)
+  const repeatedLosersText = repeatedLosses.length
+    ? `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} down across 2+ closes`
+    : "No repeated symbol losses in the current view.";
+
+  const nearTermText = nearTermCycles.length
+    ? `${formatNumber(nearTermContracts)} ${nearTermContracts === 1 ? "contract" : "contracts"} · ${formatCurrency(
+        nearTermCycles.reduce((sum, cycle) => sum + optionCycleCapital(cycle, true), 0)
+      )} exposure`
+    : "No open option expirations in the next 14 days.";
+
   return (
-    <section className="overflow-hidden rounded-lg border bg-card shadow-panel">
-      <div className="flex flex-col gap-3 border-b bg-[linear-gradient(135deg,rgba(14,116,144,0.1),transparent_44%)] p-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="rounded-md border bg-primary/10 p-2 text-primary">
-            <Lightbulb className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold">Insights</h2>
-            <p className="text-sm text-muted-foreground">Operational signals that are not repeated in the metric matrix.</p>
+    <div className="space-y-3">
+      {/* ── Two featured insight cards (Tape layout) ── */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {/* Repeated losers — neg accent */}
+        <div className="flex-1 rounded-r-xl border border-hairline border-l-0 bg-surface pl-0 overflow-hidden">
+          <div className="flex h-full border-l-2 border-neg rounded-r-xl">
+            <div className="flex-1 px-4 py-3">
+              <div className="font-sans text-[12.5px] font-medium text-foreground">Repeated losers</div>
+              <div className="mt-1 font-sans text-[11.5px] text-text-muted">
+                {repeatedLosses.length > 0 ? (
+                  <>
+                    {repeatedLosersText}{" "}
+                    <button
+                      type="button"
+                      onClick={() => onReviewTrades(null, repeatedLosses[0])}
+                      className="text-neg underline-offset-2 hover:underline"
+                    >
+                      — review
+                    </button>
+                  </>
+                ) : (
+                  repeatedLosersText
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          {formatNumber(signalCount)} signals
-        </span>
+        {/* Expiring soon — brand accent */}
+        <div className="flex-1 rounded-r-xl border border-hairline border-l-0 bg-surface pl-0 overflow-hidden">
+          <div className="flex h-full border-l-2 border-brand rounded-r-xl">
+            <div className="flex-1 px-4 py-3">
+              <div className="font-sans text-[12.5px] font-medium text-foreground">Expiring ≤14 days</div>
+              <div className="mt-1 font-mono text-[11.5px] tabular-nums text-text-muted">{nearTermText}</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="grid gap-px bg-border xl:grid-cols-[0.8fr_1.2fr]">
-        <InsightGroup title="What's Working" items={workingInsights} />
-        <InsightGroup title="Needs Attention" items={attentionInsights} />
-      </div>
-    </section>
+
+      {/* ── Full insight grid (all working + attention signals) ── */}
+      <section className="overflow-hidden rounded-xl border border-hairline bg-surface">
+        <div className="grid gap-px bg-hairline xl:grid-cols-[0.8fr_1.2fr]">
+          <InsightGroup title="What's Working" items={workingInsights} />
+          <InsightGroup title="Needs Attention" items={attentionInsights} />
+        </div>
+      </section>
+    </div>
   );
 }
 
 function InsightGroup({ title, items }: { title: string; items: InsightItem[] }) {
   return (
-    <section className="bg-card">
-      <div className="border-b bg-muted/35 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-      <div className="grid gap-px bg-border md:grid-cols-2 xl:grid-cols-3">
+    <section className="bg-surface">
+      <div className="border-b border-hairline bg-surface-inset px-4 py-2.5 font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-text-muted">{title}</div>
+      <div className="grid gap-px bg-hairline md:grid-cols-2 xl:grid-cols-3">
         {items.map((insight) => (
           <InsightCard key={insight.title} {...insight} />
         ))}
@@ -904,27 +962,27 @@ function InsightCard({
   onAction?: () => void;
 }) {
   return (
-    <article className="group relative flex min-h-44 flex-col bg-card p-4 transition hover:bg-muted/35">
+    <article className="group relative flex min-h-40 flex-col bg-surface p-4 transition hover:bg-surface-inset">
       <div
         className={cn(
-          "absolute inset-x-0 top-0 h-1",
-          insightTone === "positive" && "bg-success",
-          insightTone === "negative" && "bg-danger",
-          insightTone === "warning" && "bg-warning",
-          insightTone === "primary" && "bg-primary",
-          insightTone === "neutral" && "bg-border"
+          "absolute inset-x-0 top-0 h-px",
+          insightTone === "positive" && "bg-pos",
+          insightTone === "negative" && "bg-neg",
+          insightTone === "warning" && "bg-warn",
+          insightTone === "primary" && "bg-brand",
+          insightTone === "neutral" && "bg-hairline"
         )}
       />
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+        <div className="font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-text-muted">{title}</div>
         <span
           className={cn(
             "rounded-md border p-2 transition group-hover:scale-105",
-            insightTone === "positive" && "border-success/25 bg-success/10 text-success",
-            insightTone === "negative" && "border-danger/25 bg-danger/10 text-danger",
-            insightTone === "warning" && "border-warning/25 bg-warning/10 text-warning",
-            insightTone === "primary" && "border-primary/25 bg-primary/10 text-primary",
-            insightTone === "neutral" && "border-border bg-muted text-muted-foreground"
+            insightTone === "positive" && "border-pos/25 bg-pos/10 text-pos",
+            insightTone === "negative" && "border-neg/25 bg-neg/10 text-neg",
+            insightTone === "warning" && "border-warn/25 bg-warn/10 text-warn",
+            insightTone === "primary" && "border-brand/25 bg-brand/10 text-brand",
+            insightTone === "neutral" && "border-hairline bg-surface-inset text-text-muted"
           )}
         >
           <Icon className="h-4 w-4" />
@@ -932,21 +990,22 @@ function InsightCard({
       </div>
       <div
         className={cn(
-          "mt-4 text-2xl font-semibold tabular-nums",
-          insightTone === "positive" && "text-success",
-          insightTone === "negative" && "text-danger",
-          insightTone === "warning" && "text-warning",
-          insightTone === "primary" && "text-primary"
+          "mt-3 font-mono text-xl font-medium tabular-nums",
+          insightTone === "positive" && "text-pos",
+          insightTone === "negative" && "text-neg",
+          insightTone === "warning" && "text-warn",
+          insightTone === "primary" && "text-brand",
+          insightTone === "neutral" && "text-foreground"
         )}
       >
         {value}
       </div>
-      <p className="mt-3 text-sm leading-5 text-muted-foreground">{detail}</p>
+      <p className="mt-2 font-sans text-[11.5px] leading-5 text-text-muted">{detail}</p>
       {actionLabel && onAction && (
         <button
           type="button"
           onClick={onAction}
-          className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+          className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-md border border-hairline bg-surface px-3 py-1.5 font-sans text-[11px] font-semibold text-foreground hover:bg-surface-inset"
         >
           {actionLabel}
           <ArrowRight className="h-3.5 w-3.5" />
