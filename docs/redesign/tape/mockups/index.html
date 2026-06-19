@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PositionIQ — "Tape" redesign mockups</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.24.0/dist/tabler-icons.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  body{margin:0;background:#E9ECEF;color:#0C1118;font-family:'Space Grotesk',system-ui,sans-serif;padding:32px 24px 64px;}
+  .wrap{max-width:760px;margin:0 auto;}
+  .pagehead{margin:0 0 8px;font-size:22px;font-weight:700;}
+  .pagesub{margin:0 0 28px;font-size:13px;color:#5C6B7A;line-height:1.6;}
+  .cap{font-size:13px;font-weight:500;margin:30px 0 8px;display:flex;align-items:center;gap:8px;}
+  .cap .n{font-family:'JetBrains Mono',monospace;font-size:11px;color:#fff;background:#0C1118;border-radius:5px;padding:2px 7px;}
+  .cap .meta{font-size:11px;color:#5C6B7A;font-weight:400;}
+
+  /* ---- screen frame + token sets ---- */
+  .screen{border-radius:14px;padding:16px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);}
+  .screen.dark{--bg:#0C1118;--sf:#121A24;--ln:#1F2A37;--lns:#16202B;--tx:#E6EDF3;--mu:#76879B;--dm:#9FB0C2;--bd:#F2B43B;--ps:#34D399;--ng:#F87171;--wn:#FBBF24;}
+  .screen.light{--bg:#F4F6F8;--sf:#FFFFFF;--ln:#E2E7EC;--lns:#EDF0F3;--tx:#0C1118;--mu:#5C6B7A;--dm:#3A4654;--bd:#B7791F;--ps:#157F4F;--ng:#D64545;--wn:#B45309;}
+
+  /* ---- shared components ---- */
+  .pn{background:var(--sf);border:1px solid var(--ln);border-radius:12px;}
+  .lb{font-size:10px;letter-spacing:.12em;color:var(--mu);text-transform:uppercase;}
+  .nm{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+  .ps{color:var(--ps);}.ng{color:var(--ng);}
+  .pl{border:1px solid var(--ln);border-radius:999px;padding:3px 9px;font-size:11px;color:var(--dm);}
+  .tb{font-size:12.5px;color:var(--mu);padding-bottom:7px;white-space:nowrap;}
+  .on{color:var(--tx);border-bottom:2px solid var(--bd);}
+  .se{font-size:11px;color:var(--dm);border:1px solid var(--ln);border-radius:8px;padding:5px 9px;}
+  .ch{font-size:10px;border-radius:999px;padding:2px 8px;}
+  .head{display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--ln);padding-bottom:10px;}
+  .brand{display:flex;align-items:center;gap:8px;flex:none;}
+  .dot{width:9px;height:9px;border-radius:2px;background:var(--bd);}
+  .wm{font-weight:700;letter-spacing:.06em;font-size:13px;}
+  .tape{flex:1;display:flex;gap:18px;overflow:hidden;font-size:12px;color:var(--mu);white-space:nowrap;}
+  .tabs{display:flex;gap:16px;margin:10px 0 14px;overflow:hidden;}
+  .rh{font-size:9.5px;letter-spacing:.05em;color:var(--mu);text-transform:uppercase;border-bottom:1px solid var(--ln);}
+  .rw{padding:8px 14px;border-bottom:1px solid var(--lns);font-size:12px;}
+  .sgk{font-family:'Space Grotesk',sans-serif;}
+  .scrollhint{font-size:10.5px;color:var(--mu);margin-top:8px;text-align:right;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="pagehead">PositionIQ — “Tape” redesign mockups</h1>
+  <p class="pagesub">Static visual targets for the redesign. Type: Space Grotesk (UI) + JetBrains Mono (all numbers, tabular). No drop shadows — hierarchy comes from surface tint + 1px hairlines. Brand gold is the only decorative accent; green/red stay strictly semantic. Numbers shown are sample data, identical across screens. Read alongside <code>../README.md</code> for exact tokens and component contracts.</p>
+
+  <div class="cap"><span class="n">01</span> Overview · dark <span class="meta">— hero readout, instrument cluster, goal bars, curated stat strip, insights</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>NVDA <span class="ps">+9,120</span></span><span>AAPL <span class="ps">+3,540</span></span><span>AMD <span class="ps">+2,110</span></span><span>PLTR <span class="ps">+1,760</span></span><span>TSLA <span class="ng">−1,280</span></span></div><span class="se" style="flex:none;"><i class="ti ti-sun"></i></span></div>
+    <div class="tabs"><span class="tb on">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;"><span class="se">Symbol: All</span><span class="se">Strategy: All</span><span class="se">Year: 2026</span><span class="se">Month: All</span><span class="se">Account: All</span><span class="se" style="margin-left:auto;color:var(--bd);">All time</span></div>
+    <div style="display:grid;grid-template-columns:1.45fr 1fr;gap:12px;">
+      <div class="pn" style="padding:15px 17px;">
+        <div class="lb">Net realized P&amp;L · all time</div>
+        <div class="nm ps" style="font-size:40px;font-weight:700;margin-top:5px;">+$48,210</div>
+        <svg viewBox="0 0 320 42" width="100%" height="42" preserveAspectRatio="none" style="margin-top:6px;display:block;"><polyline points="0,37 30,33 60,35 90,27 120,29 150,21 180,23 210,15 240,17 270,9 300,6 320,4" fill="none" stroke="#34D399" stroke-width="2" stroke-linejoin="round"/></svg>
+        <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap;"><span class="pl nm">142 closed</span><span class="pl nm">68% win</span><span class="pl nm">$84.3k deployed</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+        <div class="pn" style="padding:11px 12px;"><div class="lb">YTD ROI</div><div class="nm ps" style="font-size:19px;font-weight:500;margin-top:5px;">+14.2%</div></div>
+        <div class="pn" style="padding:11px 12px;"><div class="lb">Monthly ROI</div><div class="nm ps" style="font-size:19px;font-weight:500;margin-top:5px;">+3.8%</div></div>
+        <div class="pn" style="padding:11px 12px;"><div class="lb">Premium</div><div class="nm" style="font-size:19px;font-weight:500;margin-top:5px;">$22,480</div></div>
+        <div class="pn" style="padding:11px 12px;"><div class="lb">Stock P&amp;L</div><div class="nm" style="font-size:19px;font-weight:500;margin-top:5px;">$25,730</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div class="pn" style="padding:13px 15px;"><div style="display:flex;justify-content:space-between;"><span class="lb">YTD goal · $50,000</span><span class="nm" style="font-size:12px;color:var(--dm);">64%</span></div><div style="height:6px;background:#0C1118;border-radius:99px;margin-top:9px;overflow:hidden;"><div style="width:64%;height:100%;background:var(--bd);"></div></div><div class="nm" style="font-size:11px;color:var(--mu);margin-top:7px;">$18,060 to target</div></div>
+      <div class="pn" style="padding:13px 15px;"><div style="display:flex;justify-content:space-between;"><span class="lb">Monthly target · $4,167</span><span class="nm ps" style="font-size:12px;">99%</span></div><div style="height:6px;background:#0C1118;border-radius:99px;margin-top:9px;overflow:hidden;"><div style="width:99%;height:100%;background:var(--ps);"></div></div><div class="nm" style="font-size:11px;color:var(--mu);margin-top:7px;">$4,120 of $4,167 this month</div></div>
+    </div>
+    <div class="pn" style="display:flex;align-items:stretch;margin-top:12px;padding:2px 0;">
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Avg win</div><div class="nm ps" style="font-size:14px;margin-top:3px;">+$612</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Avg loss</div><div class="nm ng" style="font-size:14px;margin-top:3px;">−$284</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Best symbol</div><div class="nm ps" style="font-size:14px;margin-top:3px;">NVDA</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Best strategy</div><div class="sgk" style="font-size:13px;margin-top:4px;">CSP</div></div>
+      <div style="display:flex;align-items:center;padding:0 14px;font-size:11.5px;color:var(--bd);white-space:nowrap;">+11 more <i class="ti ti-chevron-down"></i></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <div class="pn" style="flex:1;padding:11px 14px;border-left:2px solid var(--ng);border-radius:0 12px 12px 0;"><div style="font-size:12.5px;color:var(--tx);">Repeated losers</div><div style="font-size:11.5px;color:var(--mu);margin-top:3px;">TSLA, RIVN down across 2+ closes <span class="ng">— review</span></div></div>
+      <div class="pn" style="flex:1;padding:11px 14px;border-left:2px solid var(--bd);border-radius:0 12px 12px 0;"><div style="font-size:12.5px;color:var(--tx);">Expiring ≤14 days</div><div class="nm" style="font-size:11.5px;color:var(--mu);margin-top:3px;">4 contracts · $38.4k exposure</div></div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">02</span> Overview · light <span class="meta">— same instrument, day theme</span></div>
+  <div class="screen light">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>NVDA <span class="ps">+9,120</span></span><span>AAPL <span class="ps">+3,540</span></span><span>AMD <span class="ps">+2,110</span></span><span>PLTR <span class="ps">+1,760</span></span><span>TSLA <span class="ng">−1,280</span></span></div><span class="se" style="flex:none;"><i class="ti ti-moon"></i></span></div>
+    <div class="tabs"><span class="tb on">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div style="display:grid;grid-template-columns:1.45fr 1fr;gap:12px;">
+      <div class="pn" style="padding:15px 17px;">
+        <div class="lb">Net realized P&amp;L · all time</div>
+        <div class="nm ps" style="font-size:40px;font-weight:700;margin-top:5px;">+$48,210</div>
+        <svg viewBox="0 0 320 42" width="100%" height="42" preserveAspectRatio="none" style="margin-top:6px;display:block;"><polyline points="0,37 30,33 60,35 90,27 120,29 150,21 180,23 210,15 240,17 270,9 300,6 320,4" fill="none" stroke="#157F4F" stroke-width="2" stroke-linejoin="round"/></svg>
+        <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap;"><span class="pl nm">142 closed</span><span class="pl nm">68% win</span><span class="pl nm">$84.3k deployed</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+        <div class="pn" style="padding:11px 12px;"><div class="lb">YTD ROI</div><div class="nm ps" style="font-size:19px;font-weight:500;margin-top:5px;">+14.2%</div></div>
+        <div class="pn" style="padding:11px 12px;"><div class="lb">Monthly ROI</div><div class="nm ps" style="font-size:19px;font-weight:500;margin-top:5px;">+3.8%</div></div>
+        <div class="pn" style="padding:11px 12px;"><div class="lb">Premium</div><div class="nm" style="font-size:19px;font-weight:500;margin-top:5px;">$22,480</div></div>
+        <div class="pn" style="padding:11px 12px;"><div class="lb">Stock P&amp;L</div><div class="nm" style="font-size:19px;font-weight:500;margin-top:5px;">$25,730</div></div>
+      </div>
+    </div>
+    <div class="pn" style="display:flex;align-items:stretch;margin-top:12px;padding:2px 0;">
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Avg win</div><div class="nm ps" style="font-size:14px;margin-top:3px;">+$612</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Avg loss</div><div class="nm ng" style="font-size:14px;margin-top:3px;">−$284</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Best symbol</div><div class="nm ps" style="font-size:14px;margin-top:3px;">NVDA</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Best strategy</div><div class="sgk" style="font-size:13px;margin-top:4px;">CSP</div></div>
+      <div style="display:flex;align-items:center;padding:0 14px;font-size:11.5px;color:var(--bd);white-space:nowrap;">+11 more <i class="ti ti-chevron-down"></i></div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">03</span> Global filter bar <span class="meta">— part of the shell; same period &amp; filters apply to every tab</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>NVDA <span class="ps">+9,120</span></span></div></div>
+    <div class="tabs"><span class="tb on">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div class="pn" style="padding:13px 15px;">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div><div class="lb">Year</div><div style="display:inline-flex;align-items:center;gap:10px;border:1px solid var(--ln);border-radius:8px;padding:5px 10px;margin-top:5px;"><span style="color:var(--dm);font-size:13px;"><i class="ti ti-chevron-left"></i></span><span class="nm" style="font-size:13px;color:var(--tx);">2026</span><span style="color:var(--dm);font-size:13px;"><i class="ti ti-chevron-right"></i></span></div></div>
+        <div style="flex:1;min-width:300px;"><div class="lb">Month</div>
+          <div style="display:grid;grid-template-columns:repeat(13,1fr);gap:3px;margin-top:5px;">
+            <span class="nm mcell">All</span><span class="nm mcell">Jan</span><span class="nm mcell">Feb</span><span class="nm mcell">Mar</span><span class="nm mcell">Apr</span><span class="nm mcell">May</span><span class="nm mcell mon">Jun</span><span class="nm mcell">Jul</span><span class="nm mcell">Aug</span><span class="nm mcell">Sep</span><span class="nm mcell">Oct</span><span class="nm mcell">Nov</span><span class="nm mcell">Dec</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px;padding-top:12px;border-top:1px solid var(--lns);">
+        <span class="lb" style="margin-right:2px;">Quick</span>
+        <span class="preset">All time</span><span class="preset">YTD</span><span class="preset pon">This year</span><span class="preset">Last year</span>
+        <span style="width:1px;height:18px;background:var(--ln);margin:0 4px;"></span>
+        <span class="se">Symbol: All</span><span class="se">Strategy: All</span><span class="se">Account: All</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:12px;">
+        <span class="lb" style="margin-right:2px;">Active</span>
+        <span class="achip">Jun 2026 <i class="ti ti-x" style="font-size:11px;"></i></span>
+        <span class="nm" style="font-size:11px;color:var(--mu);margin-left:6px;">→ 18 closed events · <span class="ps">+$4,120</span> realized</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">04</span> Capital &amp; ROI <span class="meta">— readout row, monthly ROI chart, monthly ledger</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>NVDA <span class="ps">+9,120</span></span><span>TSLA <span class="ng">−1,280</span></span></div></div>
+    <div class="tabs"><span class="tb">Overview</span><span class="tb on">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:9px;">
+      <div class="pn" style="padding:10px 12px;"><div class="lb">Monthly ROI</div><div class="nm ps" style="font-size:17px;margin-top:4px;">+3.8%</div></div>
+      <div class="pn" style="padding:10px 12px;"><div class="lb">YTD ROI</div><div class="nm ps" style="font-size:17px;margin-top:4px;">+14.2%</div></div>
+      <div class="pn" style="padding:10px 12px;"><div class="lb">Avg monthly</div><div class="nm ps" style="font-size:17px;margin-top:4px;">+2.4%</div></div>
+      <div class="pn" style="padding:10px 12px;"><div class="lb">Avg deployed</div><div class="nm" style="font-size:17px;margin-top:4px;">$84.3k</div></div>
+      <div class="pn" style="padding:10px 12px;"><div class="lb">Peak deployed</div><div class="nm" style="font-size:17px;margin-top:4px;">$112k</div></div>
+      <div class="pn" style="padding:10px 12px;"><div class="lb">Cap. efficiency</div><div class="nm" style="font-size:17px;margin-top:4px;color:var(--bd);">69</div></div>
+    </div>
+    <div class="pn" style="margin-top:12px;padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;"><div class="lb">Monthly realized ROI</div><div class="nm" style="font-size:11px;color:var(--mu);">2026</div></div>
+      <svg viewBox="0 0 560 150" width="100%" height="150" style="margin-top:10px;display:block;">
+        <line x1="0" y1="110" x2="560" y2="110" stroke="#1F2A37" stroke-width="1"/>
+        <rect x="14" y="93" width="34" height="17" rx="2" fill="#34D399"/><rect x="76" y="81" width="34" height="29" rx="2" fill="#34D399"/><rect x="138" y="110" width="34" height="11" rx="2" fill="#F87171"/><rect x="200" y="68" width="34" height="42" rx="2" fill="#34D399"/><rect x="262" y="86" width="34" height="24" rx="2" fill="#34D399"/><rect x="324" y="74" width="34" height="36" rx="2" fill="#34D399"/><rect x="386" y="110" width="34" height="15" rx="2" fill="#F87171"/><rect x="448" y="57" width="34" height="53" rx="2" fill="#34D399"/><rect x="510" y="69" width="34" height="41" rx="2" fill="#34D399"/>
+        <g font-family="JetBrains Mono" font-size="9" fill="#76879B"><text x="31" y="138" text-anchor="middle">Jan</text><text x="93" y="138" text-anchor="middle">Feb</text><text x="155" y="138" text-anchor="middle">Mar</text><text x="217" y="138" text-anchor="middle">Apr</text><text x="279" y="138" text-anchor="middle">May</text><text x="341" y="138" text-anchor="middle">Jun</text><text x="403" y="138" text-anchor="middle">Jul</text><text x="465" y="138" text-anchor="middle">Aug</text><text x="527" y="138" text-anchor="middle">Sep</text></g>
+      </svg>
+    </div>
+    <div class="pn" style="margin-top:12px;overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;"><span>Month</span><span style="text-align:right;">Realized P&amp;L</span><span style="text-align:right;">Avg capital</span><span style="text-align:right;">Monthly ROI</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;"><span>2026-08</span><span class="ps" style="text-align:right;">+$4,980</span><span style="text-align:right;color:var(--dm);">$91,200</span><span class="ps" style="text-align:right;">+3.8%</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;"><span>2026-07</span><span class="ng" style="text-align:right;">−$1,040</span><span style="text-align:right;color:var(--dm);">$88,400</span><span class="ng" style="text-align:right;">−1.1%</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;border-bottom:none;"><span>2026-06</span><span class="ps" style="text-align:right;">+$3,210</span><span style="text-align:right;color:var(--dm);">$82,600</span><span class="ps" style="text-align:right;">+2.6%</span></div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">05</span> Covered calls <span class="meta">— live exposure first, then open cycles, then results</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>NVDA <span class="ps">+9,120</span></span><span>AAPL <span class="ps">+3,540</span></span></div></div>
+    <div class="tabs"><span class="tb">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb on">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;">
+      <div class="pn" style="padding:11px 13px;"><div class="lb">Premium collected</div><div class="nm ps" style="font-size:18px;margin-top:4px;">+$12,840</div></div>
+      <div class="pn" style="padding:11px 13px;"><div class="lb">Buy-to-close cost</div><div class="nm ng" style="font-size:18px;margin-top:4px;">−$3,210</div></div>
+      <div class="pn" style="padding:11px 13px;"><div class="lb">Covered call ROI</div><div class="nm ps" style="font-size:18px;margin-top:4px;">+8.9%</div></div>
+      <div class="pn" style="padding:11px 13px;border-color:#2A3140;"><div class="lb" style="color:var(--bd);">Current CC capital</div><div class="nm" style="font-size:18px;margin-top:4px;">$38,400</div><div class="nm" style="font-size:10px;color:var(--mu);margin-top:2px;">3 open contracts</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px;"><span class="sgk" style="font-size:13px;font-weight:500;">Open covered calls</span><span class="ch" style="background:rgba(52,211,153,.12);color:var(--ps);">live</span></div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .7fr;"><span>Symbol</span><span style="text-align:right;">Qty</span><span style="text-align:right;">Strike</span><span>Expiry</span><span style="text-align:right;">Premium</span><span style="text-align:right;">Exposure</span><span style="text-align:right;">Status</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .7fr;"><span class="sgk">NVDA</span><span style="text-align:right;">2</span><span style="text-align:right;">$140</span><span>07-19</span><span class="ps" style="text-align:right;">+$640</span><span style="text-align:right;color:var(--dm);">$24,800</span><span style="text-align:right;"><span class="ch" style="background:rgba(242,180,59,.12);color:var(--bd);">open</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .7fr;border-bottom:none;"><span class="sgk">AAPL</span><span style="text-align:right;">1</span><span style="text-align:right;">$210</span><span>07-26</span><span class="ps" style="text-align:right;">+$310</span><span style="text-align:right;color:var(--dm);">$13,600</span><span style="text-align:right;"><span class="ch" style="background:rgba(242,180,59,.12);color:var(--bd);">open</span></span></div>
+    </div>
+    <div class="sgk" style="font-size:13px;font-weight:500;margin:16px 0 8px;">Covered call results</div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .7fr;"><span>Symbol</span><span style="text-align:right;">Qty</span><span style="text-align:right;">Strike</span><span>Closed</span><span style="text-align:right;">Net P&amp;L</span><span style="text-align:right;">Capital</span><span style="text-align:right;">ROI</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .7fr;"><span class="sgk">MSFT</span><span style="text-align:right;">1</span><span style="text-align:right;">$420</span><span>06-21</span><span class="ps" style="text-align:right;">+$540</span><span style="text-align:right;color:var(--dm);">$41,000</span><span class="ps" style="text-align:right;">+1.3%</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .7fr;border-bottom:none;"><span class="sgk">AMD</span><span style="text-align:right;">3</span><span style="text-align:right;">$165</span><span>06-14</span><span class="ng" style="text-align:right;">−$210</span><span style="text-align:right;color:var(--dm);">$48,900</span><span class="ng" style="text-align:right;">−0.4%</span></div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">06</span> Cash-secured puts <span class="meta">— same skeleton, collateral vocabulary, assignment outcome</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>PLTR <span class="ps">+1,760</span></span><span>SOFI <span class="ps">+430</span></span></div></div>
+    <div class="tabs"><span class="tb">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb on">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;">
+      <div class="pn" style="padding:11px 13px;"><div class="lb">Premium collected</div><div class="nm ps" style="font-size:18px;margin-top:4px;">+$9,640</div></div>
+      <div class="pn" style="padding:11px 13px;"><div class="lb">Buy-to-close cost</div><div class="nm ng" style="font-size:18px;margin-top:4px;">−$1,180</div></div>
+      <div class="pn" style="padding:11px 13px;"><div class="lb">Return on collateral</div><div class="nm ps" style="font-size:18px;margin-top:4px;">+11.4%</div></div>
+      <div class="pn" style="padding:11px 13px;border-color:#2A3140;"><div class="lb" style="color:var(--bd);">Current CSP collateral</div><div class="nm" style="font-size:18px;margin-top:4px;">$46,000</div><div class="nm" style="font-size:10px;color:var(--mu);margin-top:2px;">4 open contracts</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px;"><span class="sgk" style="font-size:13px;font-weight:500;">Open cash-secured puts</span><span class="ch" style="background:rgba(52,211,153,.12);color:var(--ps);">live</span></div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .8fr;"><span>Symbol</span><span style="text-align:right;">Qty</span><span style="text-align:right;">Strike</span><span>Expiry</span><span style="text-align:right;">Premium</span><span style="text-align:right;">Collateral</span><span style="text-align:right;">Status</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .8fr;"><span class="sgk">PLTR</span><span style="text-align:right;">2</span><span style="text-align:right;">$30</span><span>07-19</span><span class="ps" style="text-align:right;">+$210</span><span style="text-align:right;color:var(--dm);">$6,000</span><span style="text-align:right;"><span class="ch" style="background:rgba(242,180,59,.12);color:var(--bd);">open</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .8fr;border-bottom:none;"><span class="sgk">SOFI</span><span style="text-align:right;">2</span><span style="text-align:right;">$8</span><span>08-16</span><span class="ps" style="text-align:right;">+$96</span><span style="text-align:right;color:var(--dm);">$1,600</span><span style="text-align:right;"><span class="ch" style="background:rgba(242,180,59,.12);color:var(--bd);">open</span></span></div>
+    </div>
+    <div class="sgk" style="font-size:13px;font-weight:500;margin:16px 0 8px;">Cash-secured put results</div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .8fr;"><span>Symbol</span><span style="text-align:right;">Qty</span><span style="text-align:right;">Strike</span><span>Closed</span><span style="text-align:right;">Net P&amp;L</span><span style="text-align:right;">Collateral</span><span style="text-align:right;">Outcome</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .8fr;"><span class="sgk">AMD</span><span style="text-align:right;">1</span><span style="text-align:right;">$150</span><span>06-21</span><span class="ps" style="text-align:right;">+$185</span><span style="text-align:right;color:var(--dm);">$15,000</span><span style="text-align:right;"><span class="ch" style="background:rgba(52,211,153,.12);color:var(--ps);">expired</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.9fr .6fr .7fr .9fr .8fr .9fr .8fr;border-bottom:none;"><span class="sgk">F</span><span style="text-align:right;">3</span><span style="text-align:right;">$12</span><span>06-14</span><span class="ps" style="text-align:right;">+$240</span><span style="text-align:right;color:var(--dm);">$3,600</span><span style="text-align:right;"><span class="ch" style="background:rgba(159,176,194,.14);color:var(--dm);">assigned</span></span></div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">07</span> Swing trades <span class="meta">— summary strip + ledger; rows open the detail drawer</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>SWING</span></div></div>
+    <div class="tabs"><span class="tb">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb on">Swing</span><span class="tb">Tax lots</span><span class="tb">Trades</span></div>
+    <div class="pn" style="display:flex;align-items:stretch;padding:2px 0;margin-bottom:12px;">
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Swing P&amp;L</div><div class="nm ps" style="font-size:15px;margin-top:3px;">+$25,730</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Closed swings</div><div class="nm" style="font-size:15px;margin-top:3px;">38</div></div>
+      <div style="flex:1;padding:9px 14px;border-right:1px solid var(--lns);"><div class="lb">Win rate</div><div class="nm ps" style="font-size:15px;margin-top:3px;">71%</div></div>
+      <div style="flex:1;padding:9px 14px;"><div class="lb">Avg hold</div><div class="nm" style="font-size:15px;margin-top:3px;">19 d</div></div>
+    </div>
+    <div class="sgk" style="font-size:13px;font-weight:500;margin:0 0 8px;">Swing trade ledger</div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.7fr .8fr .5fr .8fr .8fr .9fr .7fr;"><span>Closed</span><span>Symbol</span><span style="text-align:right;">Qty</span><span style="text-align:right;">Proceeds</span><span style="text-align:right;">Cost basis</span><span style="text-align:right;">Realized P&amp;L</span><span style="text-align:right;">ROI</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .5fr .8fr .8fr .9fr .7fr;background:rgba(242,180,59,.04);"><span>2026-06-16</span><span class="sgk">NVDA <i class="ti ti-arrow-right" style="font-size:10px;color:var(--bd);"></i></span><span style="text-align:right;">50</span><span style="text-align:right;color:var(--dm);">$7,050</span><span style="text-align:right;color:var(--dm);">$5,920</span><span class="ps" style="text-align:right;">+$1,130</span><span class="ps" style="text-align:right;">+19.1%</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .5fr .8fr .8fr .9fr .7fr;"><span>2026-06-09</span><span class="sgk">SOFI</span><span style="text-align:right;">400</span><span style="text-align:right;color:var(--dm);">$3,360</span><span style="text-align:right;color:var(--dm);">$3,120</span><span class="ps" style="text-align:right;">+$240</span><span class="ps" style="text-align:right;">+7.7%</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .5fr .8fr .8fr .9fr .7fr;border-bottom:none;"><span>2026-05-30</span><span class="sgk">TSLA</span><span style="text-align:right;">20</span><span style="text-align:right;color:var(--dm);">$3,540</span><span style="text-align:right;color:var(--dm);">$4,820</span><span class="ng" style="text-align:right;">−$1,280</span><span class="ng" style="text-align:right;">−26.6%</span></div>
+    </div>
+  </div>
+
+  <div class="cap"><span class="n">08</span> Tax lots <span class="meta">— sortable lots with status chips</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>FIFO basis</span></div></div>
+    <div class="tabs"><span class="tb">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb on">Tax lots</span><span class="tb">Trades</span></div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.7fr .8fr .7fr .7fr .9fr .7fr .8fr;"><span>Symbol</span><span>Opened</span><span>Source</span><span style="text-align:right;">Orig qty</span><span style="text-align:right;">Remaining</span><span style="text-align:right;">Basis/sh</span><span style="text-align:right;">Status</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .7fr .7fr .9fr .7fr .8fr;"><span class="sgk">NVDA</span><span>2025-11-04</span><span class="sgk" style="color:var(--dm);">Buy</span><span style="text-align:right;">100</span><span style="text-align:right;">100</span><span style="text-align:right;color:var(--dm);">$118.40</span><span style="text-align:right;"><span class="ch" style="background:rgba(52,211,153,.12);color:var(--ps);">open</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .7fr .7fr .9fr .7fr .8fr;"><span class="sgk">F</span><span>2026-06-21</span><span class="sgk" style="color:var(--dm);">Put assignment</span><span style="text-align:right;">300</span><span style="text-align:right;">300</span><span style="text-align:right;color:var(--dm);">$11.20</span><span style="text-align:right;"><span class="ch" style="background:rgba(242,180,59,.12);color:var(--bd);">open</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .7fr .7fr .9fr .7fr .8fr;"><span class="sgk">AMD</span><span>2025-08-12</span><span class="sgk" style="color:var(--dm);">Buy</span><span style="text-align:right;">150</span><span style="text-align:right;">0</span><span style="text-align:right;color:var(--dm);">$96.10</span><span style="text-align:right;"><span class="ch" style="background:rgba(159,176,194,.14);color:var(--dm);">closed</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.7fr .8fr .7fr .7fr .9fr .7fr .8fr;border-bottom:none;"><span class="sgk">PYPL</span><span>2024-03-09</span><span class="sgk" style="color:var(--dm);">Transfer</span><span style="text-align:right;">80</span><span style="text-align:right;">80</span><span style="text-align:right;color:var(--ng);">$0.00</span><span style="text-align:right;"><span class="ch" style="background:rgba(248,113,113,.12);color:var(--ng);">zero basis</span></span></div>
+    </div>
+    <div class="scrollhint">Scroll for close date, total basis, notes →</div>
+  </div>
+
+  <div class="cap"><span class="n">09</span> Trades <span class="meta">— issue banner, search, dense sortable blotter</span></div>
+  <div class="screen dark">
+    <div class="head"><div class="brand"><span class="dot"></span><span class="wm">POSITIONIQ</span></div><div class="tape nm"><span>142 rows</span></div></div>
+    <div class="tabs"><span class="tb">Overview</span><span class="tb">Capital &amp; ROI</span><span class="tb">Covered calls</span><span class="tb">Puts</span><span class="tb">Swing</span><span class="tb">Tax lots</span><span class="tb on">Trades</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.28);border-radius:10px;padding:9px 13px;margin-bottom:10px;">
+      <span style="font-size:12px;color:var(--wn);"><i class="ti ti-alert-triangle" style="vertical-align:-2px;"></i> Showing 3 unresolved rows that need classification.</span>
+      <span class="se">Clear filter</span>
+    </div>
+    <div class="pn" style="display:flex;align-items:center;gap:8px;padding:9px 13px;margin-bottom:10px;"><i class="ti ti-search" style="color:var(--mu);font-size:16px;"></i><span style="font-size:12.5px;color:var(--mu);">Search trades…</span></div>
+    <div class="pn" style="overflow:hidden;">
+      <div class="rw rh" style="display:grid;grid-template-columns:.8fr .7fr 1fr .5fr .8fr .8fr;"><span>Date <i class="ti ti-arrow-down" style="font-size:11px;"></i></span><span>Symbol</span><span>Action</span><span style="text-align:right;">Qty</span><span style="text-align:right;">Net</span><span style="text-align:right;">Status</span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.8fr .7fr 1fr .5fr .8fr .8fr;"><span>2026-06-18</span><span class="sgk">NVDA</span><span class="sgk" style="color:var(--dm);">Sell to open</span><span style="text-align:right;">2</span><span class="ps" style="text-align:right;">+$640</span><span style="text-align:right;"><span class="ch" style="background:rgba(52,211,153,.12);color:var(--ps);">ok</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.8fr .7fr 1fr .5fr .8fr .8fr;"><span>2026-06-17</span><span class="sgk">—</span><span class="sgk" style="color:var(--dm);">Dividend</span><span style="text-align:right;">—</span><span class="ps" style="text-align:right;">+$42</span><span style="text-align:right;"><span class="ch" style="background:rgba(251,191,36,.14);color:var(--wn);">unresolved</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.8fr .7fr 1fr .5fr .8fr .8fr;"><span>2026-06-14</span><span class="sgk">AMD</span><span class="sgk" style="color:var(--dm);">Buy to close</span><span style="text-align:right;">3</span><span class="ng" style="text-align:right;">−$210</span><span style="text-align:right;"><span class="ch" style="background:rgba(52,211,153,.12);color:var(--ps);">ok</span></span></div>
+      <div class="rw nm" style="display:grid;grid-template-columns:.8fr .7fr 1fr .5fr .8fr .8fr;border-bottom:none;"><span>2026-06-12</span><span class="sgk">XYZ</span><span class="sgk" style="color:var(--dm);">Unknown</span><span style="text-align:right;">100</span><span style="text-align:right;color:var(--dm);">$1,204</span><span style="text-align:right;"><span class="ch" style="background:rgba(251,191,36,.14);color:var(--wn);">unresolved</span></span></div>
+    </div>
+    <div class="scrollhint">Scroll for instrument, price, strike, expiration, raw description →</div>
+  </div>
+
+  <div class="cap"><span class="n">10</span> Detail drawer <span class="meta">— realized P&amp;L explanation; opens from a row click</span></div>
+  <div style="min-height:480px;background:rgba(8,11,16,.74);border:1px solid #1F2A37;border-radius:14px;display:flex;justify-content:flex-end;overflow:hidden;">
+    <div class="screen dark" style="width:64%;min-width:380px;border:none;border-left:1px solid #1F2A37;border-radius:0;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid var(--ln);padding-bottom:13px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;"><span class="sgk" style="font-size:16px;font-weight:700;">NVDA</span><span class="ch" style="background:rgba(242,180,59,.12);color:var(--bd);">Swing trade</span></div>
+          <div class="nm" style="font-size:11px;color:var(--mu);margin-top:4px;">Closed 2026-06-16 · 50 shares</div>
+        </div>
+        <span class="se"><i class="ti ti-x"></i></span>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin:16px 0 6px;">
+        <div><div class="lb">Realized P&amp;L</div><div class="nm ps" style="font-size:32px;font-weight:700;margin-top:3px;">+$1,130</div></div>
+        <div style="margin-left:auto;text-align:right;"><div class="lb">ROI</div><div class="nm ps" style="font-size:18px;margin-top:5px;">+19.1%</div></div>
+      </div>
+      <div class="lb" style="margin-top:14px;">How this was calculated</div>
+      <div style="margin-top:6px;">
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--lns);font-size:13px;"><span style="color:var(--dm);">Gross proceeds</span><span class="nm ps">+$7,050.00</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--lns);font-size:13px;"><span style="color:var(--dm);">Allocated cost basis (FIFO)</span><span class="nm ng">−$5,920.00</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--lns);font-size:13px;"><span style="color:var(--dm);">Fees</span><span class="nm" style="color:var(--mu);">−$0.00</span></div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--ln);margin-top:2px;font-size:13px;"><span style="color:var(--tx);">Realized P&amp;L</span><span class="nm ps" style="font-weight:700;">+$1,130.00</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px;">
+        <div class="pn" style="padding:10px 12px;"><div class="lb">Opened</div><div class="nm" style="font-size:12.5px;margin-top:3px;">2026-05-28</div></div>
+        <div class="pn" style="padding:10px 12px;"><div class="lb">Holding</div><div class="nm" style="font-size:12.5px;margin-top:3px;">19 days</div></div>
+        <div class="pn" style="padding:10px 12px;"><div class="lb">Capital</div><div class="nm" style="font-size:12.5px;margin-top:3px;">$5,920</div></div>
+        <div class="pn" style="padding:10px 12px;"><div class="lb">Annualized</div><div class="nm ps" style="font-size:12.5px;margin-top:3px;">+367%</div></div>
+        <div class="pn" style="padding:10px 12px;"><div class="lb">Cost method</div><div class="sgk" style="font-size:12.5px;margin-top:3px;">FIFO</div></div>
+        <div class="pn" style="padding:10px 12px;"><div class="lb">Warnings</div><div class="sgk ps" style="font-size:12.5px;margin-top:3px;">None</div></div>
+      </div>
+      <div class="pn" style="margin-top:14px;border-left:2px solid var(--bd);border-radius:0 10px 10px 0;padding:10px 12px;">
+        <div class="sgk" style="font-size:12px;color:var(--tx);">Basis allocation</div>
+        <div class="nm" style="font-size:11px;color:var(--mu);margin-top:4px;line-height:1.6;">Consumed lot from 2025-11-04: 50 sh @ $118.40 → $5,920.00 basis. 50 sh remain in that lot.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<style>
+  .mcell{text-align:center;padding:6px 0;border-radius:6px;color:var(--mu);font-size:10.5px;}
+  .mcell.mon{background:rgba(242,180,59,.16);color:var(--bd);}
+  .preset{font-size:11px;color:var(--dm);border:1px solid var(--ln);border-radius:999px;padding:5px 11px;}
+  .preset.pon{border-color:rgba(242,180,59,.5);color:var(--bd);background:rgba(242,180,59,.08);}
+  .achip{font-size:10.5px;color:var(--bd);background:rgba(242,180,59,.08);border:1px solid rgba(242,180,59,.4);border-radius:999px;padding:3px 9px;display:inline-flex;align-items:center;gap:5px;}
+</style>
+</body>
+</html>
