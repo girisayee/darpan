@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /* ── New design-system tokens ── */
+        /* ── Design-system tokens ── */
         background:         "rgb(var(--bg) / <alpha-value>)",
         surface:            "rgb(var(--surface) / <alpha-value>)",
         "surface-inset":    "rgb(var(--surface-inset) / <alpha-value>)",
@@ -18,24 +18,25 @@ const config: Config = {
         foreground:         "rgb(var(--text) / <alpha-value>)",
         "muted-foreground": "rgb(var(--text-muted) / <alpha-value>)",
         dim:                "rgb(var(--text-dim) / <alpha-value>)",
-        brand:              "rgb(var(--brand) / <alpha-value>)",
+        accent:             "rgb(var(--accent) / <alpha-value>)",
         pos:                "rgb(var(--pos) / <alpha-value>)",
         neg:                "rgb(var(--neg) / <alpha-value>)",
         warn:               "rgb(var(--warn) / <alpha-value>)",
 
-        /* ── Legacy aliases (keep existing components compiling) ── */
+        /* ── Transient aliases (keep lingering classes rendering until R2/R3) ── */
+        brand:                "rgb(var(--accent) / <alpha-value>)",
+        primary:              "rgb(var(--accent) / <alpha-value>)",
+        "primary-foreground": "rgb(var(--bg) / <alpha-value>)",
         card:                 "rgb(var(--surface) / <alpha-value>)",
         border:               "rgb(var(--hairline) / <alpha-value>)",
-        primary:              "rgb(var(--brand) / <alpha-value>)",
-        "primary-foreground": "rgb(var(--bg) / <alpha-value>)",
+        muted:                "rgb(var(--surface-inset) / <alpha-value>)",
         success:              "rgb(var(--pos) / <alpha-value>)",
         danger:               "rgb(var(--neg) / <alpha-value>)",
         warning:              "rgb(var(--warn) / <alpha-value>)",
-        muted:                "rgb(var(--surface-inset) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        mono: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       borderRadius: { md: "8px", lg: "12px", xl: "14px" },
       keyframes: {

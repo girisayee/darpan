@@ -7,11 +7,12 @@ const KEY = "positioniq.theme";
 
 /**
  * Pure helper: resolve the initial theme from a stored string and a media query result.
- * Returns stored when it is exactly "light" or "dark"; otherwise uses prefersLight.
+ * Returns stored when it is exactly "light" or "dark"; otherwise uses prefersDark.
+ * Light is the default (prefersDark=false → "light").
  */
-export function resolveInitialTheme(stored: string | null, prefersLight: boolean): Theme {
+export function resolveInitialTheme(stored: string | null, prefersDark: boolean): Theme {
   if (stored === "light" || stored === "dark") return stored;
-  return prefersLight ? "light" : "dark";
+  return prefersDark ? "dark" : "light";
 }
 
 /**
@@ -22,19 +23,19 @@ export function nextTheme(t: Theme): Theme {
 }
 
 /**
- * React hook: persists theme to localStorage and applies the .light class on <html>.
- * Dark is the default (no class); light mode adds the .light class.
+ * React hook: persists theme to localStorage and applies the .dark class on <html>.
+ * Light is the default (no class); dark mode adds the .dark class.
  */
 export function useTheme(): { theme: Theme; toggle: () => void } {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "dark";
+    if (typeof window === "undefined") return "light";
     const stored = localStorage.getItem(KEY);
-    const prefersLight = window.matchMedia?.("(prefers-color-scheme: light)")?.matches ?? false;
-    return resolveInitialTheme(stored, prefersLight);
+    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+    return resolveInitialTheme(stored, prefersDark);
   });
 
   useEffect(() => {
-    document.documentElement.classList.toggle("light", theme === "light");
+    document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem(KEY, theme);
   }, [theme]);
 
