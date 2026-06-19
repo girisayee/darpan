@@ -40,11 +40,11 @@ export function DataTable<T>({
   }, [columns, rows, sort]);
 
   if (!rows.length) {
-    return <div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">{empty}</div>;
+    return <div className="rounded-lg border border-hairline bg-surface p-6 text-sm text-muted-foreground">{empty}</div>;
   }
 
   return (
-    <div className="scrollbar-thin overflow-auto rounded-lg border bg-card shadow-panel">
+    <div className="scrollbar-thin overflow-auto rounded-lg border border-hairline bg-surface">
       <table className="table-sticky min-w-full border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
@@ -54,11 +54,17 @@ export function DataTable<T>({
               return (
                 <th
                   key={column.key}
-                  className={cn("border-b px-3 py-3 text-left font-semibold text-muted-foreground", column.align === "right" && "text-right")}
+                  className={cn(
+                    "border-b border-hairline-soft px-3 py-2.5 text-left",
+                    column.align === "right" && "text-right"
+                  )}
                 >
                   <button
                     type="button"
-                    className={cn("inline-flex items-center gap-1.5", column.align === "right" && "justify-end")}
+                    className={cn(
+                      "inline-flex items-center gap-1 text-[9.5px] font-medium uppercase tracking-[.05em] text-muted-foreground",
+                      column.align === "right" && "flex-row-reverse"
+                    )}
                     onClick={() =>
                       setSort((current) => ({
                         key: column.key,
@@ -67,7 +73,7 @@ export function DataTable<T>({
                     }
                   >
                     {column.header}
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-3 w-3 shrink-0" />
                   </button>
                 </th>
               );
@@ -78,11 +84,23 @@ export function DataTable<T>({
           {sorted.map((row, rowIndex) => (
             <tr
               key={rowIndex}
-              className={cn("border-b last:border-0", onRowClick && "cursor-pointer hover:bg-muted/60")}
+              className={cn(
+                "border-b border-hairline-soft last:border-0 transition-colors duration-[120ms]",
+                onRowClick && "cursor-pointer hover:bg-brand/[0.04]"
+              )}
               onClick={() => onRowClick?.(row)}
             >
               {columns.map((column) => (
-                <td key={column.key} className={cn("border-b px-3 py-3 align-top last:border-b", column.align === "right" && "text-right")}>
+                <td
+                  key={column.key}
+                  className={cn(
+                    "px-3 py-2.5 align-top",
+                    column.align === "right"
+                      ? "text-right font-mono tabular-nums text-dim"
+                      : "font-sans",
+                    column.align === "right" && "text-right"
+                  )}
+                >
                   {column.render ? column.render(row) : column.value(row)}
                 </td>
               ))}
