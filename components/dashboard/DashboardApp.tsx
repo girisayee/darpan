@@ -36,6 +36,7 @@ import {
   parseBackup
 } from "@/lib/storage/local-store";
 import { clearStore, getServerSnapshot, getStoreSnapshot, loadStore, saveStore, subscribeStore } from "@/lib/storage/server-store-client";
+import { useTheme } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
@@ -79,7 +80,7 @@ export function DashboardApp() {
   const settings = store.settings;
   const storedTransactions = store.transactions;
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
-  const [dark, setDark] = useState(() => (typeof window === "undefined" ? false : window.matchMedia?.("(prefers-color-scheme: dark)").matches));
+  const { theme, toggle } = useTheme();
   const [symbol, setSymbol] = useState("ALL");
   const [strategy, setStrategy] = useState("ALL");
   const [year, setYear] = useState("ALL");
@@ -88,10 +89,6 @@ export function DashboardApp() {
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
   const [tradeSearch, setTradeSearch] = useState("");
   const [tradeIssueFilter, setTradeIssueFilter] = useState<TradeIssueFilter>(null);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
 
   useEffect(() => {
     void loadStore();
@@ -148,7 +145,7 @@ export function DashboardApp() {
             <IconButton label="Import" onClick={() => setActiveTab("Import")} icon={<Upload className="h-4 w-4" />} />
             <IconButton label="Settings" onClick={() => setActiveTab("Settings")} icon={<Settings className="h-4 w-4" />} />
             <IconButton label="Export backup" onClick={() => downloadBackup(allTransactions, settings)} icon={<FileDown className="h-4 w-4" />} />
-            <IconButton label={dark ? "Light mode" : "Dark mode"} onClick={() => setDark((value) => !value)} icon={dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} />
+            <IconButton label={theme === "dark" ? "Light mode" : "Dark mode"} onClick={toggle} icon={theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} />
           </div>
         </div>
         <div className="grid gap-2 p-4 md:grid-cols-5">
