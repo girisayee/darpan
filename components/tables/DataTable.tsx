@@ -97,8 +97,7 @@ export function DataTable<T>({
                     "px-3 py-2.5 align-top",
                     column.align === "right"
                       ? "text-right font-mono tabular-nums text-dim"
-                      : "font-sans",
-                    column.align === "right" && "text-right"
+                      : "font-sans"
                   )}
                 >
                   {column.render ? column.render(row) : column.value(row)}

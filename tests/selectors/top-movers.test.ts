@@ -1,7 +1,8 @@
 import { topMovers } from "@/lib/selectors/top-movers";
+import type { CalculationResult } from "@/types/trading";
 
 const r = (b: { symbol: string; pnl: number }[]) =>
-  ({ aggregates: { symbolBreakdown: b } } as any);
+  ({ aggregates: { symbolBreakdown: b } } as unknown as CalculationResult);
 
 test("sorts by absolute pnl and caps to limit", () => {
   const out = topMovers(

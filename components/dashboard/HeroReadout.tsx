@@ -40,7 +40,7 @@ export function HeroReadout({ label, value, tone = "neutral", spark, pills }: He
 
   return (
     <div className="bg-surface border border-hairline rounded-xl p-4">
-      <div className="text-[10px] font-sans uppercase tracking-[.12em] text-text-muted">{label}</div>
+      <div className="text-[10px] font-sans uppercase tracking-[.12em] text-muted-foreground">{label}</div>
       <div className={valueClass}>{value}</div>
 
       {spark && spark.length >= 2 && (
@@ -68,7 +68,7 @@ export function HeroReadout({ label, value, tone = "neutral", spark, pills }: He
           {pills.map((pill) => (
             <span
               key={pill}
-              className="rounded-full border border-hairline bg-surface-inset px-2.5 py-1 font-sans text-[10.5px] text-text-muted"
+              className="rounded-full border border-hairline bg-surface-inset px-2.5 py-1 font-sans text-[10.5px] text-muted-foreground"
             >
               {pill}
             </span>

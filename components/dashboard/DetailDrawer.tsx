@@ -40,7 +40,7 @@ function strategyLabel(strategy: string) {
 function MetaCell({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <div className="rounded-[10px] border border-hairline bg-surface px-3 py-2.5">
-      <div className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">{label}</div>
+      <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">{label}</div>
       <div className={cn("mt-1 font-mono text-[12.5px] tabular-nums text-foreground", valueClass)}>
         {value}
       </div>
@@ -193,7 +193,7 @@ export function DetailDrawer({
                   {strategyLabel(event.strategy)}
                 </span>
               </div>
-              <div className="mt-1 font-mono text-[11px] tabular-nums text-text-muted">
+              <div className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground">
                 Closed {event.date}
                 {event.quantity ? ` · ${formatNumber(event.quantity)} shares` : ""}
               </div>
@@ -203,7 +203,7 @@ export function DetailDrawer({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="rounded-lg border border-hairline p-2 text-text-muted transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <X className="h-4 w-4" />
             </button>
@@ -212,7 +212,7 @@ export function DetailDrawer({
           {/* ── Hero: Realized P&L + ROI ── */}
           <div className="flex items-baseline gap-3 mt-4 mb-2">
             <div>
-              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">
+              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
                 Realized P&amp;L
               </div>
               <div
@@ -225,7 +225,7 @@ export function DetailDrawer({
               </div>
             </div>
             <div className="ml-auto text-right">
-              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">
+              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
                 ROI
               </div>
               <div
@@ -242,20 +242,20 @@ export function DetailDrawer({
           </div>
 
           {/* ── Calculation waterfall ── */}
-          <div className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted mt-4">
+          <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground mt-4">
             How this was calculated
           </div>
           <div className="mt-1.5">
             {/* Gross proceeds */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-              <span className="text-text-dim">Gross proceeds</span>
+              <span className="text-dim">Gross proceeds</span>
               <span className={cn("font-mono tabular-nums", toneClass(grossProceeds))}>
                 {signedCurrency(grossProceeds)}
               </span>
             </div>
             {/* Cost basis */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-              <span className="text-text-dim">
+              <span className="text-dim">
                 Allocated cost basis
                 {event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)
                   ? ` (${event.explanation.match(/\b(FIFO|LIFO|AVERAGE)\b/i)![0]})`
@@ -267,8 +267,8 @@ export function DetailDrawer({
             </div>
             {/* Fees */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-              <span className="text-text-dim">Fees</span>
-              <span className="font-mono tabular-nums text-text-muted">
+              <span className="text-dim">Fees</span>
+              <span className="font-mono tabular-nums text-muted-foreground">
                 {fees !== 0
                   ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}`
                   : "$0.00"}
@@ -338,16 +338,12 @@ export function DetailDrawer({
 
           {/* ── Basis-allocation note ── */}
           {hasBasisNote && (
-            <div className="mt-3.5 overflow-hidden rounded-r-xl border border-hairline border-l-0 bg-surface">
-              <div className="flex h-full border-l-2 border-brand rounded-r-xl">
-                <div className="flex-1 px-3 py-2.5">
-                  <div className="font-sans text-[12px] font-medium text-foreground">
-                    Basis allocation
-                  </div>
-                  <div className="mt-1 font-mono text-[11px] tabular-nums text-text-muted leading-relaxed">
-                    {event.explanation}
-                  </div>
-                </div>
+            <div className="mt-3.5 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-brand bg-surface px-3 py-2.5">
+              <div className="font-sans text-[12px] font-medium text-foreground">
+                Basis allocation
+              </div>
+              <div className="mt-1 font-mono text-[11px] tabular-nums text-muted-foreground leading-relaxed">
+                {event.explanation}
               </div>
             </div>
           )}
@@ -355,7 +351,7 @@ export function DetailDrawer({
           {/* ── Warnings (if any) ── */}
           {event.warnings.length > 0 && (
             <div className="mt-3.5 space-y-1.5">
-              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">
+              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
                 Warnings
               </div>
               {event.warnings.map((w, i) => (

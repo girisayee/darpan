@@ -28,7 +28,7 @@ export function StatStrip({ items, moreCount, onMore }: StatStripProps) {
             role="listitem"
             className="flex min-w-[100px] flex-1 flex-col gap-0.5 px-4 py-3"
           >
-            <span className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">
+            <span className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
               {item.label}
             </span>
             <span

@@ -13,7 +13,6 @@ import {
   Gauge,
   RefreshCcw,
   Search,
-  Settings,
   Target,
   TrendingDown,
   X
@@ -159,7 +158,7 @@ export function DashboardApp() {
 
       <section className="min-h-[60vh]">
         {activeTab === "Overview" && <OverviewTab result={result} settings={settings} onReviewTrades={openTrades} />}
-        {activeTab === "Capital & ROI" && <CapitalTab result={result} settings={settings} onSelectEvent={setSelectedEvent} />}
+        {activeTab === "Capital & ROI" && <CapitalTab result={result} onSelectEvent={setSelectedEvent} />}
         {activeTab === "Covered Calls" && <OptionsTab result={result} optionType="call" onSelectEvent={setSelectedEvent} />}
         {activeTab === "Cash-Secured Puts" && <OptionsTab result={result} optionType="put" onSelectEvent={setSelectedEvent} />}
         {activeTab === "Swing Trades" && <SwingTab result={result} onSelectEvent={setSelectedEvent} />}
@@ -222,7 +221,8 @@ function OverviewTab({
     { label: "Best Strategy", value: label(bestStrategy?.strategy), tone: "neutral" as const },
   ];
   const moreKpis = allKpis; // All KPIs revealed in the expanded grid
-  const moreCount = moreKpis.length;
+  // "+N more" count = total KPIs minus the curated items already shown in the strip
+  const moreCount = allKpis.length - stripItems.length;
 
   // Sparkline: cumulative realized P&L per month
   const spark = result.monthlyReturns.map((m) => m.realizedPnl);
@@ -360,7 +360,7 @@ function GoalBar({
   return (
     <section className="rounded-xl border border-hairline bg-surface p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="font-sans text-[10px] uppercase tracking-[.12em] text-text-muted">
+        <span className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
           {title} · {targetLabel}
         </span>
         <span className={cn("font-mono text-[12px] font-medium tabular-nums", pctClass)}>
@@ -370,13 +370,13 @@ function GoalBar({
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-inset">
         <div className={cn("h-full rounded-full transition-all", fillClass)} style={{ width: `${progress}%` }} />
       </div>
-      <div className="mt-2 font-mono text-[11px] tabular-nums text-text-muted">{helper}</div>
+      <div className="mt-2 font-mono text-[11px] tabular-nums text-muted-foreground">{helper}</div>
     </section>
   );
 }
 
 
-function CapitalTab({ result, settings, onSelectEvent }: { result: CalculationResult; settings: AppSettings; onSelectEvent: (event: RealizedPnLEvent) => void }) {
+function CapitalTab({ result, onSelectEvent }: { result: CalculationResult; onSelectEvent: (event: RealizedPnLEvent) => void }) {
   const latest = result.monthlyReturns.at(-1);
   const efficiency = result.aggregates.averageMonthlyRoi === null ? null : Math.max(0, Math.min(100, 50 + result.aggregates.averageMonthlyRoi * 8));
   return (
@@ -494,6 +494,15 @@ function SwingTab({ result, onSelectEvent }: { result: CalculationResult; onSele
   );
 }
 
+function tradeStatusChip(row: TradeTransaction) {
+  const kindMap: Record<string, "ok" | "unresolved" | "closed"> = {
+    normalized: "ok",
+    unresolved: "unresolved",
+    ignored: "closed",
+  };
+  return <StatusChip kind={kindMap[row.status] ?? "ok"} />;
+}
+
 function taxLotStatusChip(row: TaxLot) {
   // Detect zero-basis: per-share basis is 0 (or effectively 0) for an open lot
   if (row.costBasisPerShare === 0 && row.status === "open") {
@@ -549,16 +558,6 @@ function TradesTab({
     if (issueFilter === "duplicates" && !duplicateIds.has(row.id)) return false;
     return [row.id, row.rawDescription, row.symbol, row.action, row.status, row.notes ?? ""].join(" ").toLowerCase().includes(search.toLowerCase());
   });
-  // TransactionStatus: "normalized" | "unresolved" | "ignored"
-  // Map to StatusChip kinds with safe fallback
-  function tradeStatusChip(row: TradeTransaction) {
-    const kindMap: Record<string, "ok" | "unresolved" | "closed"> = {
-      normalized: "ok",
-      unresolved: "unresolved",
-      ignored: "closed",
-    };
-    return <StatusChip kind={kindMap[row.status] ?? "ok"} />;
-  }
 
   const columns: Column<TradeTransaction>[] = [
     { key: "tradeDate", header: "Date", value: (row) => row.tradeDate },
@@ -592,12 +591,12 @@ function TradesTab({
         </div>
       )}
       <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3 py-2 focus-within:ring-2 focus-within:ring-brand/40">
-        <Search className="h-4 w-4 shrink-0 text-text-muted" />
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search trades…"
-          className="w-full bg-transparent font-sans text-[12.5px] text-foreground outline-none placeholder:text-text-muted"
+          className="w-full bg-transparent font-sans text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground"
         />
       </div>
       <DataTable rows={rows} columns={columns} empty="No transactions match the filters." />
@@ -632,7 +631,7 @@ function ImportTab({ existing, onSave }: { existing: TradeTransaction[]; onSave:
         <textarea
           value={raw}
           onChange={(event) => setRaw(event.target.value)}
-          className="mt-4 h-80 w-full resize-none rounded-md border border-hairline bg-surface p-3 font-mono text-xs text-foreground outline-none placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="mt-4 h-80 w-full resize-none rounded-md border border-hairline bg-surface p-3 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
           placeholder="Paste Robinhood transaction CSV here"
         />
       </section>
@@ -676,9 +675,9 @@ function SettingsTab({
         <Toggle label="Include fees in P&L" checked={settings.includeFees} onChange={(checked) => onChange({ ...settings, includeFees: checked })} />
         <Toggle label="Annualized return" checked={settings.annualizedReturn} onChange={(checked) => onChange({ ...settings, annualizedReturn: checked })} />
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-text-muted">Annual realized P&amp;L goal</span>
+          <span className="font-sans text-[11.5px] text-muted-foreground">Annual realized P&amp;L goal</span>
           <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-brand/40">
-            <span className="font-mono text-[12px] tabular-nums text-text-muted">$</span>
+            <span className="font-mono text-[12px] tabular-nums text-muted-foreground">$</span>
             <input
               type="number"
               min="0"
@@ -688,11 +687,11 @@ function SettingsTab({
               className="h-10 w-full bg-transparent px-2 font-mono text-[13px] tabular-nums text-foreground outline-none"
             />
           </div>
-          <span className="font-mono text-[11px] tabular-nums text-text-muted">
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
             Monthly pace: {formatCurrency(settings.annualRealizedPnlGoal / 12)}
           </span>
         </label>
-        <div className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-text-muted">
+        <div className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-muted-foreground">
           Imported trade data is stored in the local SQLite database at <span className="font-mono text-[11px]">data/positioniq.sqlite</span>.
         </div>
       </SettingsPanel>
@@ -706,7 +705,7 @@ function SettingsTab({
               .map(([symbol, basis]) => (
                 <div key={symbol} className="flex items-center justify-between rounded-md border border-hairline bg-surface px-3 py-2">
                   <span className="font-mono text-[11px] font-semibold text-foreground">{symbol}</span>
-                  <span className="font-mono text-[11px] tabular-nums text-text-muted">{formatCurrency(basis, { maximumFractionDigits: 2 })}/share</span>
+                  <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{formatCurrency(basis, { maximumFractionDigits: 2 })}/share</span>
                 </div>
               ))}
           </div>
@@ -717,8 +716,8 @@ function SettingsTab({
             {settings.manualZeroBasisLots.map((lot) => (
               <div key={`${lot.symbol}-${lot.quantity}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-3 py-2">
                 <span className="font-mono text-[11px] font-semibold text-foreground">{lot.symbol}</span>
-                <span className="font-mono text-[11px] tabular-nums text-text-muted">{formatNumber(lot.quantity, 5)} shares at $0 basis</span>
-                {lot.note && <span className="w-full font-sans text-[11px] text-text-muted">{lot.note}</span>}
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{formatNumber(lot.quantity, 5)} shares at $0 basis</span>
+                {lot.note && <span className="w-full font-sans text-[11px] text-muted-foreground">{lot.note}</span>}
               </div>
             ))}
           </div>
@@ -726,21 +725,21 @@ function SettingsTab({
       </SettingsPanel>
       <SettingsPanel title="Capital Calculation">
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-text-muted">Covered call denominator</span>
+          <span className="font-sans text-[11.5px] text-muted-foreground">Covered call denominator</span>
           <Select value={settings.coveredCallDenominator} onChange={(value) => onChange({ ...settings, coveredCallDenominator: value as AppSettings["coveredCallDenominator"] })}>
             <option value="UNDERLYING_COST_BASIS">Underlying stock cost basis</option>
             <option value="CURRENT_MARKET_VALUE">Current market value if available</option>
           </Select>
         </label>
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-text-muted">Cash-secured put denominator</span>
+          <span className="font-sans text-[11.5px] text-muted-foreground">Cash-secured put denominator</span>
           <Select value={settings.cashSecuredPutDenominator} onChange={(value) => onChange({ ...settings, cashSecuredPutDenominator: value as AppSettings["cashSecuredPutDenominator"] })}>
             <option value="CONSERVATIVE_COLLATERAL">Conservative collateral: strike * shares</option>
             <option value="NET_COLLATERAL_AFTER_PREMIUM">Net collateral after premium</option>
           </Select>
         </label>
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-text-muted">Monthly ROI denominator</span>
+          <span className="font-sans text-[11.5px] text-muted-foreground">Monthly ROI denominator</span>
           <Select value={settings.monthlyRoiDenominator} onChange={(value) => onChange({ ...settings, monthlyRoiDenominator: value as AppSettings["monthlyRoiDenominator"] })}>
             <option value="AVERAGE_DEPLOYED_CAPITAL">Average deployed capital</option>
             <option value="PEAK_DEPLOYED_CAPITAL">Peak deployed capital</option>
@@ -880,7 +879,7 @@ function ImportIssues({ issues }: { issues: ImportPreview["issues"] }) {
       <h3 className="font-sans text-[13px] font-medium text-foreground">Unresolved Imports</h3>
       <div className="mt-3 space-y-2">
         {issues.map((issue, index) => (
-          <div key={index} className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-text-muted">
+          <div key={index} className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-muted-foreground">
             Row {issue.rowIndex + 1}: {issue.message}
           </div>
         ))}
@@ -1016,37 +1015,29 @@ function Insights({ result, onReviewTrades }: { result: CalculationResult; onRev
       {/* ── Two featured insight cards (Tape layout) ── */}
       <div className="flex flex-col gap-3 sm:flex-row">
         {/* Repeated losers — neg accent */}
-        <div className="flex-1 rounded-r-xl border border-hairline border-l-0 bg-surface pl-0 overflow-hidden">
-          <div className="flex h-full border-l-2 border-neg rounded-r-xl">
-            <div className="flex-1 px-4 py-3">
-              <div className="font-sans text-[12.5px] font-medium text-foreground">Repeated losers</div>
-              <div className="mt-1 font-sans text-[11.5px] text-text-muted">
-                {repeatedLosses.length > 0 ? (
-                  <>
-                    {repeatedLosersText}{" "}
-                    <button
-                      type="button"
-                      onClick={() => onReviewTrades(null, repeatedLosses[0])}
-                      className="text-neg underline-offset-2 hover:underline"
-                    >
-                      — review
-                    </button>
-                  </>
-                ) : (
-                  repeatedLosersText
-                )}
-              </div>
-            </div>
+        <div className="flex-1 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-neg bg-surface px-4 py-3">
+          <div className="font-sans text-[12.5px] font-medium text-foreground">Repeated losers</div>
+          <div className="mt-1 font-sans text-[11.5px] text-muted-foreground">
+            {repeatedLosses.length > 0 ? (
+              <>
+                {repeatedLosersText}{" "}
+                <button
+                  type="button"
+                  onClick={() => onReviewTrades(null, repeatedLosses[0])}
+                  className="text-neg underline-offset-2 hover:underline"
+                >
+                  — review
+                </button>
+              </>
+            ) : (
+              repeatedLosersText
+            )}
           </div>
         </div>
         {/* Expiring soon — brand accent */}
-        <div className="flex-1 rounded-r-xl border border-hairline border-l-0 bg-surface pl-0 overflow-hidden">
-          <div className="flex h-full border-l-2 border-brand rounded-r-xl">
-            <div className="flex-1 px-4 py-3">
-              <div className="font-sans text-[12.5px] font-medium text-foreground">Expiring ≤14 days</div>
-              <div className="mt-1 font-mono text-[11.5px] tabular-nums text-text-muted">{nearTermText}</div>
-            </div>
-          </div>
+        <div className="flex-1 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-brand bg-surface px-4 py-3">
+          <div className="font-sans text-[12.5px] font-medium text-foreground">Expiring ≤14 days</div>
+          <div className="mt-1 font-mono text-[11.5px] tabular-nums text-muted-foreground">{nearTermText}</div>
         </div>
       </div>
 
@@ -1064,7 +1055,7 @@ function Insights({ result, onReviewTrades }: { result: CalculationResult; onRev
 function InsightGroup({ title, items }: { title: string; items: InsightItem[] }) {
   return (
     <section className="bg-surface">
-      <div className="border-b border-hairline bg-surface-inset px-4 py-2.5 font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-text-muted">{title}</div>
+      <div className="border-b border-hairline bg-surface-inset px-4 py-2.5 font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{title}</div>
       <div className="grid gap-px bg-hairline md:grid-cols-2 xl:grid-cols-3">
         {items.map((insight) => (
           <InsightCard key={insight.title} {...insight} />
@@ -1104,7 +1095,7 @@ function InsightCard({
         )}
       />
       <div className="flex items-start justify-between gap-3">
-        <div className="font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-text-muted">{title}</div>
+        <div className="font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{title}</div>
         <span
           className={cn(
             "rounded-md border p-2 transition group-hover:scale-105",
@@ -1112,7 +1103,7 @@ function InsightCard({
             insightTone === "negative" && "border-neg/25 bg-neg/10 text-neg",
             insightTone === "warning" && "border-warn/25 bg-warn/10 text-warn",
             insightTone === "primary" && "border-brand/25 bg-brand/10 text-brand",
-            insightTone === "neutral" && "border-hairline bg-surface-inset text-text-muted"
+            insightTone === "neutral" && "border-hairline bg-surface-inset text-muted-foreground"
           )}
         >
           <Icon className="h-4 w-4" />
@@ -1130,7 +1121,7 @@ function InsightCard({
       >
         {value}
       </div>
-      <p className="mt-2 font-sans text-[11.5px] leading-5 text-text-muted">{detail}</p>
+      <p className="mt-2 font-sans text-[11.5px] leading-5 text-muted-foreground">{detail}</p>
       {actionLabel && onAction && (
         <button
           type="button"
@@ -1202,7 +1193,7 @@ function Segmented({ value, values, onChange }: { value: string; values: string[
             "rounded px-3 py-2 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
             value === item
               ? "bg-brand/15 text-brand"
-              : "text-text-muted hover:text-foreground"
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
           {label(item)}
@@ -1212,14 +1203,6 @@ function Segmented({ value, values, onChange }: { value: string; values: string[
   );
 }
 
-function Metric({ label: metricLabel, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border p-3">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{metricLabel}</div>
-      <div className="mt-1 font-semibold">{value}</div>
-    </div>
-  );
-}
 
 function filterResult(result: CalculationResult, filters: { symbol: string; strategy: string; year: string; month: string; account: string }): CalculationResult {
   const eventFilter = (event: RealizedPnLEvent) =>
