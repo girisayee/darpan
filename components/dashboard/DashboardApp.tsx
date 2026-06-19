@@ -161,7 +161,7 @@ export function DashboardApp() {
         {activeTab === "Capital & ROI" && <CapitalTab result={result} settings={settings} onSelectEvent={setSelectedEvent} />}
         {activeTab === "Covered Calls" && <OptionsTab result={result} optionType="call" onSelectEvent={setSelectedEvent} />}
         {activeTab === "Cash-Secured Puts" && <OptionsTab result={result} optionType="put" onSelectEvent={setSelectedEvent} />}
-        {activeTab === "Swing Trades" && <EventsTable title="Swing Trade Ledger" rows={result.realizedEvents.filter((event) => event.strategy === "SWING_TRADE")} onSelectEvent={setSelectedEvent} />}
+        {activeTab === "Swing Trades" && <SwingTab result={result} onSelectEvent={setSelectedEvent} />}
         {activeTab === "Tax Lots" && <TaxLotsTab result={result} />}
         {activeTab === "Trades" && <TradesTab result={result} search={tradeSearch} onSearchChange={setTradeSearch} issueFilter={tradeIssueFilter} onIssueFilterChange={setTradeIssueFilter} />}
         {activeTab === "Import" && <ImportTab existing={storedTransactions} onSave={(rows) => replaceTransactions([...storedTransactions, ...rows])} />}
@@ -465,6 +465,49 @@ function OptionsTab({ result, optionType, onSelectEvent }: { result: Calculation
   );
 }
 
+function SwingTab({ result, onSelectEvent }: { result: CalculationResult; onSelectEvent: (event: RealizedPnLEvent) => void }) {
+  const swingEvents = result.realizedEvents.filter((event) => event.strategy === "SWING_TRADE");
+  const swingPnl = swingEvents.reduce((sum, ev) => sum + ev.realizedPnl, 0);
+  const closedCount = swingEvents.length;
+  const winners = swingEvents.filter((ev) => ev.realizedPnl > 0).length;
+  const winRate = closedCount > 0 ? (winners / closedCount) * 100 : null;
+
+  // Avg hold — only include events that have a holdingDays value
+  const eventsWithDays = swingEvents.filter((ev) => ev.holdingDays != null);
+  const avgHold = eventsWithDays.length > 0
+    ? eventsWithDays.reduce((sum, ev) => sum + (ev.holdingDays ?? 0), 0) / eventsWithDays.length
+    : null;
+
+  const stripItems = [
+    { label: "Swing P&L", value: formatCurrency(swingPnl), tone: tone(swingPnl) },
+    { label: "Closed Swings", value: formatNumber(closedCount), tone: "neutral" as const },
+    { label: "Win Rate", value: winRate !== null ? `${formatNumber(winRate, 0)}%` : "N/A", tone: winRate !== null ? tone(winRate - 50) : "neutral" as const },
+    ...(avgHold !== null ? [{ label: "Avg Hold", value: `${formatNumber(Math.round(avgHold), 0)} d`, tone: "neutral" as const }] : []),
+  ];
+
+  return (
+    <div className="space-y-3">
+      <StatStrip items={stripItems} />
+      <EventsTable title="Swing Trade Ledger" rows={swingEvents} onSelectEvent={onSelectEvent} />
+    </div>
+  );
+}
+
+function taxLotStatusChip(row: TaxLot) {
+  // Detect zero-basis: per-share basis is 0 (or effectively 0) for an open lot
+  if (row.costBasisPerShare === 0 && row.status === "open") {
+    return <StatusChip kind="zero-basis" />;
+  }
+  // TaxLotStatus: "open" | "closed" | "partially_closed"
+  // StatusChip kinds: "open"|"closed"|"expired"|"assigned"|"ok"|"unresolved"|"zero-basis"
+  const kindMap: Record<string, "open" | "closed"> = {
+    open: "open",
+    closed: "closed",
+    partially_closed: "closed",
+  };
+  return <StatusChip kind={kindMap[row.status] ?? "closed"} />;
+}
+
 function TaxLotsTab({ result }: { result: CalculationResult }) {
   const columns: Column<TaxLot>[] = [
     { key: "symbol", header: "Symbol", value: (row) => row.symbol },
@@ -475,10 +518,15 @@ function TaxLotsTab({ result }: { result: CalculationResult }) {
     { key: "remainingQuantity", header: "Remaining", value: (row) => row.remainingQuantity, align: "right" },
     { key: "costBasisTotal", header: "Cost Basis", value: (row) => row.costBasisTotal, render: (row) => formatCurrency(row.costBasisTotal), align: "right" },
     { key: "costBasisPerShare", header: "Per Share", value: (row) => row.costBasisPerShare, render: (row) => formatCurrency(row.costBasisPerShare, { maximumFractionDigits: 2 }), align: "right" },
-    { key: "status", header: "Status", value: (row) => row.status, render: (row) => label(row.status) },
+    { key: "status", header: "Status", value: (row) => row.status, render: (row) => taxLotStatusChip(row), align: "right" },
     { key: "notes", header: "Notes", value: (row) => row.notes ?? "" }
   ];
-  return <DataTable rows={result.taxLots} columns={columns} empty="No tax lots yet." />;
+  return (
+    <section className="space-y-2">
+      <h2 className="font-sans text-[13px] font-medium text-foreground">Tax Lots</h2>
+      <DataTable rows={result.taxLots} columns={columns} empty="No tax lots yet." />
+    </section>
+  );
 }
 
 function TradesTab({
@@ -500,6 +548,17 @@ function TradesTab({
     if (issueFilter === "duplicates" && !duplicateIds.has(row.id)) return false;
     return [row.id, row.rawDescription, row.symbol, row.action, row.status, row.notes ?? ""].join(" ").toLowerCase().includes(search.toLowerCase());
   });
+  // TransactionStatus: "normalized" | "unresolved" | "ignored"
+  // Map to StatusChip kinds with safe fallback
+  function tradeStatusChip(row: TradeTransaction) {
+    const kindMap: Record<string, "ok" | "unresolved" | "closed"> = {
+      normalized: "ok",
+      unresolved: "unresolved",
+      ignored: "closed",
+    };
+    return <StatusChip kind={kindMap[row.status] ?? "ok"} />;
+  }
+
   const columns: Column<TradeTransaction>[] = [
     { key: "tradeDate", header: "Date", value: (row) => row.tradeDate },
     { key: "symbol", header: "Symbol", value: (row) => row.symbol },
@@ -512,25 +571,33 @@ function TradesTab({
     { key: "strikePrice", header: "Strike", value: (row) => row.strikePrice ?? 0, render: (row) => row.strikePrice ? formatCurrency(row.strikePrice, { maximumFractionDigits: 2 }) : "N/A", align: "right" },
     { key: "expirationDate", header: "Expiration", value: (row) => row.expirationDate ?? "" },
     { key: "rawDescription", header: "Raw Description", value: (row) => row.rawDescription },
-    { key: "status", header: "Status", value: (row) => row.status }
+    { key: "status", header: "Status", value: (row) => row.status, render: (row) => tradeStatusChip(row), align: "right" }
   ];
   return (
     <div className="space-y-3">
       {issueFilter && (
-        <div className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning sm:flex-row sm:items-center sm:justify-between">
-          <span>{issueFilter === "unresolved" ? "Showing unresolved rows that need classification or an ignore decision." : "Showing likely duplicate rows preserved during import."}</span>
+        <div className="flex flex-col gap-2 rounded-[10px] border border-warn/30 bg-warn/10 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-sans text-[12px] text-warn">
+            <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />
+            {issueFilter === "unresolved" ? "Showing unresolved rows that need classification or an ignore decision." : "Showing likely duplicate rows preserved during import."}
+          </span>
           <button
             type="button"
-            className="rounded-md border border-warning/30 bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+            className="inline-flex items-center rounded-md border border-warn/30 bg-surface px-3 py-1.5 font-sans text-[11px] font-semibold text-warn hover:bg-warn/10"
             onClick={() => onIssueFilterChange(null)}
           >
-            Clear issue filter
+            Clear filter
           </button>
         </div>
       )}
-      <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-panel">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search trades" className="w-full bg-transparent text-sm outline-none" />
+      <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3 py-2 focus-within:ring-2 focus-within:ring-brand/40">
+        <Search className="h-4 w-4 shrink-0 text-text-muted" />
+        <input
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Search trades…"
+          className="w-full bg-transparent font-sans text-[12.5px] text-foreground outline-none placeholder:text-text-muted"
+        />
       </div>
       <DataTable rows={rows} columns={columns} empty="No transactions match the filters." />
     </div>
