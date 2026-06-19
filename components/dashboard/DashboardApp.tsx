@@ -612,8 +612,8 @@ function ImportTab({ existing, onSave }: { existing: TradeTransaction[]; onSave:
   const normalizedRows = preview?.rows ?? [];
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <section className="rounded-lg border bg-card p-4 shadow-panel">
-        <h2 className="text-lg font-semibold">Robinhood Import</h2>
+      <section className="rounded-xl border border-hairline bg-surface p-4">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">Robinhood Import</h2>
         <div className="mt-4 flex flex-wrap gap-2">
           <IconButton label="Upload CSV" onClick={() => fileInput.current?.click()} icon={<FileUp className="h-4 w-4" />} />
           <IconButton label="Parse Rows" onClick={() => setPreview(parseRobinhoodInput(raw, existing))} icon={<RefreshCcw className="h-4 w-4" />} />
@@ -632,7 +632,7 @@ function ImportTab({ existing, onSave }: { existing: TradeTransaction[]; onSave:
         <textarea
           value={raw}
           onChange={(event) => setRaw(event.target.value)}
-          className="mt-4 h-80 w-full resize-none rounded-md border bg-background p-3 font-mono text-xs outline-none focus:ring-2 focus:ring-primary/40"
+          className="mt-4 h-80 w-full resize-none rounded-md border border-hairline bg-surface p-3 font-mono text-xs text-foreground outline-none placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-brand/40"
           placeholder="Paste Robinhood transaction CSV here"
         />
       </section>
@@ -649,7 +649,7 @@ function ImportTab({ existing, onSave }: { existing: TradeTransaction[]; onSave:
             <ImportIssues issues={preview.issues} />
           </>
         ) : (
-          <div className="rounded-lg border bg-card p-8 text-sm text-muted-foreground shadow-panel">No import preview yet.</div>
+          <div className="rounded-xl border border-hairline bg-surface p-8 font-sans text-sm text-muted-foreground">No import preview yet.</div>
         )}
       </section>
     </div>
@@ -675,72 +675,72 @@ function SettingsTab({
       <SettingsPanel title="General">
         <Toggle label="Include fees in P&L" checked={settings.includeFees} onChange={(checked) => onChange({ ...settings, includeFees: checked })} />
         <Toggle label="Annualized return" checked={settings.annualizedReturn} onChange={(checked) => onChange({ ...settings, annualizedReturn: checked })} />
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Annual realized P&L goal</span>
-          <div className="flex items-center rounded-md border bg-background px-3 focus-within:ring-2 focus-within:ring-primary/30">
-            <span className="text-muted-foreground">$</span>
+        <label className="grid gap-1">
+          <span className="font-sans text-[11.5px] text-text-muted">Annual realized P&amp;L goal</span>
+          <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-brand/40">
+            <span className="font-mono text-[12px] tabular-nums text-text-muted">$</span>
             <input
               type="number"
               min="0"
               step="1000"
               value={settings.annualRealizedPnlGoal}
               onChange={(event) => onChange({ ...settings, annualRealizedPnlGoal: Math.max(0, Number(event.target.value) || 0) })}
-              className="h-10 w-full bg-transparent px-2 text-sm outline-none"
+              className="h-10 w-full bg-transparent px-2 font-mono text-[13px] tabular-nums text-foreground outline-none"
             />
           </div>
-          <span className="text-xs text-muted-foreground">
+          <span className="font-mono text-[11px] tabular-nums text-text-muted">
             Monthly pace: {formatCurrency(settings.annualRealizedPnlGoal / 12)}
           </span>
         </label>
-        <div className="rounded-md border bg-muted/45 p-3 text-sm text-muted-foreground">
-          Imported trade data is stored in the local SQLite database at <span className="font-mono">data/positioniq.sqlite</span>.
+        <div className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-text-muted">
+          Imported trade data is stored in the local SQLite database at <span className="font-mono text-[11px]">data/positioniq.sqlite</span>.
         </div>
       </SettingsPanel>
       <SettingsPanel title="Cost Basis">
         <Segmented value={settings.costBasisMethod} values={["FIFO", "LIFO", "AVERAGE"]} onChange={(value) => onChange({ ...settings, costBasisMethod: value as AppSettings["costBasisMethod"] })} />
-        <div className="rounded-md border bg-muted/45 p-3">
-          <div className="text-sm font-medium">Manual basis overrides</div>
-          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+        <div className="rounded-md border border-hairline bg-surface-inset p-3">
+          <div className="font-sans text-[12px] font-medium text-foreground">Manual basis overrides</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {Object.entries(settings.manualCostBasisPerShare)
               .filter(([symbol]) => symbol !== "PAYPAL")
               .map(([symbol, basis]) => (
-                <div key={symbol} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
-                  <span className="font-mono text-xs font-semibold">{symbol}</span>
-                  <span className="tabular-nums text-muted-foreground">{formatCurrency(basis, { maximumFractionDigits: 2 })}/share</span>
+                <div key={symbol} className="flex items-center justify-between rounded-md border border-hairline bg-surface px-3 py-2">
+                  <span className="font-mono text-[11px] font-semibold text-foreground">{symbol}</span>
+                  <span className="font-mono text-[11px] tabular-nums text-text-muted">{formatCurrency(basis, { maximumFractionDigits: 2 })}/share</span>
                 </div>
               ))}
           </div>
         </div>
-        <div className="rounded-md border bg-muted/45 p-3">
-          <div className="text-sm font-medium">Zero-basis lots</div>
-          <div className="mt-2 grid gap-2 text-sm">
+        <div className="rounded-md border border-hairline bg-surface-inset p-3">
+          <div className="font-sans text-[12px] font-medium text-foreground">Zero-basis lots</div>
+          <div className="mt-2 grid gap-2">
             {settings.manualZeroBasisLots.map((lot) => (
-              <div key={`${lot.symbol}-${lot.quantity}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background px-3 py-2">
-                <span className="font-mono text-xs font-semibold">{lot.symbol}</span>
-                <span className="tabular-nums text-muted-foreground">{formatNumber(lot.quantity, 5)} shares at $0 basis</span>
-                {lot.note && <span className="w-full text-xs text-muted-foreground">{lot.note}</span>}
+              <div key={`${lot.symbol}-${lot.quantity}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-3 py-2">
+                <span className="font-mono text-[11px] font-semibold text-foreground">{lot.symbol}</span>
+                <span className="font-mono text-[11px] tabular-nums text-text-muted">{formatNumber(lot.quantity, 5)} shares at $0 basis</span>
+                {lot.note && <span className="w-full font-sans text-[11px] text-text-muted">{lot.note}</span>}
               </div>
             ))}
           </div>
         </div>
       </SettingsPanel>
       <SettingsPanel title="Capital Calculation">
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Covered call denominator</span>
+        <label className="grid gap-1">
+          <span className="font-sans text-[11.5px] text-text-muted">Covered call denominator</span>
           <Select value={settings.coveredCallDenominator} onChange={(value) => onChange({ ...settings, coveredCallDenominator: value as AppSettings["coveredCallDenominator"] })}>
             <option value="UNDERLYING_COST_BASIS">Underlying stock cost basis</option>
             <option value="CURRENT_MARKET_VALUE">Current market value if available</option>
           </Select>
         </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Cash-secured put denominator</span>
+        <label className="grid gap-1">
+          <span className="font-sans text-[11.5px] text-text-muted">Cash-secured put denominator</span>
           <Select value={settings.cashSecuredPutDenominator} onChange={(value) => onChange({ ...settings, cashSecuredPutDenominator: value as AppSettings["cashSecuredPutDenominator"] })}>
             <option value="CONSERVATIVE_COLLATERAL">Conservative collateral: strike * shares</option>
             <option value="NET_COLLATERAL_AFTER_PREMIUM">Net collateral after premium</option>
           </Select>
         </label>
-        <label className="grid gap-1 text-sm">
-          <span className="text-muted-foreground">Monthly ROI denominator</span>
+        <label className="grid gap-1">
+          <span className="font-sans text-[11.5px] text-text-muted">Monthly ROI denominator</span>
           <Select value={settings.monthlyRoiDenominator} onChange={(value) => onChange({ ...settings, monthlyRoiDenominator: value as AppSettings["monthlyRoiDenominator"] })}>
             <option value="AVERAGE_DEPLOYED_CAPITAL">Average deployed capital</option>
             <option value="PEAK_DEPLOYED_CAPITAL">Peak deployed capital</option>
@@ -874,13 +874,13 @@ function TradesPreview({ rows }: { rows: TradeTransaction[] }) {
 }
 
 function ImportIssues({ issues }: { issues: ImportPreview["issues"] }) {
-  if (!issues.length) return <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground shadow-panel">No import warnings.</div>;
+  if (!issues.length) return <div className="rounded-xl border border-hairline bg-surface p-4 font-sans text-[12px] text-muted-foreground">No import warnings.</div>;
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-panel">
-      <h3 className="font-semibold">Unresolved Imports</h3>
+    <div className="rounded-xl border border-hairline bg-surface p-4">
+      <h3 className="font-sans text-[13px] font-medium text-foreground">Unresolved Imports</h3>
       <div className="mt-3 space-y-2">
         {issues.map((issue, index) => (
-          <div key={index} className="rounded-md border bg-muted/45 p-3 text-sm">
+          <div key={index} className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-text-muted">
             Row {issue.rowIndex + 1}: {issue.message}
           </div>
         ))}
@@ -1147,7 +1147,7 @@ function InsightCard({
 
 function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40">
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-md border border-hairline bg-surface px-3 font-sans text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
       {children}
     </select>
   );
@@ -1160,9 +1160,10 @@ function IconButton({ label: buttonLabel, icon, onClick, disabled, danger }: { l
       onClick={onClick}
       disabled={disabled}
       title={buttonLabel}
+      aria-label={buttonLabel}
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
-        danger && "border-danger/30 text-danger hover:bg-danger/10"
+        "inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-surface px-3 font-sans text-[12px] font-medium text-foreground transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50",
+        danger && "border-neg/30 text-neg hover:bg-neg/10"
       )}
     >
       {icon}
@@ -1173,8 +1174,8 @@ function IconButton({ label: buttonLabel, icon, onClick, disabled, danger }: { l
 
 function SettingsPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 rounded-lg border bg-card p-4 shadow-panel">
-      <h2 className="flex items-center gap-2 text-lg font-semibold"><Settings className="h-4 w-4" /> {title}</h2>
+    <section className="space-y-4 rounded-xl border border-hairline bg-surface p-4">
+      <h2 className="font-sans text-[13px] font-medium text-foreground">{title}</h2>
       {children}
     </section>
   );
@@ -1182,18 +1183,28 @@ function SettingsPanel({ title, children }: { title: string; children: React.Rea
 
 function Toggle({ label: toggleLabel, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
-      <span>{toggleLabel}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-primary" />
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 transition-colors hover:bg-surface-inset">
+      <span className="font-sans text-[12.5px] text-foreground">{toggleLabel}</span>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-brand focus-visible:ring-2 focus-visible:ring-brand/40" />
     </label>
   );
 }
 
 function Segmented({ value, values, onChange }: { value: string; values: string[]; onChange: (value: string) => void }) {
   return (
-    <div className="grid grid-cols-3 rounded-md border bg-muted p-1">
+    <div className="grid rounded-md border border-hairline bg-surface-inset p-1" style={{ gridTemplateColumns: `repeat(${values.length}, 1fr)` }}>
       {values.map((item) => (
-        <button key={item} type="button" onClick={() => onChange(item)} className={cn("rounded px-3 py-2 text-sm font-medium text-muted-foreground", value === item && "bg-card text-foreground shadow-sm")}>
+        <button
+          key={item}
+          type="button"
+          onClick={() => onChange(item)}
+          className={cn(
+            "rounded px-3 py-2 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+            value === item
+              ? "bg-brand/15 text-brand"
+              : "text-text-muted hover:text-foreground"
+          )}
+        >
           {label(item)}
         </button>
       ))}
