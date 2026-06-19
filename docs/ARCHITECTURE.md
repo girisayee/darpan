@@ -100,7 +100,7 @@ Repeated UI primitives:
 
 - `KpiCard`: card with visible hover/focus tooltip.
 - `DataTable`: sortable table.
-- `OverviewCharts`: Recharts-based visualizations.
+- `MonthlyRoiChart`: Recharts-based monthly ROI bar chart.
 
 ## Types
 

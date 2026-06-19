@@ -187,8 +187,7 @@ export function DetailDrawer({
                 </span>
                 {/* Strategy chip — brand-tinted pill, safe kind mapping */}
                 <span
-                  className="inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[10px] font-medium leading-none"
-                  style={{ background: "rgba(242,180,59,0.12)", color: "var(--color-brand)" }}
+                  className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-brand"
                 >
                   {strategyLabel(event.strategy)}
                 </span>
