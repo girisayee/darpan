@@ -6,74 +6,29 @@ type HeroReadoutProps = {
   label: string;
   value: string;
   tone?: "positive" | "negative" | "neutral";
-  spark?: number[];
-  pills?: string[];
+  ytdBadge?: string;
+  subLine?: string;
 };
 
-function buildPolyline(values: number[], width = 80, height = 28): string {
-  if (values.length < 2) return "";
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * width;
-    const y = height - ((v - min) / range) * height;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  return points.join(" ");
-}
-
-export function HeroReadout({ label, value, tone = "neutral", spark, pills }: HeroReadoutProps) {
+export function HeroReadout({ label, value, tone = "neutral", ytdBadge, subLine }: HeroReadoutProps) {
   const valueClass = cn(
-    "mt-1 font-mono text-[40px] font-bold tabular-nums leading-none",
+    "mt-1 text-[36px] font-medium tracking-tight tabular-nums leading-none",
     tone === "positive" && "text-pos",
     tone === "negative" && "text-neg",
     tone === "neutral" && "text-foreground"
   );
 
-  const sparkStroke =
-    tone === "positive"
-      ? "rgb(var(--pos))"
-      : tone === "negative"
-        ? "rgb(var(--neg))"
-        : "rgb(var(--text-muted))";
-
   return (
-    <div className="bg-surface border border-hairline rounded-xl p-4">
-      <div className="text-[10px] font-sans uppercase tracking-[.12em] text-muted-foreground">{label}</div>
-      <div className={valueClass}>{value}</div>
-
-      {spark && spark.length >= 2 && (
-        <svg
-          viewBox={`0 0 80 28`}
-          width={80}
-          height={28}
-          aria-hidden="true"
-          className="mt-2 block"
-          style={{ overflow: "visible" }}
-        >
-          <polyline
-            points={buildPolyline(spark)}
-            fill="none"
-            stroke={sparkStroke}
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        </svg>
-      )}
-
-      {pills && pills.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {pills.map((pill) => (
-            <span
-              key={pill}
-              className="rounded-full border border-hairline bg-surface-inset px-2.5 py-1 font-sans text-[10.5px] text-muted-foreground"
-            >
-              {pill}
-            </span>
-          ))}
-        </div>
+    <div>
+      <div className="text-[12px] text-muted-foreground">{label}</div>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
+        <span className={valueClass}>{value}</span>
+        {ytdBadge && (
+          <span className="text-[13px] tabular-nums text-pos">{ytdBadge}</span>
+        )}
+      </div>
+      {subLine && (
+        <div className="mt-1.5 text-[13px] tabular-nums text-muted-foreground">{subLine}</div>
       )}
     </div>
   );

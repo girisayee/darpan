@@ -2,19 +2,11 @@
 
 import {
   AlertTriangle,
-  ArrowRight,
-  Brain,
-  CalendarDays,
-  ChevronUp,
-  CircleDollarSign,
   Download,
   FileDown,
   FileUp,
-  Gauge,
   RefreshCcw,
   Search,
-  Target,
-  TrendingDown,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -190,157 +182,122 @@ function OverviewTab({
   const worstStrategy = [...strategyStats].sort((a, b) => a.pnl - b.pnl)[0];
   const latest = result.monthlyReturns.at(-1);
 
-  // All KPIs — curated 4 shown in strip, rest revealed via "+N more"
+  // All KPIs — curated 5 shown in strip, rest revealed via "More metrics →"
   const allKpis = [
     { label: "Total P&L", value: formatCurrency(result.aggregates.totalRealizedPnl), helper: "Closed realized events", tooltip: "All-time total realized P&L across all closed events.", numeric: result.aggregates.totalRealizedPnl },
-    { label: "Tax Year P&L", value: formatCurrency(result.aggregates.currentYearRealizedPnl), helper: "Calendar-year realized P&L", tooltip: "Current calendar-year realized P&L.", numeric: result.aggregates.currentYearRealizedPnl },
+    { label: "Tax year P&L", value: formatCurrency(result.aggregates.currentYearRealizedPnl), helper: "Calendar-year realized P&L", tooltip: "Current calendar-year realized P&L.", numeric: result.aggregates.currentYearRealizedPnl },
     { label: "Monthly ROI", value: formatPercent(latest?.realizedRoiPercent), helper: "Latest month: P&L / avg deployed capital", tooltip: "Monthly realized P&L divided by average deployed capital.", numeric: latest?.realizedRoiPercent ?? 0 },
     { label: "YTD ROI", value: formatPercent(result.aggregates.ytdRoi), helper: "YTD P&L / YTD avg deployed capital", tooltip: "YTD realized P&L divided by average deployed capital.", numeric: result.aggregates.ytdRoi ?? 0 },
-    { label: "Avg Monthly ROI", value: formatPercent(result.aggregates.averageMonthlyRoi), helper: "Average of months with known capital", tooltip: "Only months with known capital are included.", numeric: result.aggregates.averageMonthlyRoi ?? 0 },
-    { label: "Avg Deployed", value: formatCurrency(result.aggregates.averageDeployedCapital), helper: "Avg monthly capital-days denominator", tooltip: "Average deployed capital uses daily capital exposure.", numeric: 0 },
-    { label: "Peak Deployed", value: formatCurrency(result.aggregates.peakDeployedCapital), helper: "Highest daily deployed capital", tooltip: "Highest deployed capital observed in a month.", numeric: 0 },
-    { label: "Options Premium", value: formatCurrency(result.aggregates.totalOptionsPremium), helper: "Closed option premium P&L", tooltip: "Net realized option premium from all closed cycles.", numeric: result.aggregates.totalOptionsPremium },
+    { label: "Avg monthly ROI", value: formatPercent(result.aggregates.averageMonthlyRoi), helper: "Average of months with known capital", tooltip: "Only months with known capital are included.", numeric: result.aggregates.averageMonthlyRoi ?? 0 },
+    { label: "Avg deployed", value: formatCurrency(result.aggregates.averageDeployedCapital), helper: "Avg monthly capital-days denominator", tooltip: "Average deployed capital uses daily capital exposure.", numeric: 0 },
+    { label: "Peak deployed", value: formatCurrency(result.aggregates.peakDeployedCapital), helper: "Highest daily deployed capital", tooltip: "Highest deployed capital observed in a month.", numeric: 0 },
+    { label: "Options premium", value: formatCurrency(result.aggregates.totalOptionsPremium), helper: "Closed option premium P&L", tooltip: "Net realized option premium from all closed cycles.", numeric: result.aggregates.totalOptionsPremium },
     { label: "Stock P&L", value: formatCurrency(result.aggregates.totalStockTradingPnl), helper: "Realized stock sales", tooltip: "Realized P&L from stock sales (swings and assignments).", numeric: result.aggregates.totalStockTradingPnl },
-    { label: "Win Rate", value: formatPercent(result.aggregates.winRate), helper: "Winning events / total events", tooltip: "Fraction of realized events that closed profitable.", numeric: result.aggregates.winRate ?? 0 },
-    { label: "Avg Win", value: formatCurrency(result.aggregates.averageWin), helper: "Average profitable event", tooltip: "Mean P&L of all winning realized events.", numeric: result.aggregates.averageWin ?? 0 },
-    { label: "Avg Loss", value: formatCurrency(result.aggregates.averageLoss), helper: "Average losing event", tooltip: "Mean P&L of all losing realized events.", numeric: result.aggregates.averageLoss ?? 0 },
-    { label: "Best Symbol", value: result.aggregates.bestSymbol ?? "N/A", helper: "Highest symbol P&L", tooltip: "Symbol with the largest cumulative realized P&L.", numeric: 0 },
-    { label: "Worst Symbol", value: result.aggregates.worstSymbol ?? "N/A", helper: "Lowest symbol P&L", tooltip: "Symbol with the smallest (most negative) cumulative realized P&L.", numeric: 0 },
-    { label: "Best Strategy", value: label(bestStrategy?.strategy), helper: "Highest strategy P&L", tooltip: "Strategy group with the largest cumulative realized P&L.", numeric: 0 },
-    { label: "Worst Strategy", value: label(worstStrategy?.strategy), helper: "Lowest strategy P&L", tooltip: "Strategy group with the smallest cumulative realized P&L.", numeric: 0 },
-    { label: "Closed Trades", value: formatNumber(result.realizedEvents.length), helper: "Total realized P&L events", tooltip: "Count of all realized P&L events in the current view.", numeric: 0 },
+    { label: "Win rate", value: formatPercent(result.aggregates.winRate), helper: "Winning events / total events", tooltip: "Fraction of realized events that closed profitable.", numeric: result.aggregates.winRate ?? 0 },
+    { label: "Avg win", value: formatCurrency(result.aggregates.averageWin), helper: "Average profitable event", tooltip: "Mean P&L of all winning realized events.", numeric: result.aggregates.averageWin ?? 0 },
+    { label: "Avg loss", value: formatCurrency(result.aggregates.averageLoss), helper: "Average losing event", tooltip: "Mean P&L of all losing realized events.", numeric: result.aggregates.averageLoss ?? 0 },
+    { label: "Best symbol", value: result.aggregates.bestSymbol ?? "N/A", helper: "Highest symbol P&L", tooltip: "Symbol with the largest cumulative realized P&L.", numeric: 0 },
+    { label: "Worst symbol", value: result.aggregates.worstSymbol ?? "N/A", helper: "Lowest symbol P&L", tooltip: "Symbol with the smallest (most negative) cumulative realized P&L.", numeric: 0 },
+    { label: "Best strategy", value: label(bestStrategy?.strategy), helper: "Highest strategy P&L", tooltip: "Strategy group with the largest cumulative realized P&L.", numeric: 0 },
+    { label: "Worst strategy", value: label(worstStrategy?.strategy), helper: "Lowest strategy P&L", tooltip: "Strategy group with the smallest cumulative realized P&L.", numeric: 0 },
+    { label: "Closed trades", value: formatNumber(result.realizedEvents.length), helper: "Total realized P&L events", tooltip: "Count of all realized P&L events in the current view.", numeric: 0 },
   ];
 
-  // Curated 4 shown in StatStrip
+  // Curated 5 shown in StatStrip metric row
   const stripItems = [
-    { label: "Avg Win", value: formatCurrency(result.aggregates.averageWin), tone: tone(result.aggregates.averageWin ?? 0) },
-    { label: "Avg Loss", value: formatCurrency(result.aggregates.averageLoss), tone: tone(result.aggregates.averageLoss ?? 0) },
-    { label: "Best Symbol", value: result.aggregates.bestSymbol ?? "N/A", tone: "neutral" as const },
-    { label: "Best Strategy", value: label(bestStrategy?.strategy), tone: "neutral" as const },
+    { label: "Monthly ROI", value: formatPercent(latest?.realizedRoiPercent), tone: tone(latest?.realizedRoiPercent ?? 0) },
+    { label: "Options premium", value: formatCurrency(result.aggregates.totalOptionsPremium), tone: tone(result.aggregates.totalOptionsPremium) },
+    { label: "Stock P&L", value: formatCurrency(result.aggregates.totalStockTradingPnl), tone: tone(result.aggregates.totalStockTradingPnl) },
+    { label: "Avg deployed", value: formatCurrency(result.aggregates.averageDeployedCapital), tone: "neutral" as const },
+    { label: "Best symbol", value: result.aggregates.bestSymbol ?? "N/A", tone: "neutral" as const },
   ];
-  const moreKpis = allKpis; // All KPIs revealed in the expanded grid
-  // "+N more" count = total KPIs minus the curated items already shown in the strip
+  // Remaining KPIs revealed in the expanded grid
   const moreCount = allKpis.length - stripItems.length;
-
-  // Sparkline: cumulative realized P&L per month
-  const spark = result.monthlyReturns.map((m) => m.realizedPnl);
-  // Cumulative
-  const cumulativeSpark = spark.reduce<number[]>((acc, v) => {
-    acc.push((acc.at(-1) ?? 0) + v);
-    return acc;
-  }, []);
 
   const annualGoal = settings.annualRealizedPnlGoal;
   const monthlyGoal = annualGoal / 12;
+  const ytdPnl = result.aggregates.currentYearRealizedPnl;
+  const ytdRoi = result.aggregates.ytdRoi ?? 0;
 
   return (
-    <div className="space-y-3">
-      {/* ── Hero row: HeroReadout + 2×2 Instrument Cluster ── */}
-      <div className="grid gap-3 lg:grid-cols-[1.45fr_1fr]">
+    <div className="space-y-0">
+      {/* ── Hero ── */}
+      <div className="py-5">
         <HeroReadout
           label="Net realized P&L · all time"
           value={formatCurrency(result.aggregates.totalRealizedPnl)}
           tone={tone(result.aggregates.totalRealizedPnl)}
-          spark={cumulativeSpark.length >= 2 ? cumulativeSpark : undefined}
-          pills={[
-            `${formatNumber(result.realizedEvents.length)} closed`,
-            `${formatPercent(result.aggregates.winRate)} win`,
-            `${formatCurrency(result.aggregates.averageDeployedCapital)} deployed`,
-          ]}
+          ytdBadge={ytdRoi !== 0 ? `${ytdRoi > 0 ? "▲" : "▼"} ${formatPercent(Math.abs(ytdRoi))} YTD` : undefined}
+          subLine={`${formatNumber(result.realizedEvents.length)} closed · ${formatPercent(result.aggregates.winRate)} win rate · ${formatCurrency(result.aggregates.averageDeployedCapital)} avg deployed`}
         />
-        {/* 2×2 Instrument Cluster */}
-        <div className="grid grid-cols-2 gap-2">
-          <KpiCard
-            label="YTD ROI"
-            value={formatPercent(result.aggregates.ytdRoi)}
-            helper="YTD P&L / avg deployed capital"
-            tooltip="YTD realized P&L divided by average deployed capital."
-            tone={tone(result.aggregates.ytdRoi ?? 0)}
-          />
-          <KpiCard
-            label="Monthly ROI"
-            value={formatPercent(latest?.realizedRoiPercent)}
-            helper="Latest month realized ROI"
-            tooltip="Monthly realized P&L divided by average deployed capital."
-            tone={tone(latest?.realizedRoiPercent ?? 0)}
-          />
-          <KpiCard
-            label="Options Premium"
-            value={formatCurrency(result.aggregates.totalOptionsPremium)}
-            helper="Closed option premium P&L"
-            tooltip="Net realized option premium from all closed cycles."
-            tone={tone(result.aggregates.totalOptionsPremium)}
-          />
-          <KpiCard
-            label="Stock P&L"
-            value={formatCurrency(result.aggregates.totalStockTradingPnl)}
-            helper="Realized stock sales"
-            tooltip="Realized P&L from stock sales."
-            tone={tone(result.aggregates.totalStockTradingPnl)}
-          />
-        </div>
       </div>
 
-      {/* ── Goal Bars ── */}
-      <div className="grid gap-3 lg:grid-cols-2">
+      {/* ── Hairline ── */}
+      <div className="h-px bg-hairline" />
+
+      {/* ── Metric row ── */}
+      <div className="py-5">
+        <StatStrip
+          items={stripItems}
+          moreCount={moreCount}
+          onMore={() => setShowMoreKpis((v) => !v)}
+          showingMore={showMoreKpis}
+        />
+      </div>
+
+      {/* ── Expanded KPI grid ── */}
+      {showMoreKpis && (
+        <>
+          <div className="h-px bg-hairline" />
+          <div className="grid gap-x-10 gap-y-6 py-5 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
+            {allKpis.map((kpi) => (
+              <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tooltip={kpi.tooltip} tone={tone(kpi.numeric)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── Hairline ── */}
+      <div className="h-px bg-hairline" />
+
+      {/* ── Goal rows ── */}
+      <div className="flex flex-col gap-3 py-5 sm:flex-row sm:gap-10">
         <GoalBar
           title="YTD goal"
-          targetLabel={formatCurrency(annualGoal)}
           target={annualGoal}
-          actual={result.aggregates.currentYearRealizedPnl}
-          helper={`${formatCurrency(Math.max(0, annualGoal - result.aggregates.currentYearRealizedPnl))} to target`}
+          actual={ytdPnl}
+          valueLabel={`${formatCurrency(ytdPnl)} of ${formatCurrency(annualGoal)}`}
         />
         <GoalBar
           title="Monthly target"
-          targetLabel={formatCurrency(monthlyGoal)}
           target={monthlyGoal}
           actual={latest?.realizedPnl ?? 0}
-          helper={`${formatCurrency(latest?.realizedPnl ?? 0)} of ${formatCurrency(monthlyGoal)} this month`}
+          valueLabel={`${formatCurrency(latest?.realizedPnl ?? 0)} of ${formatCurrency(monthlyGoal)}`}
         />
       </div>
 
-      {/* ── Curated StatStrip + expanded KPI grid ── */}
-      <StatStrip
-        items={stripItems}
-        moreCount={moreCount}
-        onMore={() => setShowMoreKpis((v) => !v)}
-      />
-      {showMoreKpis && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          {moreKpis.map((kpi) => (
-            <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} helper={kpi.helper} tooltip={kpi.tooltip} tone={tone(kpi.numeric)} />
-          ))}
-          <div className="col-span-full flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowMoreKpis(false)}
-              className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-3 py-1.5 font-sans text-[12px] text-brand hover:bg-surface-inset"
-            >
-              <ChevronUp className="h-3.5 w-3.5" /> Collapse
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── Hairline ── */}
+      <div className="h-px bg-hairline" />
 
-      {/* ── Insights (two-card layout) ── */}
-      <Insights result={result} onReviewTrades={onReviewTrades} />
+      {/* ── Insights ── */}
+      <div className="py-5">
+        <Insights result={result} onReviewTrades={onReviewTrades} />
+      </div>
     </div>
   );
 }
 
-/** Tape-styled flat goal bar — no shadow, surface-inset track, semantic fill */
+/** Quiet slim inline goal bar — no card, 3px track */
 function GoalBar({
   title,
-  targetLabel,
   target,
   actual,
-  helper
+  valueLabel
 }: {
   title: string;
-  targetLabel: string;
   target: number;
   actual: number;
-  helper: string;
+  valueLabel: string;
 }) {
   const progress = target > 0 ? Math.max(0, Math.min(100, (actual / target) * 100)) : 0;
   const fillClass =
@@ -348,28 +305,17 @@ function GoalBar({
       ? "bg-neg"
       : actual >= target
         ? "bg-pos"
-        : "bg-brand";
-  const pctClass =
-    actual < 0
-      ? "text-neg"
-      : actual >= target
-        ? "text-pos"
-        : "text-foreground";
+        : "bg-accent";
   return (
-    <section className="rounded-xl border border-hairline bg-surface p-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
-          {title} · {targetLabel}
-        </span>
-        <span className={cn("font-mono text-[12px] font-medium tabular-nums", pctClass)}>
-          {formatNumber(progress, 0)}%
-        </span>
+    <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-[12px] text-muted-foreground">{title}</span>
+        <span className="text-[12px] tabular-nums text-muted-foreground">{valueLabel}</span>
       </div>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-surface-inset">
+      <div className="h-[3px] overflow-hidden rounded-full bg-hairline">
         <div className={cn("h-full rounded-full transition-all", fillClass)} style={{ width: `${progress}%` }} />
       </div>
-      <div className="mt-2 font-mono text-[11px] tabular-nums text-muted-foreground">{helper}</div>
-    </section>
+    </div>
   );
 }
 
@@ -886,253 +832,71 @@ function ImportIssues({ issues }: { issues: ImportPreview["issues"] }) {
   );
 }
 
-type InsightItem = {
-  title: string;
-  value: string;
-  detail: string;
-  tone: "positive" | "negative" | "neutral" | "warning" | "primary";
-  icon: React.ElementType;
-  actionLabel?: string;
-  onAction?: () => void;
-};
-
 function Insights({ result, onReviewTrades }: { result: CalculationResult; onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void }) {
   const repeatedLosses = result.aggregates.symbolBreakdown.filter((row) => row.pnl < 0 && row.trades > 1).map((row) => row.symbol);
   const openCycles = result.optionLifecycles.filter((cycle) => cycle.status === "open");
-  const openContracts = openCycles.reduce((sum, cycle) => sum + cycle.contracts, 0);
-  const openCapital = openOptionCapital(openCycles);
-  const openPremium = openCycles.reduce((sum, cycle) => sum + cycle.premiumReceived - cycle.closeCost, 0);
   const nearTermCutoff = addDaysIso(new Date(), 14);
   const nearTermCycles = openCycles.filter((cycle) => cycle.expirationDate <= nearTermCutoff);
   const nearTermContracts = nearTermCycles.reduce((sum, cycle) => sum + cycle.contracts, 0);
-  const missingBasisEvents = result.realizedEvents.filter((event) => event.warnings.some((warning) => /missing cost basis|capital deployed/i.test(warning)));
-  const negativeMonths = result.monthlyReturns.filter((row) => row.realizedPnl < 0);
-  const profitableMonths = result.monthlyReturns.filter((row) => row.realizedPnl > 0);
-  const highCapital = [...result.monthlyReturns].sort((a, b) => b.averageDeployedCapital - a.averageDeployedCapital)[0];
-  const topThreeSymbolPnl = result.aggregates.symbolBreakdown.slice(0, 3).reduce((sum, row) => sum + Math.max(0, row.pnl), 0);
-  const positiveSymbolPnl = result.aggregates.symbolBreakdown.reduce((sum, row) => sum + Math.max(0, row.pnl), 0);
-  const concentration = positiveSymbolPnl > 0 ? (topThreeSymbolPnl / positiveSymbolPnl) * 100 : null;
-  const workingInsights: InsightItem[] = [
-    {
-      title: "Positive Months",
-      value: `${formatNumber(profitableMonths.length)} / ${formatNumber(result.monthlyReturns.length)}`,
-      detail: profitableMonths.length ? "Most recent profitable month is included in the monthly chart trend." : "No positive realized-P&L months yet in this view.",
-      tone: profitableMonths.length ? "positive" as const : "neutral" as const,
-      icon: CalendarDays
-    },
-    {
-      title: "Open Premium Base",
-      value: formatCurrency(openPremium),
-      detail: `${formatNumber(openContracts)} open ${openContracts === 1 ? "contract" : "contracts"} currently carrying premium.`,
-      tone: openPremium > 0 ? "positive" as const : "neutral" as const,
-      icon: CircleDollarSign
-    },
-    {
-      title: "Capital Context",
-      value: highCapital ? `${highCapital.year}-${String(highCapital.month).padStart(2, "0")}` : "N/A",
-      detail: highCapital ? `${formatCurrency(highCapital.averageDeployedCapital)} average deployed. ${highCapitalInsight(result)}` : "No capital usage data yet.",
-      tone: "primary" as const,
-      icon: Gauge
-    }
-  ];
-  const attentionInsights: InsightItem[] = [
-    {
-      title: "Data Cleanup",
-      value: formatNumber(result.unresolvedTransactions.length),
-      detail: result.unresolvedTransactions.length ? "Unresolved rows are skipped by calculations until classified or ignored." : "No unresolved rows in this view.",
-      tone: result.unresolvedTransactions.length ? "warning" as const : "neutral" as const,
-      icon: AlertTriangle,
-      actionLabel: result.unresolvedTransactions.length ? "Review rows" : undefined,
-      onAction: result.unresolvedTransactions.length ? () => onReviewTrades("unresolved") : undefined
-    },
-    {
-      title: "Duplicate Review",
-      value: formatNumber(result.duplicateTransactionIds.length),
-      detail: result.duplicateTransactionIds.length ? "Potential duplicate rows are preserved. Review before deleting because split fills can look duplicated." : "No duplicate warnings in this view.",
-      tone: result.duplicateTransactionIds.length ? "warning" as const : "neutral" as const,
-      icon: Brain,
-      actionLabel: result.duplicateTransactionIds.length ? "Review rows" : undefined,
-      onAction: result.duplicateTransactionIds.length ? () => onReviewTrades("duplicates") : undefined
-    },
-    {
-      title: "Open Option Exposure",
-      value: formatCurrency(openCapital),
-      detail: `${formatNumber(openContracts)} open ${openContracts === 1 ? "contract" : "contracts"} across CC/CSP cycles.`,
-      tone: openCapital > 0 ? "primary" as const : "neutral" as const,
-      icon: CircleDollarSign
-    },
-    {
-      title: "Near-Term Expirations",
-      value: formatNumber(nearTermContracts),
-      detail: nearTermCycles.length ? `${nearTermCycles.map((cycle) => `${cycle.underlyingSymbol} ${cycle.expirationDate}`).join(", ")} within 14 days.` : "No open option expirations in the next 14 days.",
-      tone: nearTermContracts ? "warning" as const : "neutral" as const,
-      icon: CalendarDays
-    },
-    {
-      title: "Basis Review",
-      value: formatNumber(missingBasisEvents.length),
-      detail: missingBasisEvents.length ? "Some realized events have missing or fallback capital basis. Check cost-basis overrides." : "Realized events have usable basis or explicit fallbacks.",
-      tone: missingBasisEvents.length ? "warning" as const : "neutral" as const,
-      icon: Target
-    },
-    {
-      title: "Negative Months",
-      value: formatNumber(negativeMonths.length),
-      detail: negativeMonths.length ? `${negativeMonths.map((row) => `${row.year}-${String(row.month).padStart(2, "0")}`).join(", ")} closed below zero.` : "No negative realized-P&L months in this view.",
-      tone: negativeMonths.length ? "negative" as const : "neutral" as const,
-      icon: TrendingDown
-    },
-    {
-      title: "Repeated Losses",
-      value: repeatedLosses.length ? repeatedLosses.join(", ") : "None",
-      detail: repeatedLosses.length ? "These symbols have repeated losing events in the current filters." : "No repeated symbol losses in the current view.",
-      tone: repeatedLosses.length ? "warning" as const : "neutral" as const,
-      icon: Brain
-    },
-    {
-      title: "P&L Concentration",
-      value: formatPercent(concentration, 0),
-      detail: "Share of positive symbol P&L coming from the top three symbols.",
-      tone: (concentration ?? 0) > 75 ? "warning" as const : "primary" as const,
-      icon: Gauge
-    }
-  ];
-  // Compose the two featured insight cards (Tape mockup style)
   const repeatedLosersText = repeatedLosses.length
-    ? `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} down across 2+ closes`
-    : "No repeated symbol losses in the current view.";
+    ? `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} have repeated losses`
+    : null;
 
   const nearTermText = nearTermCycles.length
-    ? `${formatNumber(nearTermContracts)} ${nearTermContracts === 1 ? "contract" : "contracts"} · ${formatCurrency(
+    ? `${formatNumber(nearTermContracts)} ${nearTermContracts === 1 ? "contract" : "contracts"} expiring within 14 days · ${formatCurrency(
         nearTermCycles.reduce((sum, cycle) => sum + optionCycleCapital(cycle, true), 0)
       )} exposure`
-    : "No open option expirations in the next 14 days.";
+    : null;
+
+  const unresolvedCount = result.unresolvedTransactions.length;
+  const duplicateCount = result.duplicateTransactionIds.length;
+
+  const lines: { text: string; action?: { label: string; onClick: () => void } }[] = [];
+
+  if (repeatedLosersText) {
+    lines.push({
+      text: repeatedLosersText,
+      action: { label: "Review trades →", onClick: () => onReviewTrades(null, repeatedLosses[0]) }
+    });
+  }
+  if (nearTermText) {
+    lines.push({ text: nearTermText });
+  }
+  if (unresolvedCount > 0) {
+    lines.push({
+      text: `${formatNumber(unresolvedCount)} unresolved ${unresolvedCount === 1 ? "row" : "rows"} need classification.`,
+      action: { label: "Review rows →", onClick: () => onReviewTrades("unresolved") }
+    });
+  }
+  if (duplicateCount > 0) {
+    lines.push({
+      text: `${formatNumber(duplicateCount)} potential duplicate ${duplicateCount === 1 ? "row" : "rows"} preserved.`,
+      action: { label: "Review rows →", onClick: () => onReviewTrades("duplicates") }
+    });
+  }
+
+  if (lines.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      {/* ── Two featured insight cards (Tape layout) ── */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        {/* Repeated losers — neg accent */}
-        <div className="flex-1 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-neg bg-surface px-4 py-3">
-          <div className="font-sans text-[12.5px] font-medium text-foreground">Repeated losers</div>
-          <div className="mt-1 font-sans text-[11.5px] text-muted-foreground">
-            {repeatedLosses.length > 0 ? (
-              <>
-                {repeatedLosersText}{" "}
-                <button
-                  type="button"
-                  onClick={() => onReviewTrades(null, repeatedLosses[0])}
-                  className="text-neg underline-offset-2 hover:underline"
-                >
-                  — review
-                </button>
-              </>
-            ) : (
-              repeatedLosersText
-            )}
-          </div>
-        </div>
-        {/* Expiring soon — brand accent */}
-        <div className="flex-1 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-brand bg-surface px-4 py-3">
-          <div className="font-sans text-[12.5px] font-medium text-foreground">Expiring ≤14 days</div>
-          <div className="mt-1 font-mono text-[11.5px] tabular-nums text-muted-foreground">{nearTermText}</div>
-        </div>
-      </div>
-
-      {/* ── Full insight grid (all working + attention signals) ── */}
-      <section className="overflow-hidden rounded-xl border border-hairline bg-surface">
-        <div className="grid gap-px bg-hairline xl:grid-cols-[0.8fr_1.2fr]">
-          <InsightGroup title="What's Working" items={workingInsights} />
-          <InsightGroup title="Needs Attention" items={attentionInsights} />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function InsightGroup({ title, items }: { title: string; items: InsightItem[] }) {
-  return (
-    <section className="bg-surface">
-      <div className="border-b border-hairline bg-surface-inset px-4 py-2.5 font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{title}</div>
-      <div className="grid gap-px bg-hairline md:grid-cols-2 xl:grid-cols-3">
-        {items.map((insight) => (
-          <InsightCard key={insight.title} {...insight} />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function InsightCard({
-  title,
-  value,
-  detail,
-  tone: insightTone,
-  icon: Icon,
-  actionLabel,
-  onAction
-}: {
-  title: string;
-  value: string;
-  detail: string;
-  tone: "positive" | "negative" | "neutral" | "warning" | "primary";
-  icon: React.ElementType;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <article className="group relative flex min-h-40 flex-col bg-surface p-4 transition hover:bg-surface-inset">
-      <div
-        className={cn(
-          "absolute inset-x-0 top-0 h-px",
-          insightTone === "positive" && "bg-pos",
-          insightTone === "negative" && "bg-neg",
-          insightTone === "warning" && "bg-warn",
-          insightTone === "primary" && "bg-brand",
-          insightTone === "neutral" && "bg-hairline"
-        )}
-      />
-      <div className="flex items-start justify-between gap-3">
-        <div className="font-sans text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{title}</div>
-        <span
-          className={cn(
-            "rounded-md border p-2 transition group-hover:scale-105",
-            insightTone === "positive" && "border-pos/25 bg-pos/10 text-pos",
-            insightTone === "negative" && "border-neg/25 bg-neg/10 text-neg",
-            insightTone === "warning" && "border-warn/25 bg-warn/10 text-warn",
-            insightTone === "primary" && "border-brand/25 bg-brand/10 text-brand",
-            insightTone === "neutral" && "border-hairline bg-surface-inset text-muted-foreground"
+    <ul className="space-y-2" aria-label="Insights">
+      {lines.map((line, i) => (
+        <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted-foreground">
+          <span>{line.text}</span>
+          {line.action && (
+            <button
+              type="button"
+              onClick={line.action.onClick}
+              className="text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
+            >
+              {line.action.label}
+            </button>
           )}
-        >
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-      <div
-        className={cn(
-          "mt-3 font-mono text-xl font-medium tabular-nums",
-          insightTone === "positive" && "text-pos",
-          insightTone === "negative" && "text-neg",
-          insightTone === "warning" && "text-warn",
-          insightTone === "primary" && "text-brand",
-          insightTone === "neutral" && "text-foreground"
-        )}
-      >
-        {value}
-      </div>
-      <p className="mt-2 font-sans text-[11.5px] leading-5 text-muted-foreground">{detail}</p>
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-md border border-hairline bg-surface px-3 py-1.5 font-sans text-[11px] font-semibold text-foreground hover:bg-surface-inset"
-        >
-          {actionLabel}
-          <ArrowRight className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </article>
+        </li>
+      ))}
+    </ul>
   );
 }
+
 
 function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (
@@ -1298,13 +1062,3 @@ function addDaysIso(date: Date, days: number) {
   return next.toISOString().slice(0, 10);
 }
 
-function highCapitalInsight(result: CalculationResult) {
-  const rows = result.monthlyReturns.filter((row) => row.averageDeployedCapital > 0);
-  if (!rows.length) return "Capital efficiency insight: N/A.";
-  const highPnl = [...rows].sort((a, b) => b.realizedPnl - a.realizedPnl)[0];
-  const highRoi = [...rows].sort((a, b) => (b.realizedRoiPercent ?? -999) - (a.realizedRoiPercent ?? -999))[0];
-  if (highPnl && highRoi && highPnl !== highRoi) {
-    return `${highPnl.year}-${String(highPnl.month).padStart(2, "0")} drove P&L, while ${highRoi.year}-${String(highRoi.month).padStart(2, "0")} had stronger ROI.`;
-  }
-  return "P&L and ROI leaders are aligned in the current view.";
-}

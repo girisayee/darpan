@@ -12,54 +12,44 @@ type StatStripProps = {
   items: StatItem[];
   moreCount?: number;
   onMore?: () => void;
+  showingMore?: boolean;
 };
 
-export function StatStrip({ items, moreCount, onMore }: StatStripProps) {
+export function StatStrip({ items, moreCount, onMore, showingMore }: StatStripProps) {
   return (
     <div
-      className="bg-surface border border-hairline rounded-xl overflow-hidden"
+      className="flex flex-wrap items-start gap-x-10 gap-y-4"
       role="list"
       aria-label="Key statistics"
     >
-      <div className="flex flex-wrap divide-x divide-hairline-soft">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            role="listitem"
-            className="flex min-w-[100px] flex-1 flex-col gap-0.5 px-4 py-3"
+      {items.map((item) => (
+        <div key={item.label} role="listitem" className="flex flex-col gap-0.5">
+          <span className="text-[12px] text-muted-foreground">{item.label}</span>
+          <span
+            className={cn(
+              "text-[20px] font-medium tabular-nums leading-snug",
+              item.tone === "positive" && "text-pos",
+              item.tone === "negative" && "text-neg",
+              (!item.tone || item.tone === "neutral") && "text-foreground"
+            )}
           >
-            <span className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
-              {item.label}
-            </span>
-            <span
-              className={cn(
-                "font-mono text-[13px] font-medium tabular-nums",
-                item.tone === "positive" && "text-pos",
-                item.tone === "negative" && "text-neg",
-                (!item.tone || item.tone === "neutral") && "text-foreground"
-              )}
-            >
-              {item.value}
-            </span>
-          </div>
-        ))}
+            {item.value}
+          </span>
+        </div>
+      ))}
 
-        {moreCount != null && moreCount > 0 && (
-          <div className="flex items-center px-4 py-3">
-            <button
-              type="button"
-              onClick={onMore}
-              className={cn(
-                "font-sans text-[12px] font-medium text-brand",
-                "rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-              )}
-              aria-label={`Show ${moreCount} more statistics`}
-            >
-              +{moreCount} more
-            </button>
-          </div>
-        )}
-      </div>
+      {moreCount != null && moreCount > 0 && (
+        <div className="flex items-end pb-0.5" style={{ alignSelf: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onMore}
+            className="text-[13px] text-accent rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            aria-label={showingMore ? "Collapse extra metrics" : `Show ${moreCount} more metrics`}
+          >
+            {showingMore ? "← Fewer metrics" : "More metrics →"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
