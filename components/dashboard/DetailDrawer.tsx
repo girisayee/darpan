@@ -267,7 +267,7 @@ export function DetailDrawer({
             {/* Fees */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
               <span className="text-dim">Fees</span>
-              <span className="font-sans tabular-nums font-medium text-muted-foreground">
+              <span className="font-sans tabular-nums font-medium text-foreground">
                 {fees !== 0
                   ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}`
                   : "$0.00"}

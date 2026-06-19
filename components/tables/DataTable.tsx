@@ -96,7 +96,7 @@ export function DataTable<T>({
                   className={cn(
                     "px-3 py-2.5 align-top",
                     column.align === "right"
-                      ? "text-right tabular-nums text-dim"
+                      ? "text-right tabular-nums text-foreground"
                       : "font-sans"
                   )}
                 >

@@ -18,7 +18,7 @@ import { formatPercent } from "@/lib/utils/format";
 const C_POS       = "rgb(var(--pos))";
 const C_NEG       = "rgb(var(--neg))";
 const C_HAIRLINE  = "rgb(var(--hairline))";
-const C_MUTED     = "rgb(var(--muted))";
+const C_MUTED     = "rgb(var(--text-muted))";
 const C_SURFACE   = "rgb(var(--surface))";
 
 const TICK_STYLE = {

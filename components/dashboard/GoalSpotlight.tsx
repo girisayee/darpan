@@ -5,7 +5,7 @@ import { formatCurrency, formatPercent } from "@/lib/utils/format";
 
 // Fixed on-dark palette — intentional hero block in both themes
 const C = {
-  bg: "#16181F",
+  bg: "rgb(var(--spotlight))",
   border: "rgba(255,255,255,0.08)",
   text: "#F2F3F6",
   muted: "#9AA0AC",
@@ -143,7 +143,7 @@ export function GoalSpotlight({
 
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
             {/* Radial gauge */}
-            <RadialGauge pct={monthPct} />
+            <RadialGauge pct={monthPct} negative={monthlyActual < 0} />
 
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               <span
@@ -271,7 +271,7 @@ function TrajectoryChart({
 
 // ── Radial gauge ─────────────────────────────────────────────────────────────
 
-function RadialGauge({ pct }: { pct: number }) {
+function RadialGauge({ pct, negative }: { pct: number; negative?: boolean }) {
   const R = 28;
   const cx = 34;
   const cy = 34;
@@ -280,6 +280,7 @@ function RadialGauge({ pct }: { pct: number }) {
   const filled = pct * circumference;
 
   const centerLabel = `${Math.round(pct * 100)}%`;
+  const fillColor = negative ? C.neg : C.pos;
 
   return (
     <svg width="68" height="68" viewBox="0 0 68 68" aria-label={`Monthly target ${centerLabel} complete`}>
@@ -294,7 +295,7 @@ function RadialGauge({ pct }: { pct: number }) {
       <circle
         cx={cx} cy={cy} r={R}
         fill="none"
-        stroke={C.pos}
+        stroke={fillColor}
         strokeWidth={strokeW}
         strokeDasharray={`${filled.toFixed(2)} ${circumference.toFixed(2)}`}
         strokeLinecap="round"

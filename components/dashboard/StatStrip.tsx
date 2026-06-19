@@ -12,10 +12,9 @@ type StatStripProps = {
   items: StatItem[];
   moreCount?: number;
   onMore?: () => void;
-  showingMore?: boolean;
 };
 
-export function StatStrip({ items, moreCount, onMore, showingMore }: StatStripProps) {
+export function StatStrip({ items, moreCount, onMore }: StatStripProps) {
   return (
     <div
       className="flex flex-wrap items-start gap-x-10 gap-y-4"
@@ -44,9 +43,9 @@ export function StatStrip({ items, moreCount, onMore, showingMore }: StatStripPr
             type="button"
             onClick={onMore}
             className="text-[13px] text-accent rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-            aria-label={showingMore ? "Collapse extra metrics" : `Show ${moreCount} more metrics`}
+            aria-label={`Show ${moreCount} more metrics`}
           >
-            {showingMore ? "← Fewer metrics" : "More metrics →"}
+            {"More metrics →"}
           </button>
         </div>
       )}
