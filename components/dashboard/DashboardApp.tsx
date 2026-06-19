@@ -19,13 +19,14 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { MonthlyRoiChart, OverviewCharts } from "@/components/charts/DashboardCharts";
+import { MonthlyRoiChart } from "@/components/charts/DashboardCharts";
 import { HeroReadout } from "@/components/dashboard/HeroReadout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatStrip } from "@/components/dashboard/StatStrip";
 import { AppHeader } from "@/components/shell/AppHeader";
 import { FilterBar } from "@/components/shell/FilterBar";
 import { TabNav } from "@/components/shell/TabNav";
+import { StatusChip } from "@/components/common/StatusChip";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { calculateDashboard } from "@/lib/calculations/engine";
 import { parseRobinhoodInput, type ImportPreview } from "@/lib/import/robinhood";
@@ -392,7 +393,7 @@ function CapitalTab({ result, settings, onSelectEvent }: { result: CalculationRe
       {/* Monthly ROI bar chart */}
       <section className="rounded-lg border border-hairline bg-surface p-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="text-[13px] font-medium text-foreground">Monthly realized ROI</h3>
+          <h3 className="font-sans text-[13px] font-medium text-foreground">Monthly realized ROI</h3>
           <span className="font-mono text-[11px] text-muted-foreground">{latest?.year ?? ""}</span>
         </div>
         <div className="mt-3">
@@ -422,16 +423,44 @@ function OptionsTab({ result, optionType, onSelectEvent }: { result: Calculation
         <KpiCard label="Premium Collected" value={formatCurrency(lifecycles.reduce((sum, row) => sum + row.premiumReceived, 0))} helper="Gross opening premiums" tooltip="Total premium received from opening option sales." tone="positive" />
         <KpiCard label="Buy-to-Close Cost" value={formatCurrency(lifecycles.reduce((sum, row) => sum + row.closeCost, 0))} helper="Costs to close positions" tooltip="Total debit paid to close option positions." tone="negative" />
         <KpiCard label={optionType === "call" ? "Covered Call ROI" : "Return on Collateral"} value={formatPercent(weightedRoi(events))} helper="P&L / known capital" tooltip="Net realized option-cycle P&L divided by capital or collateral." tone={tone(weightedRoi(events) ?? 0)} />
-        <KpiCard
-          label={optionType === "call" ? "Current CC Capital" : "Current CSP Collateral"}
-          value={formatCurrency(currentCapital)}
-          helper={`${formatNumber(openContracts)} open ${openContracts === 1 ? "contract" : "contracts"}`}
-          tooltip={optionType === "call" ? "Stock capital currently tied to open covered calls. If basis is missing, strike exposure is used as a proxy." : "Collateral currently tied to open cash-secured puts."}
-        />
+        {/* Exposure tile — brand-accented label to emphasize live capital/collateral */}
+        <section className="bg-surface border border-brand/30 rounded-[10px] p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="w-full">
+              <div className="text-[10px] font-medium uppercase tracking-[.12em] text-brand">
+                {optionType === "call" ? "Current CC Capital" : "Current CSP Collateral"}
+              </div>
+              <div className="mt-2 font-mono text-xl font-medium tabular-nums text-foreground">
+                {formatCurrency(currentCapital)}
+              </div>
+            </div>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            {formatNumber(openContracts)} open {openContracts === 1 ? "contract" : "contracts"}
+          </p>
+        </section>
       </div>
-      <OptionCycleTable title={optionType === "call" ? "Open Covered Calls" : "Open Cash-Secured Puts"} rows={openLifecycles} empty="No open option cycles in this tab." showCurrentExposure />
-      <OptionCycleTable title={optionType === "call" ? "All Covered Call Cycles" : "All Cash-Secured Put Cycles"} rows={lifecycles} empty="No option cycles yet." />
-      <EventsTable title={optionType === "call" ? "Covered Call Results" : "Cash-Secured Put Results"} rows={events} onSelectEvent={onSelectEvent} />
+      {/* Open cycles — "live" chip signals real-time open positions */}
+      <OptionCycleTable
+        title={optionType === "call" ? "Open Covered Calls" : "Open Cash-Secured Puts"}
+        rows={openLifecycles}
+        empty="No open option cycles in this tab."
+        showCurrentExposure
+        showLiveChip
+      />
+      {/* All cycles */}
+      <OptionCycleTable
+        title={optionType === "call" ? "All Covered Call Cycles" : "All Cash-Secured Put Cycles"}
+        rows={lifecycles}
+        empty="No option cycles yet."
+      />
+      {/* Results — tape-styled heading, shared EventsTable unchanged */}
+      <section className="space-y-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">
+          {optionType === "call" ? "Covered Call Results" : "Cash-Secured Put Results"}
+        </h2>
+        <EventsTable rows={events} onSelectEvent={onSelectEvent} />
+      </section>
     </div>
   );
 }
@@ -674,7 +703,7 @@ function SettingsTab({
   );
 }
 
-function EventsTable({ title, rows, onSelectEvent }: { title: string; rows: RealizedPnLEvent[]; onSelectEvent: (event: RealizedPnLEvent) => void }) {
+function EventsTable({ title, rows, onSelectEvent }: { title?: string; rows: RealizedPnLEvent[]; onSelectEvent: (event: RealizedPnLEvent) => void }) {
   const columns: Column<RealizedPnLEvent>[] = [
     { key: "date", header: "Date", value: (row) => row.date },
     { key: "symbol", header: "Symbol", value: (row) => row.symbol },
@@ -691,7 +720,7 @@ function EventsTable({ title, rows, onSelectEvent }: { title: string; rows: Real
   ];
   return (
     <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
+      {title && <h2 className="font-sans text-[13px] font-medium text-foreground">{title}</h2>}
       <DataTable rows={rows} columns={columns} onRowClick={onSelectEvent} empty="No realized P&L events yet." />
     </section>
   );
@@ -713,7 +742,7 @@ function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
   return <DataTable rows={rows} columns={columns} empty="No monthly ROI rows yet." />;
 }
 
-function OptionCycleTable({ title, rows, empty, showCurrentExposure = false }: { title: string; rows: OptionLifecycle[]; empty: string; showCurrentExposure?: boolean }) {
+function OptionCycleTable({ title, rows, empty, showCurrentExposure = false, showLiveChip = false }: { title: string; rows: OptionLifecycle[]; empty: string; showCurrentExposure?: boolean; showLiveChip?: boolean }) {
   const columns: Column<OptionLifecycle>[] = [
     { key: "openDate", header: "Open Date", value: (row) => row.openDate },
     { key: "closeDate", header: "Close Date", value: (row) => row.closeDate ?? "" },
@@ -731,11 +760,33 @@ function OptionCycleTable({ title, rows, empty, showCurrentExposure = false }: {
       render: (row) => formatCurrency(optionCycleCapital(row, showCurrentExposure)),
       align: "right"
     },
-    { key: "status", header: "Status", value: (row) => row.status }
+    {
+      key: "status",
+      header: "Status",
+      value: (row) => row.status,
+      render: (row) => {
+        const kindMap = {
+          open: "open",
+          closed: "closed",
+          expired: "expired",
+          assigned: "assigned",
+          unresolved: "unresolved",
+        } as const;
+        return <StatusChip kind={kindMap[row.status] ?? "closed"} />;
+      },
+      align: "right"
+    }
   ];
   return (
-    <section className="space-y-3">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <section className="space-y-2">
+      <div className="flex items-center gap-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">{title}</h2>
+        {showLiveChip && (
+          <span className="inline-flex items-center rounded-full bg-pos/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-pos">
+            live
+          </span>
+        )}
+      </div>
       <DataTable rows={rows} columns={columns} empty={empty} />
     </section>
   );
