@@ -16,39 +16,60 @@ function formatSignedPnl(pnl: number): string {
   return `${sign}${formatNumber(Math.abs(pnl))}`;
 }
 
+function MoverList({
+  movers,
+  ariaHidden,
+}: {
+  movers: Mover[];
+  ariaHidden?: boolean;
+}) {
+  return (
+    <ul
+      className="flex items-center gap-4 px-3 py-1 shrink-0"
+      role="list"
+      aria-hidden={ariaHidden || undefined}
+    >
+      {movers.map(({ symbol, pnl }) => (
+        <li key={symbol} className="flex items-center gap-1.5 shrink-0">
+          <span className="font-sans text-xs text-muted-foreground uppercase tracking-wide">
+            {symbol}
+          </span>
+          <span
+            className={[
+              "font-mono tabular-nums text-xs",
+              pnl >= 0 ? "text-pos" : "text-neg",
+            ].join(" ")}
+          >
+            {formatSignedPnl(pnl)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function TickerRail({ movers }: TickerRailProps) {
   if (movers.length === 0) return null;
 
   return (
     <div
       aria-label="Top movers by realized P&L"
-      className="flex overflow-x-auto motion-reduce:overflow-x-auto whitespace-nowrap select-none"
+      className="flex overflow-x-auto whitespace-nowrap select-none"
       style={{ scrollbarWidth: "none" }}
     >
-      {/* motion-safe: animate the marquee; motion-reduce: static strip */}
-      <ul
-        className={[
-          "flex items-center gap-4 px-3 py-1",
-          "motion-safe:animate-ticker-rail",
-        ].join(" ")}
-        role="list"
-      >
-        {movers.map(({ symbol, pnl }) => (
-          <li key={symbol} className="flex items-center gap-1.5 shrink-0">
-            <span className="font-sans text-xs text-muted-foreground uppercase tracking-wide">
-              {symbol}
-            </span>
-            <span
-              className={[
-                "font-mono tabular-nums text-xs",
-                pnl >= 0 ? "text-pos" : "text-neg",
-              ].join(" ")}
-            >
-              {formatSignedPnl(pnl)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {/*
+       * motion-safe: render two copies and animate translateX(-50%) for a
+       * seamless loop. motion-reduce: single static strip, no animation.
+       */}
+      <div className="motion-safe:flex motion-safe:animate-ticker-rail motion-reduce:hidden">
+        <MoverList movers={movers} />
+        {/* Duplicate for seamless wrap-around */}
+        <MoverList movers={movers} ariaHidden />
+      </div>
+      {/* Static strip shown only under reduced-motion */}
+      <div className="motion-safe:hidden motion-reduce:flex">
+        <MoverList movers={movers} />
+      </div>
     </div>
   );
 }

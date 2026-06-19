@@ -12,21 +12,21 @@ import {
   Gauge,
   GripVertical,
   Lightbulb,
-  Moon,
   RefreshCcw,
   Search,
   Settings,
   SlidersHorizontal,
   Sparkles,
-  Sun,
   Target,
   TrendingDown,
-  Upload,
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { OverviewCharts } from "@/components/charts/DashboardCharts";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { AppHeader } from "@/components/shell/AppHeader";
+import { FilterBar } from "@/components/shell/FilterBar";
+import { TabNav } from "@/components/shell/TabNav";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { calculateDashboard } from "@/lib/calculations/engine";
 import { parseRobinhoodInput, type ImportPreview } from "@/lib/import/robinhood";
@@ -36,6 +36,7 @@ import {
   parseBackup
 } from "@/lib/storage/local-store";
 import { clearStore, getServerSnapshot, getStoreSnapshot, loadStore, saveStore, subscribeStore } from "@/lib/storage/server-store-client";
+import { topMovers } from "@/lib/selectors/top-movers";
 import { useTheme } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
@@ -103,7 +104,6 @@ export function DashboardApp() {
   const result = useMemo(() => filterResult(baseResult, { symbol, strategy, year, month, account }), [baseResult, symbol, strategy, year, month, account]);
   const symbols = useMemo(() => ["ALL", ...new Set(allTransactions.map((transaction) => transaction.symbol).filter(Boolean).sort())], [allTransactions]);
   const years = useMemo(() => ["ALL", ...new Set(allTransactions.map((transaction) => transaction.tradeDate.slice(0, 4)).filter(Boolean).sort())], [allTransactions]);
-  const months = ["ALL", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
   const accounts = useMemo(() => ["ALL", ...new Set(allTransactions.map((transaction) => transaction.accountName).filter(Boolean).sort())], [allTransactions]);
 
   function updateSettings(next: AppSettings) {
@@ -121,64 +121,51 @@ export function DashboardApp() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
-      <header className="overflow-hidden rounded-lg border bg-card/90 shadow-panel backdrop-blur">
-        <div className="flex flex-col gap-4 border-b bg-[linear-gradient(135deg,rgba(14,116,144,0.12),transparent_42%)] p-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-primary text-base font-semibold text-primary-foreground shadow-sm">
-              PI
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-normal text-foreground sm:text-3xl">PositionIQ</h1>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                Realized P&L, option income, and capital efficiency for an active options and swing-trading workflow.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={settings.defaultDateRange} onChange={(value) => updateSettings({ ...settings, defaultDateRange: value as AppSettings["defaultDateRange"] })}>
-              <option value="ALL">All Time</option>
-              <option value="YTD">YTD</option>
-              <option value="THIS_YEAR">This Year</option>
-              <option value="LAST_YEAR">Last Year</option>
-            </Select>
-            <IconButton label="Import" onClick={() => setActiveTab("Import")} icon={<Upload className="h-4 w-4" />} />
-            <IconButton label="Settings" onClick={() => setActiveTab("Settings")} icon={<Settings className="h-4 w-4" />} />
-            <IconButton label="Export backup" onClick={() => downloadBackup(allTransactions, settings)} icon={<FileDown className="h-4 w-4" />} />
-            <IconButton label={theme === "dark" ? "Light mode" : "Dark mode"} onClick={toggle} icon={theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} />
-          </div>
-        </div>
-        <div className="grid gap-2 p-4 md:grid-cols-5">
-          <FilterSelect label="Symbol" value={symbol} onChange={setSymbol} values={symbols} />
-          <FilterSelect label="Strategy" value={strategy} onChange={setStrategy} values={["ALL", "COVERED_CALL", "CASH_SECURED_PUT", "SWING_TRADE"]} />
-          <FilterSelect label="Year" value={year} onChange={setYear} values={years} />
-          <FilterSelect label="Month" value={month} onChange={setMonth} values={months} />
-          <FilterSelect label="Account" value={account} onChange={setAccount} values={accounts} />
-        </div>
-      </header>
+    <main className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
+      <AppHeader
+        movers={topMovers(baseResult)}
+        theme={theme}
+        onToggleTheme={toggle}
+        onImport={() => setActiveTab("Import")}
+        onSettings={() => setActiveTab("Settings")}
+        onExport={() => downloadBackup(allTransactions, settings)}
+      />
 
       {!store.loaded && (
-        <div className="rounded-lg border bg-card p-3 text-sm text-muted-foreground shadow-panel">Loading SQLite data...</div>
+        <div className="rounded-lg border border-hairline bg-surface p-3 text-sm text-muted-foreground">Loading SQLite data...</div>
       )}
       {store.error && (
-        <div className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger shadow-panel">{store.error}</div>
+        <div className="rounded-lg border border-neg/30 bg-neg/10 p-3 text-sm text-neg">{store.error}</div>
       )}
 
-      <nav className="flex flex-wrap gap-2 rounded-lg border bg-card/90 p-2 shadow-panel backdrop-blur">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition",
-              activeTab === tab && "bg-primary text-primary-foreground"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </nav>
+      <div className="rounded-[14px] border border-hairline bg-surface overflow-hidden">
+        <TabNav
+          tabs={tabs}
+          active={activeTab}
+          onSelect={(t) => setActiveTab(t as Tab)}
+        />
+        <div className="p-4">
+          <FilterBar
+            year={year}
+            month={month}
+            symbol={symbol}
+            strategy={strategy}
+            account={account}
+            years={years}
+            symbols={symbols}
+            accounts={accounts}
+            summaryCount={result.realizedEvents.length}
+            summaryPnl={result.aggregates.totalRealizedPnl}
+            onChange={(partial) => {
+              if (partial.year !== undefined) setYear(partial.year);
+              if (partial.month !== undefined) setMonth(partial.month);
+              if (partial.symbol !== undefined) setSymbol(partial.symbol);
+              if (partial.strategy !== undefined) setStrategy(partial.strategy);
+              if (partial.account !== undefined) setAccount(partial.account);
+            }}
+          />
+        </div>
+      </div>
 
       <section className="min-h-[60vh]">
         {activeTab === "Overview" && <OverviewTab result={result} settings={settings} onReviewTrades={openTrades} />}
@@ -1204,18 +1191,6 @@ function DetailDrawer({ event, onClose, transactions }: { event: RealizedPnLEven
   );
 }
 
-function FilterSelect({ label: filterLabel, value, onChange, values }: { label: string; value: string; onChange: (value: string) => void; values: string[] }) {
-  return (
-    <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-      {filterLabel}
-      <Select value={value} onChange={onChange}>
-        {values.map((item) => (
-          <option key={item} value={item}>{label(item)}</option>
-        ))}
-      </Select>
-    </label>
-  );
-}
 
 function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (

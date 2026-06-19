@@ -1,6 +1,7 @@
 "use client";
 
 import { periodFromPreset, type Preset } from "@/lib/filters/period";
+import { formatCurrency, formatNumber } from "@/lib/utils/format";
 
 // ── Month label map ──────────────────────────────────────────────────────────
 const MONTH_LABELS: Record<string, string> = {
@@ -46,6 +47,10 @@ export interface FilterBarProps {
   years: string[];
   symbols: string[];
   accounts: string[];
+  /** Number of closed realized events for the current filter selection */
+  summaryCount?: number;
+  /** Total realized P&L for the current filter selection */
+  summaryPnl?: number;
   onChange: (
     next: Partial<{
       year: string;
@@ -106,6 +111,8 @@ export function FilterBar({
   years,
   symbols,
   accounts,
+  summaryCount,
+  summaryPnl,
   onChange,
 }: FilterBarProps) {
   const now = new Date().getFullYear();
@@ -166,7 +173,7 @@ export function FilterBar({
             <button
               type="button"
               onClick={() => stepYear(-1)}
-              disabled={currentIndex <= 0 && year !== "ALL"}
+              disabled={!canStepBack}
               aria-label="Previous year"
               className={[
                 "text-[13px] leading-none text-dim transition-colors",
@@ -336,31 +343,41 @@ export function FilterBar({
         </select>
       </div>
 
-      {/* ── Row 3: Active chips ────────────────────────────────────────── */}
-      {chips.length > 0 && (
+      {/* ── Row 3: Active chips + live summary ───────────────────────── */}
+      {(chips.length > 0 || summaryCount !== undefined) && (
         <div className="flex flex-wrap items-center gap-[7px] mt-[12px]">
-          <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground mr-[2px]">
-            Active
-          </span>
-          {chips.map(({ key, label }) => (
-            <span
-              key={key}
-              className="inline-flex items-center gap-[4px] rounded-[999px] border border-brand/40 bg-brand/10 text-brand text-[10px] px-[8px] py-[2px]"
-            >
-              {label}
-              <button
-                type="button"
-                onClick={() => removeChip(key)}
-                aria-label={`Remove ${label} filter`}
-                className={[
-                  "leading-none text-[10px] opacity-70 hover:opacity-100 transition-opacity",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 rounded-sm",
-                ].join(" ")}
-              >
-                ×
-              </button>
+          {chips.length > 0 && (
+            <>
+              <span className="text-[10px] uppercase tracking-[.12em] text-muted-foreground mr-[2px]">
+                Active
+              </span>
+              {chips.map(({ key, label }) => (
+                <span
+                  key={key}
+                  className="inline-flex items-center gap-[4px] rounded-[999px] border border-brand/40 bg-brand/10 text-brand text-[10px] px-[8px] py-[2px]"
+                >
+                  {label}
+                  <button
+                    type="button"
+                    onClick={() => removeChip(key)}
+                    aria-label={`Remove ${label} filter`}
+                    className={[
+                      "leading-none text-[10px] opacity-70 hover:opacity-100 transition-opacity",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 rounded-sm",
+                    ].join(" ")}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </>
+          )}
+          {/* Live summary */}
+          {summaryCount !== undefined && summaryPnl !== undefined && (
+            <span className="ml-auto font-mono text-[11px] text-dim tabular-nums">
+              {`→ ${formatNumber(summaryCount)} closed · ${summaryPnl >= 0 ? "+" : ""}${formatCurrency(summaryPnl)} realized`}
             </span>
-          ))}
+          )}
         </div>
       )}
     </div>
