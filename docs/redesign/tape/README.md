@@ -31,7 +31,7 @@ The product is **PositionIQ** everywhere user-facing and in code identifiers. Re
 
 ## 3. Color tokens
 
-Defined as HSL or hex CSS variables in `app/globals.css`, surfaced through Tailwind (`tailwind.config.ts`). Both themes are required.
+Defined as CSS variables in `app/globals.css`, surfaced through Tailwind (`tailwind.config.ts`). Both themes are required. Implementation detail: tokens are stored as space-separated RGB channels (e.g. `242 180 59`) and consumed via `rgb(var(--x) / <alpha-value>)` so Tailwind opacity modifiers (`bg-brand/10`, `ring-pos/40`, etc.) work correctly; the hex values in the tables below are the human-readable reference colors.
 
 ### Dark (default — "night")
 | Token | Hex | Use |

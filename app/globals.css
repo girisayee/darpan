@@ -4,44 +4,44 @@
 
 /* ── Dark theme (default) ──────────────────────────────────────── */
 :root {
-  --bg:              #0C1118;
-  --surface:         #121A24;
-  --surface-inset:   #0C1118;
-  --hairline:        #1F2A37;
-  --hairline-soft:   #16202B;
-  --text:            #E6EDF3;
-  --text-muted:      #76879B;
-  --text-dim:        #9FB0C2;
-  --brand:           #F2B43B;
-  --pos:             #34D399;
-  --neg:             #F87171;
-  --warn:            #FBBF24;
+  --bg:              12 17 24;    /* #0C1118 */
+  --surface:         18 26 36;    /* #121A24 */
+  --surface-inset:   12 17 24;    /* #0C1118 */
+  --hairline:        31 42 55;    /* #1F2A37 */
+  --hairline-soft:   22 32 43;    /* #16202B */
+  --text:            230 237 243; /* #E6EDF3 */
+  --text-muted:      118 135 155; /* #76879B */
+  --text-dim:        159 176 194; /* #9FB0C2 */
+  --brand:           242 180 59;  /* #F2B43B */
+  --pos:             52 211 153;  /* #34D399 */
+  --neg:             248 113 113; /* #F87171 */
+  --warn:            251 191 36;  /* #FBBF24 */
 }
 
 /* ── Light theme ───────────────────────────────────────────────── */
 .light {
-  --bg:              #F4F6F8;
-  --surface:         #FFFFFF;
-  --surface-inset:   #EEF1F4;
-  --hairline:        #E2E7EC;
-  --hairline-soft:   #EDF0F3;
-  --text:            #0C1118;
-  --text-muted:      #5C6B7A;
-  --text-dim:        #3A4654;
-  --brand:           #B7791F;
-  --pos:             #157F4F;
-  --neg:             #D64545;
-  --warn:            #B45309;
+  --bg:              244 246 248; /* #F4F6F8 */
+  --surface:         255 255 255; /* #FFFFFF */
+  --surface-inset:   238 241 244; /* #EEF1F4 */
+  --hairline:        226 231 236; /* #E2E7EC */
+  --hairline-soft:   237 240 243; /* #EDF0F3 */
+  --text:            12 17 24;    /* #0C1118 */
+  --text-muted:      92 107 122;  /* #5C6B7A */
+  --text-dim:        58 70 84;    /* #3A4654 */
+  --brand:           183 121 31;  /* #B7791F */
+  --pos:             21 127 79;   /* #157F4F */
+  --neg:             214 69 69;   /* #D64545 */
+  --warn:            180 83 9;    /* #B45309 */
 }
 
 * {
-  border-color: var(--hairline);
+  border-color: rgb(var(--hairline));
 }
 
 body {
   min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
@@ -56,7 +56,7 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--surface);
+  background: rgb(var(--surface));
 }
 
 .scrollbar-thin::-webkit-scrollbar {
@@ -65,6 +65,6 @@ textarea {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--hairline);
+  background: rgb(var(--hairline));
   border-radius: 999px;
 }
