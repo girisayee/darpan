@@ -19,7 +19,7 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { OverviewCharts } from "@/components/charts/DashboardCharts";
+import { MonthlyRoiChart, OverviewCharts } from "@/components/charts/DashboardCharts";
 import { HeroReadout } from "@/components/dashboard/HeroReadout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { StatStrip } from "@/components/dashboard/StatStrip";
@@ -376,23 +376,34 @@ function GoalBar({
 
 function CapitalTab({ result, settings, onSelectEvent }: { result: CalculationResult; settings: AppSettings; onSelectEvent: (event: RealizedPnLEvent) => void }) {
   const latest = result.monthlyReturns.at(-1);
-  const bestMonth = [...result.monthlyReturns].sort((a, b) => (b.realizedRoiPercent ?? -999) - (a.realizedRoiPercent ?? -999))[0];
-  const worstMonth = [...result.monthlyReturns].sort((a, b) => (a.realizedRoiPercent ?? 999) - (b.realizedRoiPercent ?? 999))[0];
   const efficiency = result.aggregates.averageMonthlyRoi === null ? null : Math.max(0, Math.min(100, 50 + result.aggregates.averageMonthlyRoi * 8));
   return (
-    <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        <KpiCard label="Monthly ROI %" value={formatPercent(latest?.realizedRoiPercent)} helper="Latest month realized ROI" tooltip="Monthly realized P&L divided by average deployed capital." tone={tone(latest?.realizedRoiPercent ?? 0)} />
-        <KpiCard label="YTD ROI %" value={formatPercent(result.aggregates.ytdRoi)} helper="Current-year capital return" tooltip="YTD realized P&L divided by average deployed capital." tone={tone(result.aggregates.ytdRoi ?? 0)} />
-        <KpiCard label="Average Monthly ROI" value={formatPercent(result.aggregates.averageMonthlyRoi)} helper="Mean of monthly ROI values" tooltip="Only months with known capital are included." tone={tone(result.aggregates.averageMonthlyRoi ?? 0)} />
-        <KpiCard label="Average Deployed Capital" value={formatCurrency(result.aggregates.averageDeployedCapital)} helper="Capital-days / days" tooltip="Average deployed capital uses daily capital exposure." />
-        <KpiCard label="Peak Deployed Capital" value={formatCurrency(result.aggregates.peakDeployedCapital)} helper="Largest daily exposure" tooltip="Highest deployed capital observed in a month." />
-        <KpiCard label="Capital Efficiency" value={efficiency === null ? "N/A" : formatNumber(efficiency, 0)} helper="Directional score" tooltip="Simple score based on average monthly ROI." tone={tone((efficiency ?? 50) - 50)} />
-        <KpiCard label="Best ROI Month" value={bestMonth ? `${bestMonth.year}-${String(bestMonth.month).padStart(2, "0")}` : "N/A"} helper={formatPercent(bestMonth?.realizedRoiPercent)} tooltip="Month with highest ROI." tone="positive" />
-        <KpiCard label="Worst ROI Month" value={worstMonth ? `${worstMonth.year}-${String(worstMonth.month).padStart(2, "0")}` : "N/A"} helper={formatPercent(worstMonth?.realizedRoiPercent)} tooltip="Month with lowest ROI." tone="negative" />
+    <div className="space-y-3">
+      {/* 6-up readout row — mockup 04 */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <KpiCard label="Monthly ROI" value={formatPercent(latest?.realizedRoiPercent)} helper="Latest month realized ROI" tooltip="Monthly realized P&L divided by average deployed capital." tone={tone(latest?.realizedRoiPercent ?? 0)} />
+        <KpiCard label="YTD ROI" value={formatPercent(result.aggregates.ytdRoi)} helper="Current-year capital return" tooltip="YTD realized P&L divided by average deployed capital." tone={tone(result.aggregates.ytdRoi ?? 0)} />
+        <KpiCard label="Avg Monthly" value={formatPercent(result.aggregates.averageMonthlyRoi)} helper="Mean of monthly ROI values" tooltip="Only months with known capital are included." tone={tone(result.aggregates.averageMonthlyRoi ?? 0)} />
+        <KpiCard label="Avg Deployed" value={formatCurrency(result.aggregates.averageDeployedCapital)} helper="Capital-days / days" tooltip="Average deployed capital uses daily capital exposure." />
+        <KpiCard label="Peak Deployed" value={formatCurrency(result.aggregates.peakDeployedCapital)} helper="Largest daily exposure" tooltip="Highest deployed capital observed in a month." />
+        <KpiCard label="Cap. Efficiency" value={efficiency === null ? "N/A" : formatNumber(efficiency, 0)} helper="Directional score" tooltip="Simple score based on average monthly ROI." tone={tone((efficiency ?? 50) - 50)} />
       </div>
-      <OverviewCharts result={result} annualGoal={settings.annualRealizedPnlGoal} />
+
+      {/* Monthly ROI bar chart */}
+      <section className="rounded-lg border border-hairline bg-surface p-4">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-[13px] font-medium text-foreground">Monthly realized ROI</h3>
+          <span className="font-mono text-[11px] text-muted-foreground">{latest?.year ?? ""}</span>
+        </div>
+        <div className="mt-3">
+          <MonthlyRoiChart result={result} />
+        </div>
+      </section>
+
+      {/* Monthly ledger DataTable */}
       <MonthlyRoiTable rows={result.monthlyReturns} />
+
+      {/* Events ledger */}
       <EventsTable title="Capital Efficiency Ledger" rows={result.realizedEvents} onSelectEvent={onSelectEvent} />
     </div>
   );
