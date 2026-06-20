@@ -8,6 +8,10 @@
     ],
     "allowJs": false,
     "skipLibCheck": true,
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
