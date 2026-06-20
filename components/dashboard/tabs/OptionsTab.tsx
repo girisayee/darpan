@@ -15,7 +15,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, TradeTransaction } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, TradeTransaction } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import {
@@ -24,7 +24,6 @@ import {
   currentDeployedCapital,
   tone,
 } from "@/components/dashboard/tabs/shared";
-import { lifecycleToEvent } from "@/lib/utils/option-helpers";
 
 // ── View types ────────────────────────────────────────────────────────────────
 
@@ -54,13 +53,13 @@ function displayCapital(lc: OptionLifecycle): number {
   return lc.strikePrice * lc.sharesControlled;
 }
 
-/** Stage label derived from direction + optionType. */
+/** Stage label derived from direction + optionType — matches ClosedCyclesTable. */
 function stageLabel(lc: OptionLifecycle): string {
   if (lc.direction === "long") {
-    return lc.optionType === "call" ? "Long call" : "Long put";
+    return lc.optionType === "call" ? "Bought Call" : "Bought Put";
   }
-  if (lc.optionType === "call") return "Covered call";
-  return "Sold put";
+  if (lc.optionType === "call") return "Covered Call";
+  return "Sold Put";
 }
 
 /** Stage tone class. */
@@ -547,11 +546,12 @@ function OptionsKpiHeader({ result }: { result: CalculationResult }) {
 
 export function OptionsTab({
   result,
-  onSelectEvent,
+  onSelectLifecycle,
   onReviewFix,
 }: {
   result: CalculationResult;
-  onSelectEvent?: (event: RealizedPnLEvent) => void;
+  /** Open the lifecycle-driven DetailDrawer for a closed option cycle. */
+  onSelectLifecycle?: (lifecycle: OptionLifecycle) => void;
   onReviewFix?: () => void;
 }) {
   const [optionsView, setOptionsView] = useState<OptionsView>("Open");
@@ -567,13 +567,6 @@ export function OptionsTab({
       .filter((t) => t.importBatchId === "manual" || t.tags.includes("manual"))
       .map((t) => t.id)
   );
-
-  // Handler for closed cycle row activation → DetailDrawer
-  function handleCycleClick(lifecycle: OptionLifecycle) {
-    if (!onSelectEvent) return;
-    const event = lifecycleToEvent(lifecycle, result.realizedEvents);
-    onSelectEvent(event);
-  }
 
   // Open lifecycles: short direction only (CC/CSP — premium-selling positions).
   const openLifecycles = result.optionLifecycles.filter(
@@ -602,11 +595,24 @@ export function OptionsTab({
     (l) => l.status !== "open" && l.status !== "unresolved"
   );
 
-  // Covered-call assignments missing the underlying share cost basis: the called-away
-  // P&L is inflated until the opening share purchase(s) are entered via Review & fix.
-  const ccMissingBasisCount = result.realizedEvents.filter(
+  // Covered calls missing the underlying share cost basis, two ways:
+  //  (a) assignments whose called-away P&L is inflated until the basis is entered, and
+  //  (b) expired/closed covered calls written against shares that were never imported
+  //      (capital & ROI can't be computed) — counted once per symbol.
+  const ccAssignMissing = result.realizedEvents.filter(
     (e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK" && e.costBasis === null
   ).length;
+  const ccUnderlyingMissing = new Set(
+    result.optionLifecycles
+      .filter(
+        (l) =>
+          l.optionType === "call" &&
+          l.direction === "short" &&
+          l.warnings.some((w) => w.includes("could not be linked to underlying stock lot"))
+      )
+      .map((l) => l.underlyingSymbol)
+  ).size;
+  const ccMissingBasisCount = ccAssignMissing + ccUnderlyingMissing;
 
   return (
     <div className="space-y-6 py-2">
@@ -614,9 +620,9 @@ export function OptionsTab({
       {ccMissingBasisCount > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-hairline border-l-4 border-l-warn bg-warn/5 p-3">
           <p className="font-sans text-[12.5px] text-foreground">
-            {ccMissingBasisCount} covered-call assignment
-            {ccMissingBasisCount !== 1 ? "s" : ""} need share cost basis to compute
-            assignment returns
+            {ccMissingBasisCount} covered-call position
+            {ccMissingBasisCount !== 1 ? "s" : ""} missing the underlying share cost basis —
+            add your share purchase to compute capital & returns
           </p>
           {onReviewFix && (
             <button
@@ -714,7 +720,7 @@ export function OptionsTab({
             <ClosedCyclesTable
               rows={closedCyclesLifecycles}
               empty="No closed option positions yet."
-              onRowClick={onSelectEvent ? handleCycleClick : undefined}
+              onRowClick={onSelectLifecycle}
               manualTxIds={manualTxIds}
             />
           </div>

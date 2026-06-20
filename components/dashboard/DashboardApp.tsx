@@ -2,10 +2,8 @@
 
 import {
   Download,
-  FileDown,
   FileUp,
   RefreshCcw,
-  X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
@@ -21,12 +19,8 @@ import { calculateDashboard } from "@/lib/calculations/engine";
 import { parseRobinhoodInput, type ImportPreview } from "@/lib/import/robinhood";
 import { sampleTransactions } from "@/lib/sample-data/sample-transactions";
 import { filterResult } from "@/lib/selectors/filter-result";
+import { createBackup } from "@/lib/storage/local-store";
 import {
-  createBackup,
-  parseBackup
-} from "@/lib/storage/local-store";
-import {
-  clearStore,
   getServerSnapshot,
   getStoreSnapshot,
   loadStore,
@@ -38,10 +32,12 @@ import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber } from "@/lib/utils/format";
 import type {
   AppSettings,
+  OptionLifecycle,
   RealizedPnLEvent,
   TradeTransaction
 } from "@/types/trading";
 import { label, signedMoney } from "@/components/dashboard/tabs/shared";
+import { ManualEntryCard } from "@/components/dashboard/ReviewFixPanel";
 
 const tabs = [
   "Overview",
@@ -62,6 +58,7 @@ export function DashboardApp() {
   const [account, setAccount] = useState("ALL");
   const [year, setYear] = useState("2026");
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
+  const [selectedLifecycle, setSelectedLifecycle] = useState<OptionLifecycle | null>(null);
   const [reviewFixOpen, setReviewFixOpen] = useState(false);
 
   useEffect(() => {
@@ -102,13 +99,22 @@ export function DashboardApp() {
     void saveStore({ transactions: next });
   }
 
-  function openTrades() {
-    setReviewFixOpen(true);
-  }
-
   function addTransactions(txs: TradeTransaction[]) {
     void saveStore({ transactions: [...storedTransactions, ...txs] });
   }
+
+  function updateTransaction(updated: TradeTransaction) {
+    void saveStore({ transactions: storedTransactions.map((t) => t.id === updated.id ? updated : t) });
+  }
+
+  function deleteTransaction(id: string) {
+    void saveStore({ transactions: storedTransactions.filter((t) => t.id !== id) });
+  }
+
+  const manualTransactions = useMemo(
+    () => storedTransactions.filter((t) => t.importBatchId === "manual" || t.tags.includes("manual")),
+    [storedTransactions]
+  );
 
   const primaryTabs = tabs as readonly string[];
 
@@ -154,13 +160,12 @@ export function DashboardApp() {
           <OverviewTab
             result={result}
             settings={settings}
-            onReviewTrades={openTrades}
           />
         )}
         {activeTab === "Options" && (
           <OptionsTab
             result={result}
-            onSelectEvent={setSelectedEvent}
+            onSelectLifecycle={setSelectedLifecycle}
             onReviewFix={() => setReviewFixOpen(true)}
           />
         )}
@@ -182,25 +187,30 @@ export function DashboardApp() {
         )}
         {activeTab === "Settings" && (
           <SettingsTab
-            transactions={storedTransactions}
             settings={settings}
             onChange={updateSettings}
-            onImport={(rows, importedSettings) => {
-              void saveStore({ transactions: rows, settings: importedSettings });
-            }}
-            onClear={() => {
-              void clearStore();
-            }}
+            manualTransactions={manualTransactions}
+            onUpdateTransaction={updateTransaction}
+            onDeleteTransaction={deleteTransaction}
           />
         )}
       </section>
 
       <DetailDrawer
         event={selectedEvent}
-        onClose={() => setSelectedEvent(null)}
+        lifecycle={selectedLifecycle}
+        onClose={() => {
+          setSelectedEvent(null);
+          setSelectedLifecycle(null);
+        }}
         transactions={result.transactions}
         events={result.realizedEvents}
         taxLots={result.taxLots}
+        onReviewFix={() => {
+          setSelectedEvent(null);
+          setSelectedLifecycle(null);
+          setReviewFixOpen(true);
+        }}
       />
 
       <ReviewFixPanel
@@ -208,6 +218,9 @@ export function DashboardApp() {
         onClose={() => setReviewFixOpen(false)}
         result={result}
         onAddTransactions={addTransactions}
+        manualTransactions={manualTransactions}
+        onUpdateTransaction={updateTransaction}
+        onDeleteTransaction={deleteTransaction}
       />
     </main>
   );
@@ -379,19 +392,18 @@ function ImportIssues({ issues }: { issues: ImportPreview["issues"] }) {
 // ── Settings tab ──────────────────────────────────────────────────────────────
 
 function SettingsTab({
-  transactions,
   settings,
   onChange,
-  onImport,
-  onClear,
+  manualTransactions,
+  onUpdateTransaction,
+  onDeleteTransaction,
 }: {
-  transactions: TradeTransaction[];
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
-  onImport: (rows: TradeTransaction[], settings: AppSettings) => void;
-  onClear: () => void;
+  manualTransactions: TradeTransaction[];
+  onUpdateTransaction: (updated: TradeTransaction) => void;
+  onDeleteTransaction: (id: string) => void;
 }) {
-  const backupInput = useRef<HTMLInputElement | null>(null);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <SettingsPanel title="General">
@@ -412,9 +424,7 @@ function SettingsTab({
             Annual realized P&amp;L goal
           </span>
           <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
-            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-              $
-            </span>
+            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">$</span>
             <input
               type="number"
               min="0"
@@ -423,18 +433,14 @@ function SettingsTab({
               onChange={(event) =>
                 onChange({
                   ...settings,
-                  annualRealizedPnlGoal: Math.max(
-                    0,
-                    Number(event.target.value) || 0
-                  ),
+                  annualRealizedPnlGoal: Math.max(0, Number(event.target.value) || 0),
                 })
               }
               className="h-10 w-full bg-transparent px-2 font-sans text-[13px] tabular-nums text-foreground outline-none"
             />
           </div>
           <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
-            Monthly pace:{" "}
-            {formatCurrency(settings.annualRealizedPnlGoal / 12)}
+            Monthly pace: {formatCurrency(settings.annualRealizedPnlGoal / 12)}
           </span>
         </label>
         <label className="grid gap-1">
@@ -442,9 +448,7 @@ function SettingsTab({
             Max buying power
           </span>
           <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
-            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-              $
-            </span>
+            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">$</span>
             <input
               type="number"
               min="0"
@@ -463,25 +467,16 @@ function SettingsTab({
             Used for buying-power utilization
           </span>
         </label>
-        <div className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-muted-foreground">
-          Imported trade data is stored in the local SQLite database at{" "}
-          <span className="font-sans text-[11px] tabular-nums">
-            data/positioniq.sqlite
-          </span>
-          .
+        <div className="grid gap-1">
+          <span className="font-sans text-[11.5px] text-muted-foreground">Cost basis method</span>
+          <Segmented
+            value={settings.costBasisMethod}
+            values={["FIFO", "LIFO", "AVERAGE"]}
+            onChange={(value) =>
+              onChange({ ...settings, costBasisMethod: value as AppSettings["costBasisMethod"] })
+            }
+          />
         </div>
-      </SettingsPanel>
-      <SettingsPanel title="Cost Basis">
-        <Segmented
-          value={settings.costBasisMethod}
-          values={["FIFO", "LIFO", "AVERAGE"]}
-          onChange={(value) =>
-            onChange({
-              ...settings,
-              costBasisMethod: value as AppSettings["costBasisMethod"],
-            })
-          }
-        />
       </SettingsPanel>
       <SettingsPanel title="Capital Calculation">
         <label className="grid gap-1">
@@ -493,17 +488,12 @@ function SettingsTab({
             onChange={(value) =>
               onChange({
                 ...settings,
-                coveredCallDenominator:
-                  value as AppSettings["coveredCallDenominator"],
+                coveredCallDenominator: value as AppSettings["coveredCallDenominator"],
               })
             }
           >
-            <option value="UNDERLYING_COST_BASIS">
-              Underlying stock cost basis
-            </option>
-            <option value="CURRENT_MARKET_VALUE">
-              Current market value if available
-            </option>
+            <option value="UNDERLYING_COST_BASIS">Underlying stock cost basis</option>
+            <option value="CURRENT_MARKET_VALUE">Current market value if available</option>
           </Select>
         </label>
         <label className="grid gap-1">
@@ -515,17 +505,12 @@ function SettingsTab({
             onChange={(value) =>
               onChange({
                 ...settings,
-                cashSecuredPutDenominator:
-                  value as AppSettings["cashSecuredPutDenominator"],
+                cashSecuredPutDenominator: value as AppSettings["cashSecuredPutDenominator"],
               })
             }
           >
-            <option value="CONSERVATIVE_COLLATERAL">
-              Conservative collateral: strike * shares
-            </option>
-            <option value="NET_COLLATERAL_AFTER_PREMIUM">
-              Net collateral after premium
-            </option>
+            <option value="CONSERVATIVE_COLLATERAL">Conservative collateral: strike * shares</option>
+            <option value="NET_COLLATERAL_AFTER_PREMIUM">Net collateral after premium</option>
           </Select>
         </label>
         <label className="grid gap-1">
@@ -537,51 +522,39 @@ function SettingsTab({
             onChange={(value) =>
               onChange({
                 ...settings,
-                monthlyRoiDenominator:
-                  value as AppSettings["monthlyRoiDenominator"],
+                monthlyRoiDenominator: value as AppSettings["monthlyRoiDenominator"],
               })
             }
           >
-            <option value="AVERAGE_DEPLOYED_CAPITAL">
-              Average deployed capital
-            </option>
+            <option value="AVERAGE_DEPLOYED_CAPITAL">Average deployed capital</option>
             <option value="PEAK_DEPLOYED_CAPITAL">Peak deployed capital</option>
             <option value="CLOSED_TRADE_CAPITAL">Closed trade capital</option>
           </Select>
         </label>
       </SettingsPanel>
-      <SettingsPanel title="Backup">
-        <div className="flex flex-wrap gap-2">
-          <IconButton
-            label="Export backup"
-            onClick={() => downloadBackup(transactions, settings)}
-            icon={<FileDown className="h-4 w-4" />}
-          />
-          <IconButton
-            label="Import backup"
-            onClick={() => backupInput.current?.click()}
-            icon={<FileUp className="h-4 w-4" />}
-          />
-          <IconButton
-            label="Clear local data"
-            onClick={onClear}
-            icon={<X className="h-4 w-4" />}
-            danger
-          />
-        </div>
-        <input
-          ref={backupInput}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            const backup = parseBackup(await file.text());
-            onImport(backup.transactions, backup.settings);
-          }}
-        />
-      </SettingsPanel>
+      <div className="lg:col-span-2">
+        <SettingsPanel title="Manual entries">
+          {manualTransactions.length === 0 ? (
+            <p className="font-sans text-[12px] text-muted-foreground">
+              No manually-added transactions yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <p className="font-sans text-[11.5px] text-muted-foreground">
+                {manualTransactions.length} manually-added transaction{manualTransactions.length !== 1 ? "s" : ""}.
+              </p>
+              {manualTransactions.map((tx) => (
+                <ManualEntryCard
+                  key={tx.id}
+                  tx={tx}
+                  onUpdate={onUpdateTransaction}
+                  onDelete={onDeleteTransaction}
+                />
+              ))}
+            </div>
+          )}
+        </SettingsPanel>
+      </div>
     </div>
   );
 }

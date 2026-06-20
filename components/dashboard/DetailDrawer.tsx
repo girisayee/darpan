@@ -4,8 +4,8 @@ import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
-import { assignmentShareDetail } from "@/lib/utils/option-helpers";
+import type { OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
+import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
 
 // ---------- helpers ----------
 
@@ -37,6 +37,74 @@ function strategyLabel(strategy: string) {
   return labels[strategy] ?? strategy.toLowerCase().replace(/_/g, " ");
 }
 
+/** Strategy label for an option lifecycle by direction + optionType. */
+function lifecycleStrategyLabel(lc: OptionLifecycle) {
+  if (lc.direction === "long") {
+    return lc.optionType === "call" ? "Long call" : "Long put";
+  }
+  return lc.optionType === "call" ? "Covered call" : "Cash-secured put";
+}
+
+/** Outcome label from lifecycle status. */
+function outcomeLabel(status: OptionLifecycle["status"]) {
+  if (status === "assigned") return "Assigned";
+  if (status === "expired") return "Expired";
+  if (status === "closed") return "Closed";
+  return status;
+}
+
+function signedPercentText(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  return `${value >= 0 ? "+" : ""}${formatPercent(value)}`;
+}
+
+// ---------- shared row primitives ----------
+
+/** A label/value waterfall row. */
+function Row({
+  label,
+  value,
+  valueClass,
+  bold,
+  topBorder,
+  helper,
+}: {
+  label: string;
+  value: React.ReactNode;
+  valueClass?: string;
+  bold?: boolean;
+  topBorder?: boolean;
+  helper?: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between py-2.5 font-sans text-[13px]",
+        topBorder
+          ? "border-t border-hairline pt-2.5 mt-0.5"
+          : "border-b border-hairline-soft"
+      )}
+    >
+      <span className={cn(bold ? "text-foreground font-medium" : "text-dim")}>
+        {label}
+        {helper ? (
+          <span className="ml-1 text-[11px] text-muted-foreground">{helper}</span>
+        ) : null}
+      </span>
+      <span className={cn("font-sans tabular-nums font-medium", valueClass ?? "text-foreground")}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Section heading used in both views. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-4 font-sans text-[11px] text-muted-foreground">{children}</div>
+  );
+}
+
 // ---------- MetaCell ----------
 
 function MetaCell({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
@@ -54,24 +122,31 @@ function MetaCell({ label, value, valueClass }: { label: string; value: React.Re
 
 export function DetailDrawer({
   event,
+  lifecycle,
   onClose,
   transactions,
   events = [],
   taxLots = [],
+  onReviewFix,
 }: {
-  event: RealizedPnLEvent | null;
+  event?: RealizedPnLEvent | null;
+  lifecycle?: OptionLifecycle | null;
   onClose: () => void;
   transactions: TradeTransaction[];
   events?: RealizedPnLEvent[];
   taxLots?: TaxLot[];
+  onReviewFix?: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
 
+  // The drawer is open when either an event (stock/swing) or a lifecycle (option) is set.
+  const open = !!event || !!lifecycle;
+
   // Capture the element that had focus before the drawer opened
   useEffect(() => {
-    if (event) {
+    if (open) {
       previousFocusRef.current = document.activeElement;
       // Move focus into the drawer after paint
       requestAnimationFrame(() => {
@@ -84,11 +159,11 @@ export function DetailDrawer({
       }
       previousFocusRef.current = null;
     }
-  }, [event]);
+  }, [open]);
 
   // Esc closes
   useEffect(() => {
-    if (!event) return;
+    if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -97,11 +172,11 @@ export function DetailDrawer({
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [event, onClose]);
+  }, [open, onClose]);
 
   // Focus trap: keep Tab within the panel
   useEffect(() => {
-    if (!event || !panelRef.current) return;
+    if (!open || !panelRef.current) return;
     const panel = panelRef.current;
 
     function getFocusable() {
@@ -133,10 +208,88 @@ export function DetailDrawer({
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [event]);
+  }, [open]);
 
-  if (!event) return null;
+  if (!open) return null;
 
+  const ariaLabel = lifecycle
+    ? `${lifecycle.underlyingSymbol} option cycle detail`
+    : `${event!.symbol} realized P&L detail`;
+
+  return (
+    /* Backdrop scrim */
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-black/50"
+      onClick={onClose}
+      role="presentation"
+    >
+      {/* Panel — clicks inside do NOT close */}
+      <aside
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        className="motion-safe:animate-[slideIn_160ms_ease] relative z-10 h-full w-[64%] min-w-[380px] overflow-y-auto bg-surface border-l border-hairline"
+        style={{ maxWidth: "640px", background: "rgb(var(--surface))" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5">
+          {lifecycle ? (
+            <OptionCycleBody
+              lifecycle={lifecycle}
+              transactions={transactions}
+              events={events}
+              taxLots={taxLots}
+              onClose={onClose}
+              onReviewFix={onReviewFix}
+              closeButtonRef={closeButtonRef}
+            />
+          ) : (
+            <EventDetailBody
+              event={event!}
+              transactions={transactions}
+              events={events}
+              taxLots={taxLots}
+              onClose={onClose}
+              closeButtonRef={closeButtonRef}
+            />
+          )}
+        </div>
+      </aside>
+
+      {/* Hidden animation keyframes via a style tag — only injected once */}
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0.7; }
+          to   { transform: translateX(0);    opacity: 1;   }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .motion-safe\\:animate-\\[slideIn_160ms_ease\\] {
+            animation: none !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ---------- EventDetailBody (stock / swing waterfall — unchanged) ----------
+
+function EventDetailBody({
+  event,
+  transactions,
+  events,
+  taxLots,
+  onClose,
+  closeButtonRef,
+}: {
+  event: RealizedPnLEvent;
+  transactions: TradeTransaction[];
+  events: RealizedPnLEvent[];
+  taxLots: TaxLot[];
+  onClose: () => void;
+  closeButtonRef: React.RefObject<HTMLButtonElement | null>;
+}) {
   // Derived values — null-safe throughout
   const grossProceeds = event.grossProceeds ?? 0;
   const costBasis = event.costBasis ?? 0;
@@ -172,305 +325,561 @@ export function DetailDrawer({
   const shareDetail = assignmentShareDetail(event, events, taxLots);
 
   return (
-    /* Backdrop scrim */
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/50"
-      onClick={onClose}
-      role="presentation"
-    >
-      {/* Panel — clicks inside do NOT close */}
-      <aside
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${event.symbol} realized P&L detail`}
-        className="motion-safe:animate-[slideIn_160ms_ease] relative z-10 h-full w-[64%] min-w-[380px] overflow-y-auto bg-surface border-l border-hairline"
-        style={{ maxWidth: "640px", background: "rgb(var(--surface))" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-5">
-          {/* ── Header ── */}
+    <>
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-sans text-[16px] font-medium text-foreground">
+              {event.symbol}
+            </span>
+            {/* Strategy chip — accent-tinted pill, safe kind mapping */}
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+              {strategyLabel(event.strategy)}
+            </span>
+            {hasManualTx && (
+              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+                manual
+              </span>
+            )}
+          </div>
+          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
+            Closed {event.date}
+            {event.quantity ? ` · ${formatNumber(event.quantity)} shares` : ""}
+          </div>
+        </div>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* ── Hero: Realized P&L + ROI ── */}
+      <div className="flex items-baseline gap-3 mt-4 mb-2">
+        <div>
+          <div className="font-sans text-[11px] text-muted-foreground">
+            Realized P&amp;L
+          </div>
           <div
-            className="flex items-start justify-between gap-3 border-b border-hairline pb-4"
+            className={cn(
+              "font-sans text-[30px] font-medium tabular-nums mt-1",
+              toneClass(realizedPnl)
+            )}
           >
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-sans text-[16px] font-medium text-foreground">
-                  {event.symbol}
-                </span>
-                {/* Strategy chip — accent-tinted pill, safe kind mapping */}
-                <span
-                  className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent"
-                >
-                  {strategyLabel(event.strategy)}
-                </span>
-                {hasManualTx && (
-                  <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
-                    manual
-                  </span>
-                )}
-              </div>
-              <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
-                Closed {event.date}
-                {event.quantity ? ` · ${formatNumber(event.quantity)} shares` : ""}
-              </div>
-            </div>
-            <button
-              ref={closeButtonRef}
-              type="button"
-              aria-label="Close"
-              onClick={onClose}
-              className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            {signedCurrency(realizedPnl)}
           </div>
-
-          {/* ── Hero: Realized P&L + ROI ── */}
-          <div className="flex items-baseline gap-3 mt-4 mb-2">
-            <div>
-              <div className="font-sans text-[11px] text-muted-foreground">
-                Realized P&amp;L
-              </div>
-              <div
-                className={cn(
-                  "font-sans text-[30px] font-medium tabular-nums mt-1",
-                  toneClass(realizedPnl)
-                )}
-              >
-                {signedCurrency(realizedPnl)}
-              </div>
-            </div>
-            <div className="ml-auto text-right">
-              <div className="font-sans text-[11px] text-muted-foreground">
-                ROI
-              </div>
-              <div
-                className={cn(
-                  "font-sans text-[18px] font-medium tabular-nums mt-1",
-                  toneClass(roiPercent)
-                )}
-              >
-                {roiPercent !== null
-                  ? `${roiPercent >= 0 ? "+" : ""}${formatPercent(roiPercent)}`
-                  : "N/A"}
-              </div>
-            </div>
+        </div>
+        <div className="ml-auto text-right">
+          <div className="font-sans text-[11px] text-muted-foreground">ROI</div>
+          <div
+            className={cn(
+              "font-sans text-[18px] font-medium tabular-nums mt-1",
+              toneClass(roiPercent)
+            )}
+          >
+            {roiPercent !== null
+              ? `${roiPercent >= 0 ? "+" : ""}${formatPercent(roiPercent)}`
+              : "N/A"}
           </div>
+        </div>
+      </div>
 
-          {/* ── Calculation waterfall ── */}
-          <div className="font-sans text-[11px] text-muted-foreground mt-4">
-            How this was calculated
+      {/* ── Calculation waterfall ── */}
+      <div className="font-sans text-[11px] text-muted-foreground mt-4">
+        How this was calculated
+      </div>
+      <div className="mt-1.5">
+        {/* Gross proceeds */}
+        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+          <span className="text-dim">Gross proceeds</span>
+          <span className={cn("font-sans tabular-nums font-medium", toneClass(grossProceeds))}>
+            {signedCurrency(grossProceeds)}
+          </span>
+        </div>
+        {/* Cost basis */}
+        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+          <span className="text-dim">
+            Allocated cost basis
+            {event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)
+              ? ` (${event.explanation.match(/\b(FIFO|LIFO|AVERAGE)\b/i)![0]})`
+              : ""}
+          </span>
+          <span className="font-sans tabular-nums font-medium text-neg">
+            {costBasis !== 0 ? `−${formatCurrency(Math.abs(costBasis), { maximumFractionDigits: 2 })}` : "$0.00"}
+          </span>
+        </div>
+        {/* Fees */}
+        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+          <span className="text-dim">Fees</span>
+          <span className="font-sans tabular-nums font-medium text-foreground">
+            {fees !== 0
+              ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}`
+              : "$0.00"}
+          </span>
+        </div>
+        {/* Total row */}
+        <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+          <span className="text-foreground font-medium">Realized P&amp;L</span>
+          <span className={cn("font-sans tabular-nums font-medium", toneClass(realizedPnl))}>
+            {signedCurrency(realizedPnl)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Shares section (assignment share leg) ── */}
+      {shareDetail && shareDetail.kind === "called-away" && (
+        <div className="mt-4">
+          <div className="font-sans text-[11px] text-muted-foreground">
+            Called-away shares
           </div>
           <div className="mt-1.5">
-            {/* Gross proceeds */}
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-              <span className="text-dim">Gross proceeds</span>
-              <span className={cn("font-sans tabular-nums font-medium", toneClass(grossProceeds))}>
-                {signedCurrency(grossProceeds)}
-              </span>
-            </div>
-            {/* Cost basis */}
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-              <span className="text-dim">
-                Allocated cost basis
-                {event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)
-                  ? ` (${event.explanation.match(/\b(FIFO|LIFO|AVERAGE)\b/i)![0]})`
-                  : ""}
-              </span>
-              <span className="font-sans tabular-nums font-medium text-neg">
-                {costBasis !== 0 ? `−${formatCurrency(Math.abs(costBasis), { maximumFractionDigits: 2 })}` : "$0.00"}
-              </span>
-            </div>
-            {/* Fees */}
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-              <span className="text-dim">Fees</span>
+              <span className="text-dim">Shares sold at strike</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
-                {fees !== 0
-                  ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}`
-                  : "$0.00"}
+                {formatNumber(shareDetail.shares)}
               </span>
             </div>
-            {/* Total row */}
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+              <span className="text-dim">Share cost basis</span>
+              <span className="font-sans tabular-nums font-medium text-neg">
+                {shareDetail.costBasis != null
+                  ? `−${formatCurrency(Math.abs(shareDetail.costBasis), { maximumFractionDigits: 2 })}`
+                  : "N/A"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+              <span className="text-dim">Strike proceeds</span>
+              <span className="font-sans tabular-nums font-medium text-pos">
+                {`+${formatCurrency(shareDetail.proceeds, { maximumFractionDigits: 2 })}`}
+              </span>
+            </div>
             <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
-              <span className="text-foreground font-medium">Realized P&amp;L</span>
-              <span
-                className={cn(
-                  "font-sans tabular-nums font-medium",
-                  toneClass(realizedPnl)
-                )}
-              >
-                {signedCurrency(realizedPnl)}
+              <span className="text-foreground font-medium">Assignment P&amp;L (shares)</span>
+              <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.pnl))}>
+                {signedCurrency(shareDetail.pnl)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2.5 font-sans text-[13px]">
+              <span className="text-dim">Share ROI</span>
+              <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.roiPercent))}>
+                {shareDetail.roiPercent !== null
+                  ? `${shareDetail.roiPercent >= 0 ? "+" : ""}${formatPercent(shareDetail.roiPercent)}`
+                  : "N/A"}
               </span>
             </div>
           </div>
-
-          {/* ── Shares section (assignment share leg) ── */}
-          {shareDetail && shareDetail.kind === "called-away" && (
-            <div className="mt-4">
-              <div className="font-sans text-[11px] text-muted-foreground">
-                Called-away shares
-              </div>
-              <div className="mt-1.5">
-                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-                  <span className="text-dim">Shares sold at strike</span>
-                  <span className="font-sans tabular-nums font-medium text-foreground">
-                    {formatNumber(shareDetail.shares)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-                  <span className="text-dim">Share cost basis</span>
-                  <span className="font-sans tabular-nums font-medium text-neg">
-                    {shareDetail.costBasis != null
-                      ? `−${formatCurrency(Math.abs(shareDetail.costBasis), { maximumFractionDigits: 2 })}`
-                      : "N/A"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-                  <span className="text-dim">Strike proceeds</span>
-                  <span className="font-sans tabular-nums font-medium text-pos">
-                    {`+${formatCurrency(shareDetail.proceeds, { maximumFractionDigits: 2 })}`}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
-                  <span className="text-foreground font-medium">Assignment P&amp;L (shares)</span>
-                  <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.pnl))}>
-                    {signedCurrency(shareDetail.pnl)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2.5 font-sans text-[13px]">
-                  <span className="text-dim">Share ROI</span>
-                  <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.roiPercent))}>
-                    {shareDetail.roiPercent !== null
-                      ? `${shareDetail.roiPercent >= 0 ? "+" : ""}${formatPercent(shareDetail.roiPercent)}`
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
+        </div>
+      )}
+      {shareDetail && shareDetail.kind === "acquired" && (
+        <div className="mt-4">
+          <div className="font-sans text-[11px] text-muted-foreground">
+            Shares acquired
+          </div>
+          <div className="mt-1.5">
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+              <span className="text-dim">Shares purchased at strike</span>
+              <span className="font-sans tabular-nums font-medium text-foreground">
+                {formatNumber(shareDetail.shares)}
+              </span>
             </div>
-          )}
-          {shareDetail && shareDetail.kind === "acquired" && (
-            <div className="mt-4">
-              <div className="font-sans text-[11px] text-muted-foreground">
-                Shares acquired
-              </div>
-              <div className="mt-1.5">
-                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-                  <span className="text-dim">Shares purchased at strike</span>
-                  <span className="font-sans tabular-nums font-medium text-foreground">
-                    {formatNumber(shareDetail.shares)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
-                  <span className="text-dim">Cost basis / share</span>
-                  <span className="font-sans tabular-nums font-medium text-foreground">
-                    {formatCurrency(shareDetail.costBasisPerShare, { maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
-                  <span className="text-foreground font-medium">Total cost basis</span>
-                  <span className="font-sans tabular-nums font-medium text-foreground">
-                    {formatCurrency(shareDetail.costBasisTotal, { maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="py-2 font-sans text-[11px] text-muted-foreground">
-                  Strike purchase cost net of premium received.
-                </div>
-              </div>
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+              <span className="text-dim">Cost basis / share</span>
+              <span className="font-sans tabular-nums font-medium text-foreground">
+                {formatCurrency(shareDetail.costBasisPerShare, { maximumFractionDigits: 2 })}
+              </span>
             </div>
-          )}
+            <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+              <span className="text-foreground font-medium">Total cost basis</span>
+              <span className="font-sans tabular-nums font-medium text-foreground">
+                {formatCurrency(shareDetail.costBasisTotal, { maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="py-2 font-sans text-[11px] text-muted-foreground">
+              Strike purchase cost net of premium received.
+            </div>
+          </div>
+        </div>
+      )}
 
-          {/* ── 3×2 meta grid ── */}
-          <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
-            <MetaCell
-              label="Opened"
-              value={openDate ?? "N/A"}
-            />
-            <MetaCell
-              label="Holding"
+      {/* ── 3×2 meta grid ── */}
+      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+        <MetaCell label="Opened" value={openDate ?? "N/A"} />
+        <MetaCell
+          label="Holding"
+          value={holdingDays !== null ? `${formatNumber(holdingDays)} days` : "N/A"}
+        />
+        <MetaCell
+          label="Capital"
+          value={capitalDeployed !== null ? formatCurrency(capitalDeployed) : "N/A"}
+        />
+        <MetaCell
+          label="Annualized"
+          value={
+            annualizedRoiPercent !== null
+              ? `${annualizedRoiPercent >= 0 ? "+" : ""}${formatPercent(annualizedRoiPercent)}`
+              : "N/A"
+          }
+          valueClass={toneClass(annualizedRoiPercent)}
+        />
+        <MetaCell
+          label="Cost method"
+          value={event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)?.[0] ?? "N/A"}
+        />
+        <MetaCell
+          label="Warnings"
+          value={event.warnings.length > 0 ? String(event.warnings.length) : "None"}
+          valueClass={event.warnings.length > 0 ? "text-warn" : "text-pos"}
+        />
+      </div>
+
+      {/* ── Basis-allocation note ── */}
+      {hasBasisNote && (
+        <div className="mt-3.5 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
+          <div className="font-sans text-[12px] font-medium text-foreground">
+            Basis allocation
+          </div>
+          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground leading-relaxed">
+            {event.explanation}
+          </div>
+        </div>
+      )}
+
+      {/* ── Warnings (if any) ── */}
+      {event.warnings.length > 0 && (
+        <div className="mt-3.5 space-y-1.5">
+          <div className="font-sans text-[11px] text-muted-foreground">Warnings</div>
+          {event.warnings.map((w, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-[11.5px] text-warn"
+            >
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------- OptionCycleBody (lifecycle-driven) ----------
+
+function OptionCycleBody({
+  lifecycle,
+  transactions,
+  events,
+  taxLots,
+  onClose,
+  onReviewFix,
+  closeButtonRef,
+}: {
+  lifecycle: OptionLifecycle;
+  transactions: TradeTransaction[];
+  events: RealizedPnLEvent[];
+  taxLots: TaxLot[];
+  onClose: () => void;
+  onReviewFix?: () => void;
+  closeButtonRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const lc = lifecycle;
+  const share = lifecycleShareDetail(lc, events, taxLots);
+
+  // ── Numbers ────────────────────────────────────────────────────────────────
+  const capital = lc.capitalDeployed ?? 0;
+  const assignmentStockPnl = lc.assignmentStockPnl ?? 0;
+  const total = lc.netOptionPnl + (share ? assignmentStockPnl : 0);
+  const cycleRoi = capital > 0 ? (total / capital) * 100 : null;
+  const optionRoi = capital > 0 ? (lc.netOptionPnl / capital) * 100 : null;
+
+  const isShort = lc.direction === "short";
+  const endDate = lc.closeDate ?? lc.expirationDate;
+  const heldDays =
+    lc.openDate && endDate
+      ? Math.round(
+          (new Date(endDate + "T00:00:00").getTime() -
+            new Date(lc.openDate + "T00:00:00").getTime()) /
+            (24 * 60 * 60 * 1000)
+        )
+      : null;
+
+  // Annualized from option ROI when we have ROI and a positive holding period.
+  const annualized =
+    optionRoi !== null && heldDays != null && heldDays > 0
+      ? optionRoi * (365 / heldDays)
+      : null;
+
+  const expiredWorthless = lc.closeCost === 0 && lc.status === "expired";
+
+  // Manual badge: any linked tx (incl. lifecycle.linkedTransactionIds) is manual.
+  const linkedIds = new Set(lc.linkedTransactionIds);
+  const hasManualTx = transactions.some(
+    (tx) =>
+      linkedIds.has(tx.id) &&
+      (tx.importBatchId === "manual" || tx.tags.includes("manual"))
+  );
+
+  const contractsNote = `${lc.contracts} contract${lc.contracts !== 1 ? "s" : ""} · ${formatNumber(lc.sharesControlled)} sh · strike ${formatCurrency(lc.strikePrice, { maximumFractionDigits: 2 })} · exp ${lc.expirationDate}`;
+
+  return (
+    <>
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-sans text-[16px] font-medium text-foreground">
+              {lc.underlyingSymbol}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+              {lifecycleStrategyLabel(lc)}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-surface-inset px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-muted-foreground">
+              {outcomeLabel(lc.status)}
+            </span>
+            {hasManualTx && (
+              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+                manual
+              </span>
+            )}
+          </div>
+          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
+            {contractsNote}
+          </div>
+        </div>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* ── Hero: total realized + cycle ROI ── */}
+      <div className="flex items-baseline gap-3 mt-4 mb-2">
+        <div>
+          <div className="font-sans text-[11px] text-muted-foreground">Total realized</div>
+          <div
+            className={cn(
+              "font-sans text-[30px] font-medium tabular-nums mt-1",
+              toneClass(total)
+            )}
+          >
+            {signedCurrency(total)}
+          </div>
+        </div>
+        <div className="ml-auto text-right">
+          <div className="font-sans text-[11px] text-muted-foreground">Cycle ROI</div>
+          <div
+            className={cn(
+              "font-sans text-[18px] font-medium tabular-nums mt-1",
+              toneClass(cycleRoi)
+            )}
+          >
+            {signedPercentText(cycleRoi)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Option trade ── */}
+      <SectionLabel>Option trade</SectionLabel>
+      <div className="mt-1.5">
+        <Row
+          label={isShort ? "Premium collected" : "Premium paid"}
+          value={signedCurrency(isShort ? lc.premiumReceived : -lc.premiumReceived)}
+          valueClass={toneClass(isShort ? lc.premiumReceived : -lc.premiumReceived)}
+        />
+        <Row
+          label={expiredWorthless ? "Expired worthless" : "Buy-to-close cost"}
+          value={
+            expiredWorthless
+              ? "$0.00"
+              : `−${formatCurrency(Math.abs(lc.closeCost), { maximumFractionDigits: 2 })}`
+          }
+          valueClass="text-neg"
+        />
+        <Row
+          label="Fees"
+          value={
+            lc.fees !== 0
+              ? `−${formatCurrency(Math.abs(lc.fees), { maximumFractionDigits: 2 })}`
+              : "$0.00"
+          }
+        />
+        <Row
+          label="Net option P&L"
+          bold
+          topBorder
+          value={signedCurrency(lc.netOptionPnl)}
+          valueClass={toneClass(lc.netOptionPnl)}
+        />
+        <Row
+          label="Option ROI"
+          helper={
+            capital > 0
+              ? `on ${formatCurrency(capital)} ${isShort ? "collateral" : "cost"}`
+              : undefined
+          }
+          value={signedPercentText(optionRoi)}
+          valueClass={toneClass(optionRoi)}
+        />
+        <Row
+          label="Held"
+          value={
+            heldDays != null
+              ? `${lc.openDate} → ${endDate} · ${formatNumber(heldDays)} days`
+              : "—"
+          }
+        />
+      </div>
+
+      {/* ── Underlying shares (only if there is a share leg) ── */}
+      {share && share.kind === "called-away" && (
+        <>
+          <SectionLabel>Underlying shares</SectionLabel>
+          <div className="mt-1.5">
+            <Row label="Shares" value={formatNumber(share.shares)} />
+            <Row
+              label="Share cost basis"
               value={
-                holdingDays !== null
-                  ? `${formatNumber(holdingDays)} days`
-                  : "N/A"
+                share.basisMissing
+                  ? "Not entered"
+                  : `−${formatCurrency(Math.abs(share.costBasis ?? 0), { maximumFractionDigits: 2 })}`
               }
+              valueClass={share.basisMissing ? "text-warn" : "text-neg"}
             />
-            <MetaCell
-              label="Capital"
-              value={
-                capitalDeployed !== null
-                  ? formatCurrency(capitalDeployed)
-                  : "N/A"
-              }
+            <Row
+              label="Sold at strike"
+              value={`+${formatCurrency(share.proceeds, { maximumFractionDigits: 2 })}`}
+              valueClass="text-pos"
             />
-            <MetaCell
-              label="Annualized"
-              value={
-                annualizedRoiPercent !== null
-                  ? `${annualizedRoiPercent >= 0 ? "+" : ""}${formatPercent(annualizedRoiPercent)}`
-                  : "N/A"
-              }
-              valueClass={toneClass(annualizedRoiPercent)}
+            <Row
+              label="Assignment P&L (shares)"
+              bold
+              topBorder
+              value={signedCurrency(share.pnl)}
+              valueClass={toneClass(share.pnl)}
             />
-            <MetaCell
-              label="Cost method"
-              value={
-                event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)?.[0] ?? "N/A"
-              }
-            />
-            <MetaCell
-              label="Warnings"
-              value={
-                event.warnings.length > 0
-                  ? String(event.warnings.length)
-                  : "None"
-              }
-              valueClass={event.warnings.length > 0 ? "text-warn" : "text-pos"}
+            <Row
+              label="Share ROI"
+              value={signedPercentText(share.roiPercent)}
+              valueClass={toneClass(share.roiPercent)}
             />
           </div>
-
-          {/* ── Basis-allocation note ── */}
-          {hasBasisNote && (
-            <div className="mt-3.5 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
-              <div className="font-sans text-[12px] font-medium text-foreground">
-                Basis allocation
+          {share.basisMissing && (
+            <div className="mt-3 rounded-lg border border-warn/25 bg-warn/10 px-3 py-2.5">
+              <div className="font-sans text-[11.5px] text-warn leading-relaxed">
+                Showing strike proceeds only — enter your share purchase to see the
+                true gain/loss.
               </div>
-              <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground leading-relaxed">
-                {event.explanation}
-              </div>
-            </div>
-          )}
-
-          {/* ── Warnings (if any) ── */}
-          {event.warnings.length > 0 && (
-            <div className="mt-3.5 space-y-1.5">
-              <div className="font-sans text-[11px] text-muted-foreground">
-                Warnings
-              </div>
-              {event.warnings.map((w, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-[11.5px] text-warn"
+              {onReviewFix && (
+                <button
+                  type="button"
+                  onClick={onReviewFix}
+                  className="mt-2 inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                 >
-                  {w}
-                </div>
-              ))}
+                  Enter share cost basis →
+                </button>
+              )}
             </div>
           )}
-        </div>
-      </aside>
+        </>
+      )}
+      {share && share.kind === "acquired" && (
+        <>
+          <SectionLabel>Underlying shares</SectionLabel>
+          <div className="mt-1.5">
+            <Row
+              label="Shares purchased at strike"
+              value={formatNumber(share.shares)}
+            />
+            <Row
+              label="Cost basis / share"
+              value={formatCurrency(share.costBasisPerShare, { maximumFractionDigits: 2 })}
+            />
+            <Row
+              label="Total cost basis"
+              bold
+              topBorder
+              value={formatCurrency(share.costBasisTotal, { maximumFractionDigits: 2 })}
+            />
+            <div className="py-2 font-sans text-[11px] text-muted-foreground">
+              Strike purchase net of premium received — now held as a stock lot.
+            </div>
+          </div>
+        </>
+      )}
 
-      {/* Hidden animation keyframes via a style tag — only injected once */}
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateX(100%); opacity: 0.7; }
-          to   { transform: translateX(0);    opacity: 1;   }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .motion-safe\\:animate-\\[slideIn_160ms_ease\\] {
-            animation: none !important;
-          }
-        }
-      `}</style>
-    </div>
+      {/* ── Total (only if there is a share leg) ── */}
+      {share && (
+        <>
+          <SectionLabel>Total</SectionLabel>
+          <div className="mt-1.5">
+            <Row
+              label="Option P&L"
+              value={signedCurrency(lc.netOptionPnl)}
+              valueClass={toneClass(lc.netOptionPnl)}
+            />
+            <Row
+              label="Share P&L"
+              value={signedCurrency(assignmentStockPnl)}
+              valueClass={toneClass(assignmentStockPnl)}
+            />
+            <Row
+              label="Total realized"
+              bold
+              topBorder
+              value={signedCurrency(total)}
+              valueClass={toneClass(total)}
+            />
+          </div>
+        </>
+      )}
+
+      {/* ── Meta grid ── */}
+      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+        <MetaCell label="Opened" value={lc.openDate || "—"} />
+        <MetaCell
+          label="Held"
+          value={heldDays != null ? `${formatNumber(heldDays)} days` : "—"}
+        />
+        <MetaCell
+          label="Capital"
+          value={capital > 0 ? formatCurrency(capital) : "—"}
+        />
+        <MetaCell
+          label="Annualized"
+          value={annualized !== null ? signedPercentText(annualized) : "N/A"}
+          valueClass={annualized !== null ? toneClass(annualized) : undefined}
+        />
+        <MetaCell
+          label="Warnings"
+          value={lc.warnings.length > 0 ? String(lc.warnings.length) : "None"}
+          valueClass={lc.warnings.length > 0 ? "text-warn" : "text-pos"}
+        />
+        <MetaCell label="Outcome" value={outcomeLabel(lc.status)} />
+      </div>
+
+      {/* ── Warnings ── */}
+      {lc.warnings.length > 0 && (
+        <div className="mt-3.5 space-y-1.5">
+          <div className="font-sans text-[11px] text-muted-foreground">Warnings</div>
+          {lc.warnings.map((w, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-[11.5px] text-warn"
+            >
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

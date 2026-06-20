@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateDashboard } from "@/lib/calculations/engine";
-import { assignmentShareDetail, buildManualOpenTransaction } from "@/lib/utils/option-helpers";
+import { assignmentShareDetail, buildManualOpenTransaction, lifecycleShareDetail } from "@/lib/utils/option-helpers";
 import { buildOrphanRows } from "@/components/dashboard/ReviewFixPanel";
 import { defaultSettings } from "@/lib/storage/local-store";
 import type { RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
@@ -10,7 +10,7 @@ import type { RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading
 function ccOptionTx(
   id: string,
   date: string,
-  action: "SELL_TO_OPEN" | "ASSIGNMENT",
+  action: "SELL_TO_OPEN" | "ASSIGNMENT" | "EXPIRATION",
   symbol: string,
   strike: number,
   expiration: string,
@@ -163,7 +163,7 @@ describe("integration: covered-call assignment missing share cost basis", () => 
     });
     const after = calculateDashboard([...buildBaseTxs(), lotA, lotB], defaultSettings);
 
-    // Open the drawer on the option-premium event (what lifecycleToEvent returns).
+    // assignmentShareDetail accepts the option-premium (COVERED_CALL_ASSIGNMENT) event.
     const premiumEvent = after.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT");
     expect(premiumEvent).toBeDefined();
 
@@ -176,6 +176,51 @@ describe("integration: covered-call assignment missing share cost basis", () => 
       expect(detail!.proceeds).toBe(PROCEEDS); // 9600
       expect(detail!.pnl).toBe(PROCEEDS - 9850); // −250
       expect(detail!.roiPercent).toBeCloseTo(((PROCEEDS - 9850) / 9850) * 100, 6);
+    }
+  });
+
+  it("drawer (lifecycle-driven): lifecycleShareDetail returns resolved called-away numbers", () => {
+    const lotA = buildManualOpenTransaction({
+      kind: "stock", baseId: "lotA", openDate: "2026-01-10", symbol: "IREN",
+      underlyingSymbol: "IREN", action: "BUY", pricePerShare: 49.5, shares: 100,
+      fees: 0, sourceBroker: "Robinhood", accountName: "Test",
+    });
+    const lotB = buildManualOpenTransaction({
+      kind: "stock", baseId: "lotB", openDate: "2026-01-15", symbol: "IREN",
+      underlyingSymbol: "IREN", action: "BUY", pricePerShare: 49, shares: 100,
+      fees: 0, sourceBroker: "Robinhood", accountName: "Test",
+    });
+    const after = calculateDashboard([...buildBaseTxs(), lotA, lotB], defaultSettings);
+
+    const assignedLifecycle = after.optionLifecycles.find((l) => l.status === "assigned");
+    expect(assignedLifecycle).toBeDefined();
+
+    const detail = lifecycleShareDetail(assignedLifecycle!, after.realizedEvents, after.taxLots);
+    expect(detail).not.toBeNull();
+    expect(detail!.kind).toBe("called-away");
+    if (detail!.kind === "called-away") {
+      expect(detail!.shares).toBe(SHARES); // 200
+      expect(detail!.costBasis).toBe(9850);
+      expect(detail!.proceeds).toBe(PROCEEDS); // 9600
+      expect(detail!.pnl).toBe(PROCEEDS - 9850); // −250
+      expect(detail!.roiPercent).toBeCloseTo(((PROCEEDS - 9850) / 9850) * 100, 6);
+      expect(detail!.basisMissing).toBe(false);
+    }
+  });
+
+  it("drawer (lifecycle-driven, basisMissing): inflated proceeds-only, basisMissing flag set", () => {
+    const before = calculateDashboard(buildBaseTxs(), defaultSettings);
+    const assignedLifecycle = before.optionLifecycles.find((l) => l.status === "assigned");
+    expect(assignedLifecycle).toBeDefined();
+
+    const detail = lifecycleShareDetail(assignedLifecycle!, before.realizedEvents, before.taxLots);
+    expect(detail!.kind).toBe("called-away");
+    if (detail!.kind === "called-away") {
+      expect(detail!.costBasis).toBeNull();
+      expect(detail!.proceeds).toBe(PROCEEDS); // 9600
+      expect(detail!.pnl).toBe(PROCEEDS); // inflated: basis fell back to 0
+      expect(detail!.roiPercent).toBeNull();
+      expect(detail!.basisMissing).toBe(true);
     }
   });
 });
@@ -210,5 +255,27 @@ describe("assignmentShareDetail: put assignment + non-assignment", () => {
   it("non-assignment event → null", () => {
     const swing = { id: "pnl-x", strategy: "SWING_TRADE", linkedTransactionIds: [] } as unknown as RealizedPnLEvent;
     expect(assignmentShareDetail(swing, [], [])).toBeNull();
+  });
+});
+
+// Regression: covered calls that EXPIRED (never assigned) but were written against shares
+// that were never imported must still be surfaced as fixable — one row per symbol, since
+// sequential covered calls share the same underlying block of shares.
+describe("buildOrphanRows: expired covered call missing underlying shares", () => {
+  it("surfaces ONE stock orphan per symbol (not one per call)", () => {
+    const txs: TradeTransaction[] = [
+      ccOptionTx("c1", "2026-01-05", "SELL_TO_OPEN", "NFLX", 104, "2026-01-30", 2, 200),
+      ccOptionTx("c1x", "2026-01-30", "EXPIRATION", "NFLX", 104, "2026-01-30", 2, 0),
+      ccOptionTx("c2", "2026-02-02", "SELL_TO_OPEN", "NFLX", 101, "2026-02-27", 2, 150),
+      ccOptionTx("c2x", "2026-02-27", "EXPIRATION", "NFLX", 101, "2026-02-27", 2, 0),
+    ];
+    const result = calculateDashboard(txs, defaultSettings);
+    const rows = buildOrphanRows(result).filter((r) => r.symbol === "NFLX");
+
+    expect(rows).toHaveLength(1); // not 2 — sequential CCs share the same 200 shares
+    expect(rows[0].kind).toBe("stock");
+    expect(rows[0].qty).toBe(200); // max sharesControlled
+    expect(rows[0].date).toBe("2026-01-05"); // earliest CC open — opener must predate it
+    expect(rows[0].reason).toMatch(/covered call/i);
   });
 });

@@ -9,23 +9,20 @@ import { wheelAnalytics } from "@/lib/selectors/analytics";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult, Strategy } from "@/types/trading";
-import { addDaysIso, currentDeployedCapital, optionCycleCapital, tone } from "./shared";
-
-type TradeIssueFilter = "unresolved" | "duplicates" | null;
+import { currentDeployedCapital, tone } from "./shared";
 
 // Strategies for each "By strategy" bucket
 const CSP_STRATEGIES: Strategy[] = ["CASH_SECURED_PUT", "PUT_ASSIGNMENT"];
 const CC_STRATEGIES: Strategy[] = ["COVERED_CALL", "COVERED_CALL_ASSIGNMENT"];
 const SWING_STRATEGIES: Strategy[] = ["SWING_TRADE"];
+const LONG_OPTION_STRATEGIES: Strategy[] = ["LONG_OPTION"];
 
 export function OverviewTab({
   result,
   settings,
-  onReviewTrades,
 }: {
   result: CalculationResult;
   settings: AppSettings;
-  onReviewTrades: (issueFilter: TradeIssueFilter) => void;
 }) {
   // ── Goal-pace ──────────────────────────────────────────────────────────────
   const annualGoal = settings.annualRealizedPnlGoal;
@@ -64,23 +61,11 @@ export function OverviewTab({
   const csp = stratGroup(CSP_STRATEGIES);
   const cc = stratGroup(CC_STRATEGIES);
   const swing = stratGroup(SWING_STRATEGIES);
+  const longOpt = stratGroup(LONG_OPTION_STRATEGIES);
 
   // ── Buying-power utilization (current open capital / maxBP) ───────────────
   const maxBP = settings.maxBuyingPower ?? 125000;
   const currentDeployed = currentDeployedCapital(result);
-
-  // ── Insights visibility ────────────────────────────────────────────────────
-  const hasInsights =
-    result.aggregates.symbolBreakdown.some(
-      (row) => row.pnl < 0 && row.trades > 1
-    ) ||
-    result.optionLifecycles.some(
-      (c) =>
-        c.status === "open" &&
-        c.expirationDate <= addDaysIso(new Date(), 14)
-    ) ||
-    result.unresolvedTransactions.length > 0 ||
-    result.duplicateTransactionIds.length > 0;
 
   // Return on capital
   const roc =
@@ -199,7 +184,7 @@ export function OverviewTab({
       <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
 
       {/* ── By strategy ── */}
-      <MetricGroup label="By strategy" cols={3}>
+      <MetricGroup label="By strategy" cols={4}>
         <KpiCard
           label="Cash-secured puts"
           value={formatCurrency(csp.pnl)}
@@ -222,6 +207,14 @@ export function OverviewTab({
           helper={`${swing.roi == null ? "—" : formatPercent(swing.roi, 1)} ROI · ${swing.trades} trades`}
           tooltip="Realized P&L from swing trades."
           tone={tone(swing.pnl)}
+          variant="compact"
+        />
+        <KpiCard
+          label="Long options"
+          value={formatCurrency(longOpt.pnl)}
+          helper={`${longOpt.roi == null ? "—" : formatPercent(longOpt.roi, 1)} ROI · ${longOpt.trades} trades`}
+          tooltip="Realized P&L from long calls and long puts."
+          tone={tone(longOpt.pnl)}
           variant="compact"
         />
       </MetricGroup>
@@ -255,110 +248,6 @@ export function OverviewTab({
         />
       </MetricGroup>
 
-      {/* ── Needs-attention insight cards ── */}
-      {hasInsights && (
-        <>
-          <div className="h-px bg-hairline" />
-          <InsightCards result={result} onReviewTrades={onReviewTrades} />
-        </>
-      )}
     </div>
-  );
-}
-
-// ── InsightCards ──────────────────────────────────────────────────────────────
-
-function InsightCards({
-  result,
-  onReviewTrades,
-}: {
-  result: CalculationResult;
-  onReviewTrades: (issueFilter: TradeIssueFilter) => void;
-}) {
-  const repeatedLosses = result.aggregates.symbolBreakdown
-    .filter((row) => row.pnl < 0 && row.trades > 1)
-    .map((row) => row.symbol);
-
-  const openCycles = result.optionLifecycles.filter(
-    (cycle) => cycle.status === "open"
-  );
-  const nearTermCutoff = addDaysIso(new Date(), 14);
-  const nearTermCycles = openCycles.filter(
-    (cycle) => cycle.expirationDate <= nearTermCutoff
-  );
-  const nearTermContracts = nearTermCycles.reduce(
-    (sum, cycle) => sum + cycle.contracts,
-    0
-  );
-  const unresolvedCount = result.unresolvedTransactions.length;
-  const duplicateCount = result.duplicateTransactionIds.length;
-
-  type InsightItem = {
-    text: string;
-    severity: "neg" | "warn";
-    action?: { label: string; onClick: () => void };
-  };
-
-  const items: InsightItem[] = [];
-
-  if (nearTermCycles.length) {
-    items.push({
-      text: `${formatNumber(nearTermContracts)} ${nearTermContracts === 1 ? "contract" : "contracts"} expiring within 14 days · ${formatCurrency(nearTermCycles.reduce((sum, cycle) => sum + optionCycleCapital(cycle, true), 0))} exposure`,
-      severity: "neg",
-    });
-  }
-  if (unresolvedCount > 0) {
-    items.push({
-      text: `${formatNumber(unresolvedCount)} unresolved ${unresolvedCount === 1 ? "row" : "rows"} need classification.`,
-      severity: "warn",
-      action: {
-        label: "Resolve →",
-        onClick: () => onReviewTrades("unresolved"),
-      },
-    });
-  }
-  if (duplicateCount > 0) {
-    items.push({
-      text: `${formatNumber(duplicateCount)} potential duplicate ${duplicateCount === 1 ? "row" : "rows"} preserved.`,
-      severity: "warn",
-      action: {
-        label: "Review →",
-        onClick: () => onReviewTrades("duplicates"),
-      },
-    });
-  }
-  if (repeatedLosses.length) {
-    items.push({
-      text: `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} have repeated losses`,
-      severity: "neg",
-    });
-  }
-
-  if (items.length === 0) return null;
-
-  return (
-    <ul className="space-y-2" aria-label="Needs attention">
-      {items.map((item, i) => (
-        <li
-          key={i}
-          className={cn(
-            "flex flex-wrap items-baseline gap-x-2 rounded-[10px] border border-hairline p-2.5",
-            "border-l-[3px] bg-surface text-[12.5px] text-muted-foreground",
-            item.severity === "neg" ? "border-l-neg" : "border-l-warn"
-          )}
-        >
-          <span>{item.text}</span>
-          {item.action && (
-            <button
-              type="button"
-              onClick={item.action.onClick}
-              className="text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
-            >
-              {item.action.label}
-            </button>
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { inferOpenerAction, buildManualOpenTransaction } from "@/lib/utils/option-helpers";
-import type { CalculationResult, TradeAction, TradeTransaction } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, TradeAction, TradeTransaction } from "@/types/trading";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -101,6 +101,43 @@ export function buildOrphanRows(result: CalculationResult): OrphanRow[] {
       qty: Math.abs(event.quantity),
       reason:
         "Covered-call assignment — enter the share cost basis to compute the called-away P&L",
+      sourceTx: tx,
+    });
+  }
+
+  // Covered-call orphans (no assignment): short calls written against shares that were
+  // never imported. The call expired/closed without assignment — so there is no stock
+  // event — but the underlying lot is missing, so capital & ROI cannot be computed. The
+  // engine flags each with "could not be linked to underlying stock lot". Sequential
+  // covered calls share ONE underlying block of shares, so emit ONE row PER SYMBOL (qty =
+  // the largest position covered) and skip symbols already surfaced above.
+  const seenSymbols = new Set(rows.map((r) => r.symbol));
+  const ccBySymbol = new Map<string, OptionLifecycle[]>();
+  for (const lc of result.optionLifecycles) {
+    if (lc.optionType !== "call" || lc.direction !== "short") continue;
+    if (!lc.warnings.some((w) => w.includes("could not be linked to underlying stock lot"))) continue;
+    if (seenSymbols.has(lc.underlyingSymbol)) continue;
+    const arr = ccBySymbol.get(lc.underlyingSymbol) ?? [];
+    arr.push(lc);
+    ccBySymbol.set(lc.underlyingSymbol, arr);
+  }
+  for (const [symbol, lcs] of ccBySymbol) {
+    const shares = Math.max(...lcs.map((l) => l.sharesControlled));
+    // Shares must predate the first covered call written against them.
+    const earliestOpen = lcs.map((l) => l.openDate).sort()[0];
+    const tx = txById.get(lcs[0].linkedTransactionIds[0]);
+    rows.push({
+      kind: "stock",
+      eventId: `cc-underlying-${symbol}`,
+      date: earliestOpen,
+      symbol,
+      action: "BUY",
+      optionType: null,
+      strikePrice: null,
+      expirationDate: null,
+      qty: shares,
+      reason:
+        "Covered call — underlying shares not imported. Add your original share purchase to set cost basis, capital & ROI.",
       sourceTx: tx,
     });
   }
@@ -555,6 +592,230 @@ function FormField({
   );
 }
 
+// ── Edit forms for existing manual transactions ───────────────────────────────
+
+function EditOptionForm({
+  tx,
+  onSave,
+  onCancel,
+}: {
+  tx: TradeTransaction;
+  onSave: (updated: TradeTransaction) => void;
+  onCancel: () => void;
+}) {
+  const [state, setState] = useState<OptionFormState>({
+    openerAction: (tx.action === "BUY_TO_OPEN" ? "BUY_TO_OPEN" : "SELL_TO_OPEN"),
+    openDate: tx.tradeDate,
+    price: String(tx.price),
+    qty: String(tx.quantity),
+    fees: String(tx.fees),
+  });
+  const [submitted, setSubmitted] = useState(false);
+
+  const errors = submitted ? validateOptionForm(state, "9999-12-31") : {};
+  const isValid = Object.keys(validateOptionForm(state, "9999-12-31")).length === 0;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+    if (!isValid) return;
+    const updated = buildManualOpenTransaction({
+      baseId: tx.id,
+      openDate: state.openDate,
+      symbol: tx.symbol,
+      underlyingSymbol: tx.underlyingSymbol ?? tx.symbol,
+      optionType: tx.optionType ?? "put",
+      strikePrice: tx.strikePrice ?? 0,
+      expirationDate: tx.expirationDate ?? state.openDate,
+      action: state.openerAction,
+      pricePerContract: Number(state.price),
+      contracts: Number(state.qty),
+      fees: Number(state.fees) || 0,
+      sourceBroker: tx.sourceBroker,
+      accountName: tx.accountName,
+    });
+    onSave({ ...updated, id: tx.id });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <ReadOnlyField label="Symbol" value={tx.symbol} />
+        <ReadOnlyField label="Type" value={tx.optionType ? tx.optionType.charAt(0).toUpperCase() + tx.optionType.slice(1) : "—"} />
+        <ReadOnlyField label="Strike" value={tx.strikePrice ? `$${tx.strikePrice.toFixed(2)}` : "—"} />
+        <ReadOnlyField label="Expiration" value={tx.expirationDate ?? "—"} />
+      </div>
+      <div className="grid gap-1">
+        <label className="font-sans text-[11px] text-muted-foreground">Opening action</label>
+        <select
+          value={state.openerAction}
+          onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as OptionFormState["openerAction"] }))}
+          className="h-9 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          <option value="SELL_TO_OPEN">{openerActionLabel("SELL_TO_OPEN")}</option>
+          <option value="BUY_TO_OPEN">{openerActionLabel("BUY_TO_OPEN")}</option>
+        </select>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <FormField label="Open date" type="date" value={state.openDate}
+          onChange={(v) => setState((s) => ({ ...s, openDate: v }))} error={errors.openDate} />
+        <FormField label="Premium per contract ($)" type="number" value={state.price}
+          onChange={(v) => setState((s) => ({ ...s, price: v }))} error={errors.price} min="0" step="0.01" />
+        <FormField label="Contracts" type="number" value={state.qty}
+          onChange={(v) => setState((s) => ({ ...s, qty: v }))} error={errors.qty} min="1" step="1" />
+        <FormField label="Fees ($)" type="number" value={state.fees}
+          onChange={(v) => setState((s) => ({ ...s, fees: v }))} min="0" step="0.01" />
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel}
+          className="inline-flex h-8 items-center px-3 font-sans text-[12px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          Cancel
+        </button>
+        <button type="submit"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          Save changes
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function EditStockForm({
+  tx,
+  onSave,
+  onCancel,
+}: {
+  tx: TradeTransaction;
+  onSave: (updated: TradeTransaction) => void;
+  onCancel: () => void;
+}) {
+  const [openDate, setOpenDate] = useState(tx.tradeDate);
+  const [shares, setShares] = useState(String(tx.quantity));
+  const [pricePerShare, setPricePerShare] = useState(String(tx.price));
+  const [fees, setFees] = useState(String(tx.fees));
+  const [submitted, setSubmitted] = useState(false);
+
+  const lotInput = [{ openDate, shares, pricePerShare }];
+  const lotErrors: LotErrors[] = submitted ? validateLots(lotInput, "9999-12-31") : [{}];
+  const isValid = lotsValid(validateLots(lotInput, "9999-12-31"));
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+    if (!isValid) return;
+    const updated = buildManualOpenTransaction({
+      kind: "stock",
+      baseId: tx.id,
+      openDate,
+      symbol: tx.symbol,
+      underlyingSymbol: tx.underlyingSymbol ?? tx.symbol,
+      action: "BUY",
+      pricePerShare: Number(pricePerShare),
+      shares: Number(shares),
+      fees: Number(fees) || 0,
+      sourceBroker: tx.sourceBroker,
+      accountName: tx.accountName,
+    });
+    onSave({ ...updated, id: tx.id });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <ReadOnlyField label="Symbol" value={tx.symbol} />
+        <ReadOnlyField label="Opening action" value="Buy" />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <FormField label="Open date" type="date" value={openDate}
+          onChange={setOpenDate} error={lotErrors[0]?.openDate} />
+        <FormField label="Shares" type="number" value={shares}
+          onChange={setShares} error={lotErrors[0]?.shares} min="0" step="0.00001" />
+        <FormField label="Price per share ($)" type="number" value={pricePerShare}
+          onChange={setPricePerShare} error={lotErrors[0]?.pricePerShare} min="0" step="0.01" />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <FormField label="Fees ($)" type="number" value={fees} onChange={setFees} min="0" step="0.01" />
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel}
+          className="inline-flex h-8 items-center px-3 font-sans text-[12px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          Cancel
+        </button>
+        <button type="submit"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          Save changes
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── ManualEntryCard ───────────────────────────────────────────────────────────
+
+export function ManualEntryCard({
+  tx,
+  onUpdate,
+  onDelete,
+}: {
+  tx: TradeTransaction;
+  onUpdate: (updated: TradeTransaction) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const isOption = tx.instrumentType === "option";
+
+  const details: string[] = [];
+  if (isOption && tx.optionType) details.push(tx.optionType.charAt(0).toUpperCase() + tx.optionType.slice(1));
+  if (isOption && tx.strikePrice) details.push(`$${tx.strikePrice.toFixed(2)}`);
+  if (isOption && tx.expirationDate) details.push(tx.expirationDate);
+
+  return (
+    <div className="rounded-lg border border-hairline bg-surface p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-sans text-[13px] font-medium text-foreground">{tx.symbol}</span>
+            <span className="font-sans text-[11px] text-muted-foreground">{actionLabel(tx.action)}</span>
+            <span className="font-sans text-[11px] tabular-nums text-muted-foreground">× {tx.quantity}</span>
+          </div>
+          {details.length > 0 && (
+            <div className="font-sans text-[11px] text-muted-foreground">{details.join(" · ")}</div>
+          )}
+          <div className="font-sans text-[11px] tabular-nums text-muted-foreground">
+            {tx.tradeDate} · ${tx.price.toFixed(2)}{isOption ? "/contract" : "/share"}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setEditing((x) => !x)}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            {editing ? "Cancel" : "Edit"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(tx.id)}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-neg/30 bg-surface px-2.5 font-sans text-[11.5px] font-medium text-neg transition-colors hover:bg-neg/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="mt-3 rounded-lg border border-hairline bg-surface-inset p-3">
+          {isOption ? (
+            <EditOptionForm tx={tx} onSave={(u) => { onUpdate(u); setEditing(false); }} onCancel={() => setEditing(false)} />
+          ) : (
+            <EditStockForm tx={tx} onSave={(u) => { onUpdate(u); setEditing(false); }} onCancel={() => setEditing(false)} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── OrphanRowCard ─────────────────────────────────────────────────────────────
 
 function OrphanRowCard({
@@ -648,11 +909,17 @@ export function ReviewFixPanel({
   onClose,
   result,
   onAddTransactions,
+  manualTransactions,
+  onUpdateTransaction,
+  onDeleteTransaction,
 }: {
   open: boolean;
   onClose: () => void;
   result: CalculationResult;
   onAddTransactions: (txs: TradeTransaction[]) => void;
+  manualTransactions: TradeTransaction[];
+  onUpdateTransaction: (updated: TradeTransaction) => void;
+  onDeleteTransaction: (id: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -784,6 +1051,28 @@ export function ReviewFixPanel({
               </>
             )}
           </div>
+
+          {/* Manual entries */}
+          {manualTransactions.length > 0 && (
+            <div className="mt-6 space-y-3">
+              <div className="border-t border-hairline pt-5">
+                <h3 className="font-sans text-[13px] font-medium text-foreground">
+                  Manual entries
+                </h3>
+                <p className="mt-0.5 font-sans text-[11.5px] text-muted-foreground">
+                  {manualTransactions.length} manually-added transaction{manualTransactions.length !== 1 ? "s" : ""} — edit or remove as needed.
+                </p>
+              </div>
+              {manualTransactions.map((tx) => (
+                <ManualEntryCard
+                  key={tx.id}
+                  tx={tx}
+                  onUpdate={onUpdateTransaction}
+                  onDelete={onDeleteTransaction}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </aside>
 

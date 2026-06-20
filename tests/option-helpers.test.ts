@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  lifecycleToEvent,
   inferOpenerAction,
   buildManualOpenTransaction,
+  lifecycleShareDetail,
 } from "@/lib/utils/option-helpers";
 import { calculateDashboard } from "@/lib/calculations/engine";
 import { defaultSettings } from "@/lib/storage/local-store";
-import type { OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
+import type { OptionLifecycle, RealizedPnLEvent, TaxLot } from "@/types/trading";
 import { optionTx, stockTx } from "./helpers";
 
-// ── lifecycleToEvent ──────────────────────────────────────────────────────────
+// ── lifecycleShareDetail (pure) ───────────────────────────────────────────────
 
 function makeLifecycle(overrides: Partial<OptionLifecycle> = {}): OptionLifecycle {
   return {
@@ -61,52 +61,104 @@ function makeEvent(overrides: Partial<RealizedPnLEvent> = {}): RealizedPnLEvent 
   };
 }
 
-describe("lifecycleToEvent", () => {
-  it("returns the real event when linked tx ids intersect", () => {
-    const lifecycle = makeLifecycle();
-    const event = makeEvent();
-    const result = lifecycleToEvent(lifecycle, [event]);
-    expect(result).toBe(event);
-  });
-
-  it("prefers non-COVERED_CALL_ASSIGNMENT_STOCK over assignment-stock event", () => {
-    const lifecycle = makeLifecycle({ linkedTransactionIds: ["tx-sto", "tx-asgn"] });
-    const stockEvent = makeEvent({ id: "pnl-stock", strategy: "COVERED_CALL_ASSIGNMENT_STOCK", linkedTransactionIds: ["tx-asgn"] });
-    const premiumEvent = makeEvent({ id: "pnl-prem", strategy: "COVERED_CALL_ASSIGNMENT", linkedTransactionIds: ["tx-sto"] });
-    const result = lifecycleToEvent(lifecycle, [stockEvent, premiumEvent]);
-    expect(result.id).toBe("pnl-prem");
-  });
-
-  it("falls back to COVERED_CALL_ASSIGNMENT_STOCK if no other candidate", () => {
-    const lifecycle = makeLifecycle({ linkedTransactionIds: ["tx-asgn"] });
-    const stockEvent = makeEvent({ id: "pnl-stock", strategy: "COVERED_CALL_ASSIGNMENT_STOCK", linkedTransactionIds: ["tx-asgn"] });
-    const result = lifecycleToEvent(lifecycle, [stockEvent]);
-    expect(result.id).toBe("pnl-stock");
-  });
-
-  it("builds a synthetic event when no events share tx ids", () => {
-    const lifecycle = makeLifecycle({ linkedTransactionIds: ["tx-x"] });
-    const unrelated = makeEvent({ linkedTransactionIds: ["tx-unrelated"] });
-    const result = lifecycleToEvent(lifecycle, [unrelated]);
-    // Synthetic event has a derived id
-    expect(result.id).toBe("synthetic-opt-test");
-    expect(result.symbol).toBe("AMD");
-    expect(result.realizedPnl).toBe(150); // netOptionPnl + (assignmentStockPnl ?? 0)
-    expect(result.holdingDays).toBe(29);
-    expect(result.linkedTransactionIds).toEqual(["tx-x"]);
-  });
-
-  it("synthetic fallback has correct shape for expired long option", () => {
-    const lifecycle = makeLifecycle({
-      direction: "long",
-      strategy: "UNKNOWN",
-      netOptionPnl: -50,
-      linkedTransactionIds: ["tx-bto"],
+describe("lifecycleShareDetail", () => {
+  it("CC called-away with known basis → P&L and ROI off the stock event", () => {
+    const lc = makeLifecycle({
+      id: "opt-cc",
+      optionType: "call",
+      direction: "short",
+      strategy: "COVERED_CALL",
+      strikePrice: 48,
+      contracts: 2,
+      sharesControlled: 200,
+      status: "assigned",
     });
-    const result = lifecycleToEvent(lifecycle, []);
-    expect(result.id).toBe("synthetic-opt-test");
-    expect(result.strategy).toBe("LONG_OPTION");
-    expect(result.realizedPnl).toBe(-50);
+    // proceeds = 48 × 200 = 9600; basis 9850 → pnl −250
+    const stockEvent = makeEvent({
+      id: "pnl-opt-cc-assignment-stock",
+      strategy: "COVERED_CALL_ASSIGNMENT_STOCK",
+      grossProceeds: 9600,
+      costBasis: 9850,
+      realizedPnl: -250,
+      quantity: 200,
+    });
+
+    const detail = lifecycleShareDetail(lc, [stockEvent], []);
+    expect(detail).not.toBeNull();
+    expect(detail!.kind).toBe("called-away");
+    if (detail!.kind === "called-away") {
+      expect(detail!.shares).toBe(200);
+      expect(detail!.costBasis).toBe(9850);
+      expect(detail!.proceeds).toBe(9600);
+      expect(detail!.pnl).toBe(-250);
+      expect(detail!.roiPercent).toBeCloseTo((-250 / 9850) * 100, 6);
+      expect(detail!.basisMissing).toBe(false);
+    }
+  });
+
+  it("CC called-away with missing basis → basisMissing true, roi null", () => {
+    const lc = makeLifecycle({
+      id: "opt-cc",
+      optionType: "call",
+      direction: "short",
+      strategy: "COVERED_CALL",
+      strikePrice: 48,
+      contracts: 2,
+      sharesControlled: 200,
+      status: "assigned",
+    });
+    const stockEvent = makeEvent({
+      id: "pnl-opt-cc-assignment-stock",
+      strategy: "COVERED_CALL_ASSIGNMENT_STOCK",
+      grossProceeds: 9600,
+      costBasis: null,
+      realizedPnl: 9600, // inflated: basis fell back to 0
+      quantity: 200,
+    });
+
+    const detail = lifecycleShareDetail(lc, [stockEvent], []);
+    expect(detail!.kind).toBe("called-away");
+    if (detail!.kind === "called-away") {
+      expect(detail!.costBasis).toBeNull();
+      expect(detail!.proceeds).toBe(9600);
+      expect(detail!.pnl).toBe(9600);
+      expect(detail!.roiPercent).toBeNull();
+      expect(detail!.basisMissing).toBe(true);
+    }
+  });
+
+  it("put assigned → acquired shares with effective basis from the lot", () => {
+    const lc = makeLifecycle({
+      id: "opt-csp",
+      optionType: "put",
+      direction: "short",
+      strategy: "CASH_SECURED_PUT",
+      status: "assigned",
+    });
+    const lot = {
+      id: "lot-opt-csp-assignment",
+      symbol: "AMD",
+      source: "CASH_SECURED_PUT_ASSIGNMENT",
+      originalQuantity: 100,
+      costBasisTotal: 4850,
+      costBasisPerShare: 48.5,
+      linkedTransactionIds: ["tx-sto"],
+    } as unknown as TaxLot;
+
+    const detail = lifecycleShareDetail(lc, [], [lot]);
+    expect(detail!.kind).toBe("acquired");
+    if (detail!.kind === "acquired") {
+      expect(detail!.shares).toBe(100);
+      expect(detail!.costBasisTotal).toBe(4850);
+      expect(detail!.costBasisPerShare).toBe(48.5);
+    }
+  });
+
+  it("non-assigned lifecycle → null", () => {
+    const expired = makeLifecycle({ status: "expired" });
+    expect(lifecycleShareDetail(expired, [], [])).toBeNull();
+    const closed = makeLifecycle({ status: "closed", optionType: "call" });
+    expect(lifecycleShareDetail(closed, [], [])).toBeNull();
   });
 });
 

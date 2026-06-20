@@ -11,78 +11,6 @@ import type {
   TradeTransaction,
 } from "@/types/trading";
 
-// ── Feature 1: lifecycleToEvent ───────────────────────────────────────────────
-
-/**
- * Resolve an OptionLifecycle to a RealizedPnLEvent for the DetailDrawer.
- *
- * Priority:
- *  1. A real event whose linkedTransactionIds intersect the lifecycle's, excluding
- *     COVERED_CALL_ASSIGNMENT_STOCK (which is the stock-sale side, not the premium event).
- *  2. The COVERED_CALL_ASSIGNMENT_STOCK event (accepted as last resort among real events).
- *  3. A synthetic event built from lifecycle fields.
- */
-export function lifecycleToEvent(
-  lifecycle: OptionLifecycle,
-  events: RealizedPnLEvent[]
-): RealizedPnLEvent {
-  const lcIds = new Set(lifecycle.linkedTransactionIds);
-
-  // Collect all events that share at least one linked tx with the lifecycle
-  const candidates = events.filter((e) =>
-    e.linkedTransactionIds.some((id) => lcIds.has(id))
-  );
-
-  // Prefer non-COVERED_CALL_ASSIGNMENT_STOCK events
-  const preferred = candidates.find(
-    (e) => e.strategy !== "COVERED_CALL_ASSIGNMENT_STOCK"
-  );
-  if (preferred) return preferred;
-
-  // Fallback: any candidate (including the stock-sale side)
-  if (candidates.length > 0) return candidates[0];
-
-  // Last resort: build synthetic event
-  const netPnl =
-    lifecycle.netOptionPnl + (lifecycle.assignmentStockPnl ?? 0);
-  const holdingDays =
-    lifecycle.openDate && lifecycle.closeDate
-      ? Math.round(
-          (new Date(lifecycle.closeDate + "T00:00:00").getTime() -
-            new Date(lifecycle.openDate + "T00:00:00").getTime()) /
-            (24 * 60 * 60 * 1000)
-        )
-      : null;
-  const capital = lifecycle.capitalDeployed ?? 0;
-  const roiPercent =
-    capital > 0 ? (netPnl / capital) * 100 : null;
-
-  return {
-    id: `synthetic-${lifecycle.id}`,
-    date: lifecycle.closeDate ?? lifecycle.expirationDate,
-    symbol: lifecycle.underlyingSymbol,
-    strategy:
-      lifecycle.direction === "long"
-        ? "LONG_OPTION"
-        : lifecycle.optionType === "call"
-          ? "COVERED_CALL"
-          : "CASH_SECURED_PUT",
-    grossProceeds: lifecycle.premiumReceived,
-    costBasis: lifecycle.closeCost,
-    optionPremium: lifecycle.premiumReceived,
-    fees: lifecycle.fees,
-    realizedPnl: netPnl,
-    quantity: lifecycle.sharesControlled,
-    capitalDeployed: capital > 0 ? capital : null,
-    roiPercent,
-    annualizedRoiPercent: null,
-    holdingDays,
-    linkedTransactionIds: lifecycle.linkedTransactionIds,
-    explanation: lifecycle.explanation,
-    warnings: lifecycle.warnings,
-  };
-}
-
 // ── Feature 2: inferOpenerAction ─────────────────────────────────────────────
 
 /**
@@ -277,6 +205,90 @@ export function assignmentShareDetail(
         costBasisPerShare: lot.costBasisPerShare,
       };
     }
+  }
+
+  return null;
+}
+
+// ── lifecycleShareDetail: share-leg detail driven by the OptionLifecycle ──────
+
+/**
+ * Share-leg detail for an assigned option lifecycle, for the lifecycle-driven
+ * DetailDrawer. Mirrors {@link assignmentShareDetail} but is keyed off the
+ * lifecycle (status + optionType) rather than a realized event.
+ *
+ *  - "called-away": an assigned covered call sold the underlying at strike. The
+ *    stock-sale gain/loss lives in the `pnl-<id>-assignment-stock` event. When the
+ *    share cost basis was never entered (`costBasis == null`) we flag `basisMissing`
+ *    so the drawer can show a fix-it prompt instead of a misleading gain.
+ *  - "acquired": an assigned cash-secured put bought the underlying at strike — the
+ *    resulting lot (`lot-<id>-assignment`) carries the effective basis.
+ *  - else null (open / expired / bought-to-close, or no matching stock leg).
+ */
+export type LifecycleShareDetail =
+  | {
+      kind: "called-away";
+      shares: number;
+      costBasis: number | null;
+      proceeds: number;
+      pnl: number;
+      roiPercent: number | null;
+      basisMissing: boolean;
+    }
+  | {
+      kind: "acquired";
+      shares: number;
+      costBasisTotal: number;
+      costBasisPerShare: number;
+    }
+  | null;
+
+export function lifecycleShareDetail(
+  lifecycle: OptionLifecycle,
+  events: RealizedPnLEvent[],
+  taxLots: TaxLot[]
+): LifecycleShareDetail {
+  if (lifecycle.status !== "assigned") return null;
+
+  // Assigned covered call → underlying called away at strike.
+  if (lifecycle.optionType === "call") {
+    const stockEvent = events.find(
+      (e) => e.id === `pnl-${lifecycle.id}-assignment-stock`
+    );
+    if (!stockEvent) return null;
+    const basis = stockEvent.costBasis;
+    const proceeds = lifecycle.strikePrice * lifecycle.sharesControlled;
+    return {
+      kind: "called-away",
+      shares: lifecycle.sharesControlled,
+      costBasis: basis,
+      proceeds,
+      pnl: stockEvent.realizedPnl,
+      roiPercent:
+        basis != null && basis > 0 ? (stockEvent.realizedPnl / basis) * 100 : null,
+      basisMissing: basis == null,
+    };
+  }
+
+  // Assigned cash-secured put → underlying acquired at strike.
+  if (lifecycle.optionType === "put") {
+    const lot =
+      taxLots.find((l) => l.id === `lot-${lifecycle.id}-assignment`) ??
+      (() => {
+        const ids = new Set(lifecycle.linkedTransactionIds);
+        return taxLots.find(
+          (l) =>
+            l.source === "CASH_SECURED_PUT_ASSIGNMENT" &&
+            l.linkedTransactionIds.some((id) => ids.has(id))
+        );
+      })();
+    if (!lot) return null;
+    return {
+      kind: "acquired",
+      shares: lot.originalQuantity,
+      costBasisTotal: lot.costBasisTotal,
+      costBasisPerShare: lot.costBasisPerShare,
+    };
   }
 
   return null;
