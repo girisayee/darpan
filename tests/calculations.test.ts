@@ -339,6 +339,20 @@ describe("calculation engine", () => {
     expect(lc.netOptionPnl).toBe(-200);
   });
 
+  it("counts option fees once when netAmount bakes in fees (importer/manual convention)", () => {
+    // The importer and buildManualOpenTransaction set netAmount = gross − fees. The option
+    // P&L formulas subtract `fees` separately, so reading netAmount would double-count.
+    // Long call: $380 debit + $0.42 fee → loss should be exactly −380.42 (NOT −380.84).
+    const bto = {
+      ...optionTx("can-bto", "2026-01-05", "BUY_TO_OPEN", "CAN", "call", 1, "2026-01-16", -380, 0.42),
+      netAmount: -380.42, // fee baked into net, like the real importer
+    };
+    const exp = optionTx("can-exp", "2026-01-16", "EXPIRATION", "CAN", "call", 1, "2026-01-16", 0, 0);
+    const result = calculateDashboard([bto, exp]);
+    const lc = result.optionLifecycles.find((l) => l.underlyingSymbol === "CAN");
+    expect(lc!.netOptionPnl).toBeCloseTo(-380.42, 2);
+  });
+
   it("assigned covered-call lifecycle has assignmentStockPnl and unchanged option P&L", () => {
     // Stock: 100 shares @ $10 = $1000 cost basis. CC strike = $12. Premium = $100.
     // Assignment: proceeds = 12 × 100 = $1200; stockPnl = $1200 − $1000 = $200.

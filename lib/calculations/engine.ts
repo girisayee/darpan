@@ -232,7 +232,7 @@ function handleOptionTransaction(
 
   if (transaction.action === "BUY_TO_CLOSE") {
     lifecycle.status = "closed";
-    lifecycle.closeCost = Math.abs(transaction.netAmount || transaction.grossAmount);
+    lifecycle.closeCost = Math.abs(transaction.grossAmount || transaction.netAmount);
     lifecycle.netOptionPnl = lifecycle.premiumReceived - lifecycle.closeCost - lifecycle.fees;
     addOptionRealizedEvent(lifecycle, transaction.tradeDate, events, usage, positionCapital, settings, "closed");
     return;
@@ -242,7 +242,7 @@ function handleOptionTransaction(
     lifecycle.status = "closed";
     // For a long (BTO) position: proceeds received on close minus cost paid to open.
     // lifecycle.fees was already updated on line above (close-leg fees accumulated).
-    const proceeds = Math.abs(transaction.netAmount || transaction.grossAmount);
+    const proceeds = Math.abs(transaction.grossAmount || transaction.netAmount);
     lifecycle.closeCost = lifecycle.premiumReceived; // cost paid to open (stored in premiumReceived)
     lifecycle.premiumReceived = proceeds;            // repurpose field: closing proceeds for display
     lifecycle.netOptionPnl = proceeds - lifecycle.closeCost - lifecycle.fees;
@@ -283,7 +283,10 @@ function createLifecycle(transaction: TradeTransaction, warnings: string[], lots
   const optionType = transaction.optionType ?? "call";
   const contracts = Math.abs(transaction.quantity);
   const sharesControlled = contracts * 100;
-  const premium = Math.abs(transaction.netAmount || transaction.grossAmount);
+  // Use GROSS premium: option P&L formulas subtract `fees` separately, so reading the
+  // fee-inclusive netAmount here would double-count fees (importer/manual builders set
+  // netAmount = gross − fees). grossAmount is the pre-fee credit/debit.
+  const premium = Math.abs(transaction.grossAmount || transaction.netAmount);
   const stockBasis =
     optionType === "call"
       ? costBasisForOpenShares(lots, transaction.underlyingSymbol || transaction.symbol, sharesControlled, settings)
@@ -324,7 +327,7 @@ function createLongLifecycle(transaction: TradeTransaction, warnings: string[], 
   const contracts = Math.abs(transaction.quantity);
   const sharesControlled = contracts * 100;
   // For a long option, the debit paid to open is treated as cost basis.
-  const costPaid = Math.abs(transaction.netAmount || transaction.grossAmount);
+  const costPaid = Math.abs(transaction.grossAmount || transaction.netAmount);
   const openFees = settings.includeFees ? transaction.fees : 0;
   return {
     id: `opt-${transaction.id}`,

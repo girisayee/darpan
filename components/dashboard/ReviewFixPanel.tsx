@@ -175,14 +175,27 @@ interface OptionFormState {
   fees: string;
 }
 
+/**
+ * AddOptionOpenForm's state allows an unselected opener ("") so ambiguous
+ * expirations/assignments force an explicit buy-vs-sell choice. OptionFormState
+ * (used elsewhere) is assignable to this wider type.
+ */
+interface OptionOpenerState extends Omit<OptionFormState, "openerAction"> {
+  openerAction: "" | "BUY_TO_OPEN" | "SELL_TO_OPEN";
+}
+
 interface OptionFormErrors {
+  openerAction?: string;
   openDate?: string;
   price?: string;
   qty?: string;
 }
 
-function validateOptionForm(state: OptionFormState, closeDate: string): OptionFormErrors {
+function validateOptionForm(state: OptionOpenerState, closeDate: string): OptionFormErrors {
   const errs: OptionFormErrors = {};
+  if (state.openerAction !== "BUY_TO_OPEN" && state.openerAction !== "SELL_TO_OPEN") {
+    errs.openerAction = "Choose whether you bought (long) or sold this option to open.";
+  }
   if (!state.openDate) {
     errs.openDate = "Open date is required.";
   } else if (state.openDate > closeDate) {
@@ -206,11 +219,17 @@ function AddOptionOpenForm({
   row: OrphanRow;
   onSubmit: (txs: TradeTransaction[]) => void;
 }) {
-  const inferredAction = row.action && OPTION_CLOSE_ACTIONS.has(row.action)
-    ? (inferOpenerAction(row.action as TradeAction) as "BUY_TO_OPEN" | "SELL_TO_OPEN")
-    : "SELL_TO_OPEN";
+  // An EXPIRATION or ASSIGNMENT alone doesn't reveal whether the option was bought
+  // (long) or sold (covered call / CSP) to open — and guessing flips the P&L sign.
+  // Force an explicit choice for those; infer only for the unambiguous STC/BTC closes.
+  const ambiguousOpener = row.action === "EXPIRATION" || row.action === "ASSIGNMENT";
+  const inferredAction: "" | "BUY_TO_OPEN" | "SELL_TO_OPEN" = ambiguousOpener
+    ? ""
+    : row.action && OPTION_CLOSE_ACTIONS.has(row.action)
+      ? (inferOpenerAction(row.action as TradeAction) as "BUY_TO_OPEN" | "SELL_TO_OPEN")
+      : "SELL_TO_OPEN";
 
-  const [state, setState] = useState<OptionFormState>({
+  const [state, setState] = useState<OptionOpenerState>({
     openerAction: inferredAction,
     openDate: "",
     price: "",
@@ -236,7 +255,7 @@ function AddOptionOpenForm({
       optionType: row.optionType ?? "put",
       strikePrice: row.strikePrice ?? 0,
       expirationDate: row.expirationDate ?? row.date,
-      action: state.openerAction,
+      action: state.openerAction as "BUY_TO_OPEN" | "SELL_TO_OPEN",
       pricePerContract: Number(state.price),
       contracts: Number(state.qty),
       fees: Number(state.fees) || 0,
@@ -266,12 +285,26 @@ function AddOptionOpenForm({
         </label>
         <select
           value={state.openerAction}
-          onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as OptionFormState["openerAction"] }))}
-          className="h-9 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as OptionOpenerState["openerAction"] }))}
+          className={cn(
+            "h-9 rounded-md border bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+            errors.openerAction ? "border-neg/60" : "border-hairline"
+          )}
         >
+          <option value="" disabled>Select…</option>
           <option value="SELL_TO_OPEN">{openerActionLabel("SELL_TO_OPEN")}</option>
           <option value="BUY_TO_OPEN">{openerActionLabel("BUY_TO_OPEN")}</option>
         </select>
+        {errors.openerAction && (
+          <span className="font-sans text-[10.5px] text-neg">{errors.openerAction}</span>
+        )}
+        {ambiguousOpener && (
+          <span className="font-sans text-[10.5px] text-warn">
+            This {actionLabel(row.action).toLowerCase()} is ambiguous: if you <strong>sold</strong> it to open
+            (covered call / cash-secured put) the premium was kept; if you <strong>bought</strong> it (long) the
+            premium was lost. Pick the one that matches your trade.
+          </span>
+        )}
       </div>
 
       {/* User inputs */}
