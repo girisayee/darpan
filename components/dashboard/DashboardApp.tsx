@@ -160,6 +160,7 @@ export function DashboardApp() {
             onSearchChange={setTradeSearch}
             issueFilter={tradeIssueFilter}
             onIssueFilterChange={setTradeIssueFilter}
+            onSelectEvent={setSelectedEvent}
           />
         )}
         {activeTab === "Import" && (

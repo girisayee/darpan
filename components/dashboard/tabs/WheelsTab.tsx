@@ -15,14 +15,22 @@ import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, TaxLot } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, Strategy, TaxLot } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
-import { taxLotStatusChip } from "@/components/dashboard/tabs/shared";
+import { ClosedTradesTable, SegmentedControl, taxLotStatusChip } from "@/components/dashboard/tabs/shared";
 
-// ── DTE bucket types ──────────────────────────────────────────────────────────
+// ── View types ────────────────────────────────────────────────────────────────
 
+type WheelView = "Open" | "Closed";
 type TriageBucket = "All" | "Roll / close soon" | "Working";
+
+const OPTION_STRATEGIES: Strategy[] = [
+  "COVERED_CALL",
+  "COVERED_CALL_ASSIGNMENT",
+  "CASH_SECURED_PUT",
+  "PUT_ASSIGNMENT",
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -309,8 +317,7 @@ export function WheelsTab({
   result: CalculationResult;
   onSelectEvent: (event: RealizedPnLEvent) => void;
 }) {
-  void onSelectEvent; // reserved for future drill-down
-
+  const [wheelView, setWheelView] = useState<WheelView>("Open");
   const [activeBucket, setActiveBucket] = useState<TriageBucket>("All");
 
   // Derive analytics via shared selector
@@ -342,8 +349,42 @@ export function WheelsTab({
   // Tax lots (open ones are most relevant; show all for completeness)
   const taxLots = result.taxLots;
 
+  // Closed cycles — option strategies only (exclude SWING_TRADE + DATA_ISSUE)
+  const closedCyclesRows = result.realizedEvents.filter((e) =>
+    OPTION_STRATEGIES.includes(e.strategy)
+  );
+
   return (
     <div className="space-y-6 py-2">
+      {/* ── Open / Closed segmented control ─────────────────────────────────── */}
+      <SegmentedControl<WheelView>
+        value={wheelView}
+        options={["Open", "Closed"]}
+        onChange={setWheelView}
+      />
+
+      {/* ── Closed cycles view ──────────────────────────────────────────────── */}
+      {wheelView === "Closed" && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-sans text-[13px] font-medium text-foreground">
+              Closed cycles
+            </h2>
+            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
+              {closedCyclesRows.length} cycle{closedCyclesRows.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <ClosedTradesTable
+            rows={closedCyclesRows}
+            onSelectEvent={onSelectEvent}
+            empty="No closed option cycles yet."
+          />
+        </section>
+      )}
+
+      {/* ── Open positions view ─────────────────────────────────────────────── */}
+      {wheelView === "Open" && (
+        <>
       {/* ── Header strip ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
         <div className="rounded-xl border border-hairline bg-surface p-3">
@@ -425,6 +466,8 @@ export function WheelsTab({
 
       {/* ── Tax lots ledger (folded) ─────────────────────────────────────────── */}
       <TaxLotsSection rows={taxLots} />
+        </>
+      )}
     </div>
   );
 }

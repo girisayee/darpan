@@ -12,6 +12,7 @@ import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format"
 import type {
   MonthlyCapitalReturn,
   OptionLifecycle,
+  RealizedPnLEvent,
   TaxLot,
 } from "@/types/trading";
 
@@ -89,6 +90,38 @@ export function taxLotStatusChip(row: TaxLot) {
     partially_closed: "closed",
   };
   return <StatusChip kind={kindMap[row.status] ?? "closed"} />;
+}
+
+// ── SegmentedControl ─────────────────────────────────────────────────────────
+
+export function SegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: T[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-hairline bg-surface-inset p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={cn(
+            "rounded-md px-4 py-1.5 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+            value === opt
+              ? "bg-accent/15 text-accent"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // ── MonthlyRoiTable ──────────────────────────────────────────────────────────
@@ -229,6 +262,110 @@ export function TaxLotsTable({ rows }: { rows: TaxLot[] }) {
       </h2>
       <DataTable rows={rows} columns={columns} empty="No tax lots yet." />
     </section>
+  );
+}
+
+// ── ClosedTradesTable ─────────────────────────────────────────────────────────
+
+/**
+ * Null-safe descending date comparator.
+ * Null/empty dates sort last.
+ */
+export function compareDateDesc(
+  a: string | null | undefined,
+  b: string | null | undefined
+): number {
+  const aVal = a ?? "";
+  const bVal = b ?? "";
+  if (!aVal && !bVal) return 0;
+  if (!aVal) return 1;
+  if (!bVal) return -1;
+  return bVal.localeCompare(aVal);
+}
+
+export function ClosedTradesTable({
+  rows,
+  onSelectEvent,
+  empty = "No closed trades yet.",
+}: {
+  rows: RealizedPnLEvent[];
+  onSelectEvent: (e: RealizedPnLEvent) => void;
+  empty?: string;
+}) {
+  // Filter DATA_ISSUE; DataTable handles sort via defaultSort below
+  const filtered = rows.filter((r) => r.strategy !== "DATA_ISSUE");
+
+  const columns: Column<RealizedPnLEvent>[] = [
+    {
+      key: "date",
+      header: "Date",
+      value: (row) => row.date ?? "",
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">
+          {row.date ?? <span className="opacity-50">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: "symbol",
+      header: "Symbol",
+      value: (row) => row.symbol,
+      render: (row) => (
+        <span className="font-medium text-foreground">{row.symbol}</span>
+      ),
+    },
+    {
+      key: "strategy",
+      header: "Strategy",
+      value: (row) => row.strategy,
+      render: (row) => (
+        <span className="text-foreground">{label(row.strategy)}</span>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty",
+      value: (row) => row.quantity,
+      align: "right",
+    },
+    {
+      key: "optionPremium",
+      header: "Premium",
+      value: (row) => row.optionPremium,
+      render: (row) => signedMoney(row.optionPremium),
+      align: "right",
+    },
+    {
+      key: "realizedPnl",
+      header: "Realized P&L",
+      value: (row) => row.realizedPnl,
+      render: (row) => signedMoney(row.realizedPnl),
+      align: "right",
+    },
+    {
+      key: "roiPercent",
+      header: "ROI %",
+      value: (row) => row.roiPercent ?? -Infinity,
+      render: (row) => signedPercent(row.roiPercent),
+      align: "right",
+    },
+    {
+      key: "annualizedRoiPercent",
+      header: "Annualized",
+      value: (row) => row.annualizedRoiPercent ?? -Infinity,
+      render: (row) => signedPercent(row.annualizedRoiPercent),
+      align: "right",
+    },
+  ];
+
+  return (
+    <DataTable
+      rows={filtered}
+      columns={columns}
+      onRowClick={onSelectEvent}
+      empty={empty}
+      defaultSort={{ key: "date", direction: "desc" }}
+    />
   );
 }
 

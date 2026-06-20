@@ -16,17 +16,18 @@ export function DataTable<T>({
   rows,
   columns,
   onRowClick,
-  empty = "No rows to show."
+  empty = "No rows to show.",
+  defaultSort
 }: {
   rows: T[];
   columns: Column<T>[];
   onRowClick?: (row: T) => void;
   empty?: string;
+  defaultSort?: { key: string; direction: "asc" | "desc" };
 }) {
-  const [sort, setSort] = useState<{ key: string; direction: "asc" | "desc" }>({
-    key: columns[0]?.key ?? "",
-    direction: "asc"
-  });
+  const [sort, setSort] = useState<{ key: string; direction: "asc" | "desc" }>(
+    defaultSort ?? { key: columns[0]?.key ?? "", direction: "asc" }
+  );
 
   const sorted = useMemo(() => {
     const column = columns.find((item) => item.key === sort.key);
@@ -34,7 +35,13 @@ export function DataTable<T>({
     return [...rows].sort((a, b) => {
       const av = column.value(a);
       const bv = column.value(b);
-      const result = typeof av === "number" && typeof bv === "number" ? av - bv : String(av ?? "").localeCompare(String(bv ?? ""));
+      // Missing / empty values always sort last, regardless of direction
+      const aEmpty = av == null || av === "" || av === -Infinity;
+      const bEmpty = bv == null || bv === "" || bv === -Infinity;
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      const result = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
       return sort.direction === "asc" ? result : -result;
     });
   }, [columns, rows, sort]);

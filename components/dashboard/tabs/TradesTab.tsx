@@ -4,16 +4,9 @@
  * TradesTab — aurora_trades_blotter mockup (Phase 2)
  *
  * Features:
- *  - Search input (filters by symbol or action label)
- *  - Type filter chips: All · Options · Stock · Unresolved {n}
- *  - Newest-first null-safe sort (missing dates sort last, no sentinel values)
- *  - Table columns: Date · Symbol · Action · Qty · Net · Status
- *  - Pagination footer: 1–{pageSize} of {total} + Prev / Next
- *  - pageSize = 50 rows max per page
- *
- * Reuses shared helpers: signedMoney, label (from shared.tsx)
- * Reuses shared component: DataTable with Column<T>
- * Token classes only; no fabricated data.
+ *  - Segmented control: "Closed trades" | "Transactions"
+ *  - Closed trades: strategy filter chips + ClosedTradesTable
+ *  - Transactions: search input + type chips + paginated raw blotter
  */
 
 import { Search } from "lucide-react";
@@ -21,15 +14,26 @@ import { useMemo, useState } from "react";
 import { StatusChip } from "@/components/common/StatusChip";
 import { cn } from "@/lib/utils/cn";
 import { formatNumber } from "@/lib/utils/format";
-import type { CalculationResult, TradeTransaction } from "@/types/trading";
-import { label, signedMoney } from "./shared";
+import type { CalculationResult, RealizedPnLEvent, Strategy, TradeTransaction } from "@/types/trading";
+import { ClosedTradesTable, compareDateDesc, label, SegmentedControl, signedMoney } from "./shared";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type TradeIssueFilter = "unresolved" | "duplicates" | null;
 type TypeFilter = "All" | "Options" | "Stock" | "Unresolved";
+type PrimaryView = "Closed trades" | "Transactions";
+type StrategyFilter = "All" | "Covered calls" | "Cash-secured puts" | "Swing";
 
 const PAGE_SIZE = 50;
+
+// ── Strategy filter → Strategy[] map ─────────────────────────────────────────
+
+const STRATEGY_FILTER_MAP: Record<StrategyFilter, Strategy[]> = {
+  All: ["COVERED_CALL", "COVERED_CALL_ASSIGNMENT", "CASH_SECURED_PUT", "PUT_ASSIGNMENT", "SWING_TRADE"],
+  "Covered calls": ["COVERED_CALL", "COVERED_CALL_ASSIGNMENT"],
+  "Cash-secured puts": ["CASH_SECURED_PUT", "PUT_ASSIGNMENT"],
+  Swing: ["SWING_TRADE"],
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,22 +42,6 @@ function typeCategory(tx: TradeTransaction): "Options" | "Stock" | "Unresolved" 
   if (tx.status === "unresolved") return "Unresolved";
   if (tx.instrumentType === "option") return "Options";
   return "Stock";
-}
-
-/**
- * Null-safe date comparator — missing / empty dates sort last.
- * Returns negative if a should appear before b (i.e. a is newer).
- */
-function compareDateDesc(a: string | null | undefined, b: string | null | undefined): number {
-  const aVal = a ?? "";
-  const bVal = b ?? "";
-  // Both empty → stable
-  if (!aVal && !bVal) return 0;
-  // Missing value sorts last
-  if (!aVal) return 1;
-  if (!bVal) return -1;
-  // Lexicographic comparison works for ISO dates (YYYY-MM-DD)
-  return bVal.localeCompare(aVal);
 }
 
 /** Action label used both for display and search matching. */
@@ -118,13 +106,21 @@ export function TradesTab({
   onSearchChange,
   issueFilter,
   onIssueFilterChange,
+  onSelectEvent,
 }: {
   result: CalculationResult;
   search: string;
   onSearchChange: (value: string) => void;
   issueFilter: TradeIssueFilter;
   onIssueFilterChange: (value: TradeIssueFilter) => void;
+  onSelectEvent: (e: RealizedPnLEvent) => void;
 }) {
+  // Primary segmented control
+  const [primaryView, setPrimaryView] = useState<PrimaryView>("Closed trades");
+
+  // Strategy filter for closed-trades view
+  const [strategyFilter, setStrategyFilter] = useState<StrategyFilter>("All");
+
   // Sync external search prop with local controlled input
   const [localSearch, setLocalSearch] = useState(externalSearch ?? "");
 
@@ -154,6 +150,17 @@ export function TradesTab({
     }
     setPage(0);
   }
+
+  // ── Closed-trades filtering ───────────────────────────────────────────────
+
+  const allowedStrategies = STRATEGY_FILTER_MAP[strategyFilter];
+  const closedTradesRows = useMemo(
+    () =>
+      result.realizedEvents.filter(
+        (e) => allowedStrategies.includes(e.strategy)
+      ),
+    [result.realizedEvents, allowedStrategies]
+  );
 
   // ── Counts for chips ──────────────────────────────────────────────────────
 
@@ -213,95 +220,135 @@ export function TradesTab({
 
   return (
     <div className="space-y-4 py-2">
-      {/* Search + type chips toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Search input */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search symbol or action…"
-            className="h-8 w-full rounded-md border border-hairline bg-surface pl-8 pr-3 font-sans text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40"
-            aria-label="Search trades"
+      {/* Primary segmented control */}
+      <SegmentedControl<PrimaryView>
+        value={primaryView}
+        options={["Closed trades", "Transactions"]}
+        onChange={setPrimaryView}
+      />
+
+      {/* ── Closed trades view ──────────────────────────────────────────────── */}
+      {primaryView === "Closed trades" && (
+        <div className="space-y-4">
+          {/* Strategy filter chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by strategy">
+              {(["All", "Covered calls", "Cash-secured puts", "Swing"] as const).map((chip) => (
+                <FilterChip
+                  key={chip}
+                  label={chip}
+                  active={strategyFilter === chip}
+                  onClick={() => setStrategyFilter(chip)}
+                />
+              ))}
+            </div>
+            <span className="ml-auto font-sans text-[12px] tabular-nums text-muted-foreground">
+              {closedTradesRows.length} trade{closedTradesRows.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          <ClosedTradesTable
+            rows={closedTradesRows}
+            onSelectEvent={onSelectEvent}
+            empty="No closed trades match the current filter."
           />
         </div>
+      )}
 
-        {/* Type filter chips */}
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by type">
-          {(["All", "Options", "Stock"] as const).map((chip) => (
-            <FilterChip
-              key={chip}
-              label={chip}
-              active={typeFilter === chip}
-              onClick={() => handleTypeFilter(chip)}
-            />
-          ))}
-          <FilterChip
-            label="Unresolved"
-            active={typeFilter === "Unresolved"}
-            onClick={() => handleTypeFilter("Unresolved")}
-            badge={unresolvedCount}
-          />
-        </div>
-      </div>
+      {/* ── Transactions view (raw blotter, unchanged) ───────────────────────── */}
+      {primaryView === "Transactions" && (
+        <>
+          {/* Search + type chips toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search input */}
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search symbol or action…"
+                className="h-8 w-full rounded-md border border-hairline bg-surface pl-8 pr-3 font-sans text-[12.5px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40"
+                aria-label="Search trades"
+              />
+            </div>
 
-      {/* Table */}
-      <div className="scrollbar-thin overflow-auto rounded-lg border border-hairline bg-surface">
-        <table className="min-w-full border-separate border-spacing-0 text-sm">
-          <thead>
-            <tr>
-              <Th>Date</Th>
-              <Th>Symbol</Th>
-              <Th>Action</Th>
-              <Th align="right">Qty</Th>
-              <Th align="right">Net</Th>
-              <Th align="right">Status</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-3 py-8 text-center font-sans text-[13px] text-muted-foreground"
-                >
-                  {total === 0 && !searchTerm && typeFilter === "All"
-                    ? "No transactions yet."
-                    : "No transactions match the current filter."}
-                </td>
-              </tr>
-            ) : (
-              pageRows.map((tx) => (
-                <TradeRow key={tx.id} tx={tx} />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            {/* Type filter chips */}
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by type">
+              {(["All", "Options", "Stock"] as const).map((chip) => (
+                <FilterChip
+                  key={chip}
+                  label={chip}
+                  active={typeFilter === chip}
+                  onClick={() => handleTypeFilter(chip)}
+                />
+              ))}
+              <FilterChip
+                label="Unresolved"
+                active={typeFilter === "Unresolved"}
+                onClick={() => handleTypeFilter("Unresolved")}
+                badge={unresolvedCount}
+              />
+            </div>
+          </div>
 
-      {/* Pagination footer */}
-      <div className="flex items-center justify-between gap-3 pb-1">
-        <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-          {rangeLabel}
-        </span>
-        <div className="flex gap-2">
-          <PaginationButton
-            label="Prev"
-            disabled={safePage === 0}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-          />
-          <PaginationButton
-            label="Next"
-            disabled={safePage >= pageCount - 1 || total === 0}
-            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-          />
-        </div>
-      </div>
+          {/* Table */}
+          <div className="scrollbar-thin overflow-auto rounded-lg border border-hairline bg-surface">
+            <table className="min-w-full border-separate border-spacing-0 text-sm">
+              <thead>
+                <tr>
+                  <Th>Date</Th>
+                  <Th>Symbol</Th>
+                  <Th>Action</Th>
+                  <Th align="right">Qty</Th>
+                  <Th align="right">Net</Th>
+                  <Th align="right">Status</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-3 py-8 text-center font-sans text-[13px] text-muted-foreground"
+                    >
+                      {total === 0 && !searchTerm && typeFilter === "All"
+                        ? "No transactions yet."
+                        : "No transactions match the current filter."}
+                    </td>
+                  </tr>
+                ) : (
+                  pageRows.map((tx) => (
+                    <TradeRow key={tx.id} tx={tx} />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination footer */}
+          <div className="flex items-center justify-between gap-3 pb-1">
+            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
+              {rangeLabel}
+            </span>
+            <div className="flex gap-2">
+              <PaginationButton
+                label="Prev"
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              />
+              <PaginationButton
+                label="Next"
+                disabled={safePage >= pageCount - 1 || total === 0}
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
