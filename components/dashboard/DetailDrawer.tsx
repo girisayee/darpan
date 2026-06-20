@@ -147,6 +147,11 @@ export function DetailDrawer({
     event.linkedTransactionIds.includes(tx.id)
   );
 
+  // Manual badge: any linked tx has importBatchId "manual" or tags includes "manual"
+  const hasManualTx = linked.some(
+    (tx) => tx.importBatchId === "manual" || tx.tags.includes("manual")
+  );
+
   // Basis note: derive lot info from explanation or linked transactions
   const hasBasisNote = !!event.explanation && event.explanation.trim().length > 0;
 
@@ -191,6 +196,11 @@ export function DetailDrawer({
                 >
                   {strategyLabel(event.strategy)}
                 </span>
+                {hasManualTx && (
+                  <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+                    manual
+                  </span>
+                )}
               </div>
               <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
                 Closed {event.date}

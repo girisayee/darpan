@@ -51,69 +51,79 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="scrollbar-thin overflow-auto rounded-lg border border-hairline bg-surface">
-      <table className="table-sticky min-w-full border-separate border-spacing-0 text-sm">
-        <thead>
-          <tr>
-            {columns.map((column) => {
-              const active = sort.key === column.key;
-              const Icon = active ? (sort.direction === "asc" ? ArrowUp : ArrowDown) : ChevronsUpDown;
-              return (
-                <th
-                  key={column.key}
-                  className={cn(
-                    "border-b border-hairline-soft px-3 py-2.5 text-left",
-                    column.align === "right" && "text-right"
-                  )}
-                >
-                  <button
-                    type="button"
+    <div className="flex flex-col gap-0 rounded-lg border border-hairline bg-surface">
+      <div className="scrollbar-thin overflow-auto">
+        <table className="table-sticky min-w-full border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr>
+              {columns.map((column) => {
+                const active = sort.key === column.key;
+                const Icon = active ? (sort.direction === "asc" ? ArrowUp : ArrowDown) : ChevronsUpDown;
+                return (
+                  <th
+                    key={column.key}
                     className={cn(
-                      "inline-flex items-center gap-1 text-[11.5px] font-normal normal-case tracking-normal text-muted-foreground",
-                      column.align === "right" && "flex-row-reverse"
+                      "border-b border-hairline-soft px-3 py-2.5 text-left",
+                      column.align === "right" && "text-right"
                     )}
-                    onClick={() =>
-                      setSort((current) => ({
-                        key: column.key,
-                        direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc"
-                      }))
-                    }
                   >
-                    {column.header}
-                    <Icon className="h-3 w-3 shrink-0" />
-                  </button>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, rowIndex) => (
-            <tr
-              key={rowIndex}
-              className={cn(
-                "border-b border-hairline-soft last:border-0 transition-colors duration-[120ms]",
-                onRowClick && "cursor-pointer hover:bg-accent/[0.04]"
-              )}
-              onClick={() => onRowClick?.(row)}
-            >
-              {columns.map((column) => (
-                <td
-                  key={column.key}
-                  className={cn(
-                    "px-3 py-2.5 align-top",
-                    column.align === "right"
-                      ? "text-right tabular-nums text-foreground"
-                      : "font-sans"
-                  )}
-                >
-                  {column.render ? column.render(row) : column.value(row)}
-                </td>
-              ))}
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 text-[11.5px] font-normal normal-case tracking-normal text-muted-foreground",
+                        column.align === "right" && "flex-row-reverse"
+                      )}
+                      onClick={() => {
+                        setSort((current) => ({
+                          key: column.key,
+                          direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc"
+                        }));
+                      }}
+                    >
+                      {column.header}
+                      <Icon className="h-3 w-3 shrink-0" />
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((row, rowIndex) => (
+              <tr
+                key={rowIndex}
+                className={cn(
+                  "border-b border-hairline-soft last:border-0 transition-colors duration-[120ms]",
+                  onRowClick && "cursor-pointer hover:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                )}
+                onClick={() => onRowClick?.(row)}
+                onKeyDown={onRowClick ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onRowClick(row);
+                  }
+                } : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? "button" : undefined}
+              >
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={cn(
+                      "px-3 py-2.5 align-top",
+                      column.align === "right"
+                        ? "text-right tabular-nums text-foreground"
+                        : "font-sans"
+                    )}
+                  >
+                    {column.render ? column.render(row) : column.value(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

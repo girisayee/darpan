@@ -349,16 +349,22 @@ export function optionTypeLabel(row: OptionLifecycle): string {
  * Lifecycle-based closed-cycles table for the Options tab.
  * Displays one row per OptionLifecycle (closed/expired/assigned), newest-first.
  * Includes both short (sold-to-open) and long (bought-to-open) closed positions.
- * Rows are NOT clickable — no DetailDrawer drill-down for cycles.
+ * Rows are clickable when onRowClick is provided — opens the DetailDrawer.
  *
- * Column order: Date · Type · Symbol · Qty · Days held · Outcome · Premium · Shares P/L · Realized P/L · ROI
+ * Column order: Date · Type · Symbol · Qty · Days held · Outcome · Premium · Shares P/L · Realized P/L · Capital · ROI
  */
 export function ClosedCyclesTable({
   rows,
   empty = "No closed option cycles yet.",
+  onRowClick,
+  manualTxIds,
 }: {
   rows: OptionLifecycle[];
   empty?: string;
+  /** Called when a closed row is activated (click / Enter / Space). */
+  onRowClick?: (lifecycle: OptionLifecycle) => void;
+  /** Set of manual transaction ids (tags includes 'manual') — used to show badge. */
+  manualTxIds?: Set<string>;
 }) {
   const columns: Column<OptionLifecycle>[] = [
     // 1. Date (close date) — first column, default sort target
@@ -386,19 +392,30 @@ export function ClosedCyclesTable({
         </span>
       ),
     },
-    // 3. Symbol
+    // 3. Symbol (+ manual badge when lifecycle includes a manual tx)
     {
       key: "symbol",
       header: "Symbol",
       value: (row) => row.underlyingSymbol,
-      render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
-          <span className="text-[11px] text-muted-foreground">
-            ${row.strikePrice.toFixed(2)}
-          </span>
-        </div>
-      ),
+      render: (row) => {
+        const isManual = manualTxIds != null &&
+          row.linkedTransactionIds.some((id) => manualTxIds.has(id));
+        return (
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
+              {isManual && (
+                <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-sans text-[9px] font-medium leading-none text-accent">
+                  manual
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              ${row.strikePrice.toFixed(2)}
+            </span>
+          </div>
+        );
+      },
     },
     // 4. Qty
     {
@@ -486,7 +503,23 @@ export function ClosedCyclesTable({
       },
       align: "right",
     },
-    // 10. ROI — net realized P/L ÷ capitalDeployed
+    // 10. Capital — purchase price (long debit paid) or deployed capital
+    //     (short CC stock basis / CSP collateral). Same field the ROI column
+    //     divides by, so ROI = Realized P/L ÷ Capital reconciles in-row.
+    {
+      key: "capitalDeployed",
+      header: "Capital",
+      value: (row) => row.capitalDeployed ?? -Infinity,
+      render: (row) => {
+        const cap = row.capitalDeployed ?? 0;
+        if (cap <= 0) return <span className="opacity-50">—</span>;
+        return (
+          <span className="tabular-nums text-foreground">{formatCurrency(cap)}</span>
+        );
+      },
+      align: "right",
+    },
+    // 11. ROI — net realized P/L ÷ capitalDeployed
     {
       key: "roi",
       header: "ROI",
@@ -510,6 +543,7 @@ export function ClosedCyclesTable({
       rows={rows}
       columns={columns}
       empty={empty}
+      onRowClick={onRowClick}
       defaultSort={{ key: "closeDate", direction: "desc" }}
     />
   );

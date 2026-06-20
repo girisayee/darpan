@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
+import { ReviewFixPanel } from "@/components/dashboard/ReviewFixPanel";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
 import { OptionsTab } from "@/components/dashboard/tabs/OptionsTab";
@@ -51,7 +52,6 @@ const tabs = [
 
 type PrimaryTab = (typeof tabs)[number];
 type Tab = PrimaryTab | "Import" | "Settings";
-type TradeIssueFilter = "unresolved" | "duplicates" | null;
 
 export function DashboardApp() {
   const store = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerSnapshot);
@@ -61,6 +61,7 @@ export function DashboardApp() {
   const { theme, toggle } = useTheme();
   const [account, setAccount] = useState("ALL");
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
+  const [reviewFixOpen, setReviewFixOpen] = useState(false);
 
   useEffect(() => {
     void loadStore();
@@ -95,8 +96,13 @@ export function DashboardApp() {
     void saveStore({ transactions: next });
   }
 
-  function openTrades(_issueFilter: TradeIssueFilter) {
-    setActiveTab("Import");
+  function openTrades() {
+    setReviewFixOpen(true);
+  }
+
+  function addTransaction(tx: TradeTransaction) {
+    const next = [...storedTransactions, tx];
+    void saveStore({ transactions: next });
   }
 
   const primaryTabs = tabs as readonly string[];
@@ -144,7 +150,11 @@ export function DashboardApp() {
           />
         )}
         {activeTab === "Options" && (
-          <OptionsTab result={result} />
+          <OptionsTab
+            result={result}
+            onSelectEvent={setSelectedEvent}
+            onReviewFix={() => setReviewFixOpen(true)}
+          />
         )}
         {activeTab === "Swing trades" && (
           <SwingTradesTab result={result} onSelectEvent={setSelectedEvent} />
@@ -177,6 +187,13 @@ export function DashboardApp() {
         event={selectedEvent}
         onClose={() => setSelectedEvent(null)}
         transactions={result.transactions}
+      />
+
+      <ReviewFixPanel
+        open={reviewFixOpen}
+        onClose={() => setReviewFixOpen(false)}
+        result={result}
+        onAddTransaction={addTransaction}
       />
     </main>
   );

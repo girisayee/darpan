@@ -3,6 +3,7 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
+import { BuyingPowerGauge } from "@/components/dashboard/BuyingPowerGauge";
 import { goalPace } from "@/lib/selectors/goal-pace";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
 import { cn } from "@/lib/utils/cn";
@@ -67,16 +68,6 @@ export function OverviewTab({
   // ── Buying-power utilization (current open capital / maxBP) ───────────────
   const maxBP = settings.maxBuyingPower ?? 125000;
   const currentDeployed = currentDeployedCapital(result);
-  const util = maxBP > 0 ? (currentDeployed / maxBP) * 100 : null;
-  const utilPct = util !== null ? Math.min(100, util) : 0;
-  const barColor =
-    util === null
-      ? "bg-accent"
-      : util >= 80
-        ? "bg-neg"
-        : util >= 40
-          ? "bg-pos"
-          : "bg-warn";
 
   // ── Insights visibility ────────────────────────────────────────────────────
   const hasInsights =
@@ -192,6 +183,9 @@ export function OverviewTab({
         </div>
       </div>
 
+      {/* ── Buying-power ring gauge — after hero KPI row, before By strategy ── */}
+      <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
+
       {/* ── By strategy ── */}
       <MetricGroup label="By strategy" cols={3}>
         <KpiCard
@@ -219,33 +213,6 @@ export function OverviewTab({
           variant="compact"
         />
       </MetricGroup>
-
-      {/* ── Buying-power utilization bar ── */}
-      <div className="rounded-[12px] border border-hairline bg-surface p-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="font-sans text-[12px] text-muted-foreground">
-            Buying-power utilization
-          </span>
-          <span className="font-sans text-[12px] font-medium tabular-nums text-foreground">
-            {util === null ? "—" : `${formatPercent(util, 0)} · ${formatCurrency(currentDeployed)} of ${formatCurrency(maxBP)}`}
-          </span>
-        </div>
-        <div
-          className="h-2 w-full overflow-hidden rounded-full bg-background"
-          role="progressbar"
-          aria-valuenow={Math.round(utilPct)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div
-            className={`h-full rounded-full transition-all ${barColor}`}
-            style={{ width: `${utilPct}%` }}
-          />
-        </div>
-        <p className="font-sans text-[11px] text-muted-foreground">
-          Current open capital vs max buying power · healthy band 40–80%
-        </p>
-      </div>
 
       {/* ── Returns & efficiency group (YTD ROI + Expectancy only) ── */}
       <MetricGroup label="Returns & efficiency" cols={2}>

@@ -15,7 +15,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle, TradeTransaction } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, TradeTransaction } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import {
@@ -24,6 +24,7 @@ import {
   currentDeployedCapital,
   tone,
 } from "@/components/dashboard/tabs/shared";
+import { lifecycleToEvent } from "@/lib/utils/option-helpers";
 
 // ── View types ────────────────────────────────────────────────────────────────
 
@@ -342,7 +343,13 @@ function actionLabel(action: string): string {
   return map[action] ?? action;
 }
 
-function UnresolvedClosesSection({ result }: { result: CalculationResult }) {
+function UnresolvedClosesSection({
+  result,
+  onReviewFix,
+}: {
+  result: CalculationResult;
+  onReviewFix?: () => void;
+}) {
   const rows = buildUnresolvedCloseRows(result);
   if (rows.length === 0) return null;
 
@@ -435,6 +442,15 @@ function UnresolvedClosesSection({ result }: { result: CalculationResult }) {
         <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-warn/15 px-1.5 font-sans text-[10px] font-medium tabular-nums text-warn">
           {rows.length}
         </span>
+        {onReviewFix && (
+          <button
+            type="button"
+            onClick={onReviewFix}
+            className="ml-auto inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            Fix →
+          </button>
+        )}
       </div>
       <p className="font-sans text-[12px] text-muted-foreground">
         These closing legs could not be matched to an opening trade in the imported data.
@@ -531,8 +547,12 @@ function OptionsKpiHeader({ result }: { result: CalculationResult }) {
 
 export function OptionsTab({
   result,
+  onSelectEvent,
+  onReviewFix,
 }: {
   result: CalculationResult;
+  onSelectEvent?: (event: RealizedPnLEvent) => void;
+  onReviewFix?: () => void;
 }) {
   const [optionsView, setOptionsView] = useState<OptionsView>("Open");
   const [activeBucket, setActiveBucket] = useState<TriageBucket>("All");
@@ -540,6 +560,20 @@ export function OptionsTab({
   // Derive analytics via shared selector
   const analytics = wheelAnalytics(result);
   const premium = analytics.premium;
+
+  // Build set of manual tx ids for badge rendering
+  const manualTxIds = new Set(
+    result.transactions
+      .filter((t) => t.importBatchId === "manual" || t.tags.includes("manual"))
+      .map((t) => t.id)
+  );
+
+  // Handler for closed cycle row activation → DetailDrawer
+  function handleCycleClick(lifecycle: OptionLifecycle) {
+    if (!onSelectEvent) return;
+    const event = lifecycleToEvent(lifecycle, result.realizedEvents);
+    onSelectEvent(event);
+  }
 
   // Open lifecycles: short direction only (CC/CSP — premium-selling positions).
   const openLifecycles = result.optionLifecycles.filter(
@@ -654,11 +688,13 @@ export function OptionsTab({
             <ClosedCyclesTable
               rows={closedCyclesLifecycles}
               empty="No closed option positions yet."
+              onRowClick={onSelectEvent ? handleCycleClick : undefined}
+              manualTxIds={manualTxIds}
             />
           </div>
 
           {/* Unresolved closes — orphan closing legs with no matched opener */}
-          <UnresolvedClosesSection result={result} />
+          <UnresolvedClosesSection result={result} onReviewFix={onReviewFix} />
         </section>
       )}
     </div>
