@@ -10,6 +10,8 @@ export interface GoalPaceResult {
   target: number;
   aheadBy: number;
   pct: number;
+  projectedYearEnd: number;
+  requiredMonthly: number;
 }
 
 export function goalPace(input: GoalPaceInput): GoalPaceResult {
@@ -28,5 +30,11 @@ export function goalPace(input: GoalPaceInput): GoalPaceResult {
   const aheadBy = actual - target;
   const pct = annualGoal > 0 ? (actual / annualGoal) * 100 : 0;
 
-  return { cumulative, actual, target, aheadBy, pct };
+  const monthsElapsed = monthIndex + 1;
+  const remainingMonths = 12 - monthsElapsed;
+  const projectedYearEnd = monthsElapsed > 0 ? (actual / monthsElapsed) * 12 : 0;
+  const requiredMonthly =
+    remainingMonths > 0 ? Math.max(0, annualGoal - actual) / remainingMonths : 0;
+
+  return { cumulative, actual, target, aheadBy, pct, projectedYearEnd, requiredMonthly };
 }

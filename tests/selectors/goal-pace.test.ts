@@ -56,3 +56,31 @@ test("monthIndex beyond data length falls back to 0", () => {
   expect(result.actual).toBe(0);
   expect(result.aheadBy).toBe(0 - 12000 * 6 / 12);
 });
+
+test("projects year-end and required monthly from pace", () => {
+  const result = goalPace({
+    annualGoal: 50000,
+    monthlyRealized: [5000, 5000, 5000, 5000, 5000, 6940],
+    monthIndex: 5,
+  });
+  // monthsElapsed = 6, actual = 31940
+  expect(result.projectedYearEnd).toBeCloseTo(63880, 5); // 31940 / 6 * 12
+  // remaining = 6, required = (50000 - 31940) / 6
+  expect(result.requiredMonthly).toBeCloseTo(3010, 5);
+});
+
+test("final month: no remaining -> requiredMonthly 0, no NaN", () => {
+  const result = goalPace({
+    annualGoal: 12000,
+    monthlyRealized: Array(12).fill(1000),
+    monthIndex: 11,
+  });
+  expect(result.requiredMonthly).toBe(0);
+  expect(Number.isNaN(result.requiredMonthly)).toBe(false);
+  expect(result.projectedYearEnd).toBeCloseTo(12000, 5);
+});
+
+test("goal already met -> requiredMonthly clamps to 0", () => {
+  const result = goalPace({ annualGoal: 1000, monthlyRealized: [5000], monthIndex: 0 });
+  expect(result.requiredMonthly).toBe(0);
+});
