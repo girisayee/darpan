@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * WheelsTab — Phase 2 implementation.
- * Builds the wheels triage-list UI per the wheels_triage_list Aurora mockup.
+ * OptionsTab — renamed from WheelsTab, Phase 2+ implementation.
+ * Shows open and closed option positions across all strategies (CC, CSP, long options).
  *
  * DATA GAPS (noted per spec):
  *   - "% captured" and ITM/OTM require live option mark data we do not have.
@@ -15,14 +15,19 @@ import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, TradeTransaction } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
-import { ClosedCyclesTable, SegmentedControl, currentDeployedCapital } from "@/components/dashboard/tabs/shared";
+import {
+  ClosedCyclesTable,
+  SegmentedControl,
+  currentDeployedCapital,
+  tone,
+} from "@/components/dashboard/tabs/shared";
 
 // ── View types ────────────────────────────────────────────────────────────────
 
-type WheelView = "Open" | "Closed";
+type OptionsView = "Open" | "Closed";
 type TriageBucket = "All" | "Roll / close soon" | "Working";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -112,7 +117,7 @@ function TriageChip({
   );
 }
 
-// ── Open-wheels token-styled row ──────────────────────────────────────────────
+// ── Open-positions token-styled row ──────────────────────────────────────────
 
 function DteCell({ dte }: { dte: number }) {
   return (
@@ -142,14 +147,13 @@ function ActionChip({ bucket }: { bucket: Exclude<TriageBucket, "All"> }) {
   );
 }
 
-// ── Open-wheels table ─────────────────────────────────────────────────────────
+// ── Open-positions table ─────────────────────────────────────────────────────
 
-function OpenWheelsTable({
+function OpenPositionsTable({
   rows,
 }: {
   rows: OptionLifecycle[];
 }) {
-  // Compute today once for Days held calculation
   const todayMs = (() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -266,168 +270,255 @@ function OpenWheelsTable({
     <DataTable
       rows={rows}
       columns={columns}
-      empty="No open wheel positions."
+      empty="No open positions."
     />
   );
 }
 
-// ── Returns by strategy section ───────────────────────────────────────────────
+// ── Unresolved closes subsection ─────────────────────────────────────────────
 
-const CC_STRATEGIES: RealizedPnLEvent["strategy"][] = ["COVERED_CALL", "COVERED_CALL_ASSIGNMENT"];
-const CSP_STRATEGIES: RealizedPnLEvent["strategy"][] = ["CASH_SECURED_PUT", "PUT_ASSIGNMENT"];
-
-interface StrategyStats {
-  premiumCollected: number;
-  realizedPnl: number;
-  roi: number | null;
-  winRate: number | null;
-  count: number;
+/**
+ * An unresolved close row derived from a DATA_ISSUE event + its source transaction.
+ */
+interface UnresolvedCloseRow {
+  id: string;
+  date: string;
+  symbol: string;
+  action: string;
+  optionType: string | null;
+  strikePrice: number | null;
+  expirationDate: string | null;
+  qty: number;
 }
 
-function strategyStats(events: RealizedPnLEvent[], strategies: RealizedPnLEvent["strategy"][]): StrategyStats {
-  const filtered = events.filter((e) => strategies.includes(e.strategy));
-  const count = filtered.length;
-  const premiumCollected = filtered.reduce((s, e) => s + e.optionPremium, 0);
-  const realizedPnl = filtered.reduce((s, e) => s + e.realizedPnl, 0);
-  const capitalDeployed = filtered.reduce((s, e) => s + (e.capitalDeployed ?? 0), 0);
-  const roi = capitalDeployed > 0 ? (realizedPnl / capitalDeployed) * 100 : null;
-  const winners = filtered.filter((e) => e.realizedPnl > 0).length;
-  const winRate = count > 0 ? (winners / count) * 100 : null;
-  return { premiumCollected, realizedPnl, roi, winRate, count };
+function buildUnresolvedCloseRows(result: CalculationResult): UnresolvedCloseRow[] {
+  // Index transactions by id for fast lookup
+  const txById = new Map<string, TradeTransaction>(
+    result.transactions.map((t) => [t.id, t])
+  );
+
+  // DATA_ISSUE events come from option closing legs that had no matching opener.
+  // Each has exactly one linkedTransactionId pointing to the closing transaction.
+  const rows: UnresolvedCloseRow[] = [];
+  for (const event of result.realizedEvents) {
+    if (event.strategy !== "DATA_ISSUE") continue;
+    const txId = event.linkedTransactionIds[0];
+    const tx = txId ? txById.get(txId) : undefined;
+
+    // Only include option close actions, not unrelated DATA_ISSUE events.
+    const OPTION_CLOSE_ACTIONS = new Set([
+      "SELL_TO_CLOSE",
+      "BUY_TO_CLOSE",
+      "EXPIRATION",
+      "ASSIGNMENT",
+    ]);
+    if (tx && !OPTION_CLOSE_ACTIONS.has(tx.action)) continue;
+    if (!tx && event.quantity === 0) continue; // skip non-option noise
+
+    rows.push({
+      id: event.id,
+      date: event.date,
+      symbol: event.symbol,
+      action: tx?.action ?? "UNKNOWN",
+      optionType: tx?.optionType ?? null,
+      strikePrice: tx?.strikePrice ?? null,
+      expirationDate: tx?.expirationDate ?? null,
+      qty: Math.abs(event.quantity || tx?.quantity || 0),
+    });
+  }
+
+  // Sort newest-first
+  rows.sort((a, b) => b.date.localeCompare(a.date));
+  return rows;
 }
 
-function ReturnsByStrategy({ result }: { result: CalculationResult }) {
-  const events = result.realizedEvents.filter((e) => e.strategy !== "DATA_ISSUE");
-  const cc = strategyStats(events, CC_STRATEGIES);
-  const csp = strategyStats(events, CSP_STRATEGIES);
+function actionLabel(action: string): string {
+  const map: Record<string, string> = {
+    SELL_TO_CLOSE: "STC",
+    BUY_TO_CLOSE: "BTC",
+    EXPIRATION: "Expiration",
+    ASSIGNMENT: "Assignment",
+  };
+  return map[action] ?? action;
+}
 
-  if (cc.count === 0 && csp.count === 0) return null;
+function UnresolvedClosesSection({ result }: { result: CalculationResult }) {
+  const rows = buildUnresolvedCloseRows(result);
+  if (rows.length === 0) return null;
+
+  const columns: Column<UnresolvedCloseRow>[] = [
+    {
+      key: "date",
+      header: "Date",
+      value: (row) => row.date,
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">{row.date}</span>
+      ),
+    },
+    {
+      key: "symbol",
+      header: "Symbol",
+      value: (row) => row.symbol,
+      render: (row) => (
+        <span className="font-medium text-foreground">{row.symbol}</span>
+      ),
+    },
+    {
+      key: "action",
+      header: "Action",
+      value: (row) => row.action,
+      render: (row) => (
+        <span className="text-[12px] text-muted-foreground">{actionLabel(row.action)}</span>
+      ),
+    },
+    {
+      key: "optionType",
+      header: "Type",
+      value: (row) => row.optionType ?? "",
+      render: (row) => {
+        const parts: string[] = [];
+        if (row.optionType) parts.push(row.optionType.charAt(0).toUpperCase() + row.optionType.slice(1));
+        if (row.strikePrice) parts.push(`$${row.strikePrice.toFixed(2)}`);
+        if (row.expirationDate) parts.push(row.expirationDate);
+        return (
+          <span className="text-[12px] text-muted-foreground">
+            {parts.length > 0 ? parts.join(" · ") : <span className="opacity-50">—</span>}
+          </span>
+        );
+      },
+    },
+    {
+      key: "qty",
+      header: "Qty",
+      value: (row) => row.qty,
+      // qty can be 0 when the broker quantity cell is unparseable (e.g. CAN's "10S"
+      // assignment/expiration format the importer can't read) — show "—" rather than a
+      // misleading literal 0.
+      render: (row) =>
+        row.qty > 0 ? (
+          <span className="tabular-nums text-foreground">{row.qty}</span>
+        ) : (
+          <span className="opacity-50">—</span>
+        ),
+      align: "right",
+    },
+    {
+      key: "pnl",
+      header: "Realized P/L",
+      value: () => -Infinity,
+      render: () => <span className="opacity-50">—</span>,
+      align: "right",
+    },
+    {
+      key: "roi",
+      header: "ROI",
+      value: () => -Infinity,
+      render: () => <span className="opacity-50">—</span>,
+      align: "right",
+    },
+    {
+      key: "note",
+      header: "Note",
+      value: () => "",
+      render: () => (
+        <span className="text-[11px] text-warn">Opening trade not imported</span>
+      ),
+    },
+  ];
 
   return (
     <section className="space-y-2">
-      <h2 className="font-sans text-[13px] font-medium text-foreground">Returns by strategy</h2>
-      <div className="grid grid-cols-2 gap-3">
-        {/* Covered calls */}
-        <div className="rounded-[12px] border border-hairline bg-surface p-3 space-y-2">
-          <div className="font-sans text-[12px] font-semibold text-accent">Covered calls</div>
-          <div className="grid grid-cols-2 gap-y-2 gap-x-3">
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Premium</div>
-              <div className="font-sans text-[13px] font-medium text-pos tabular-nums">
-                {cc.count > 0 ? formatCurrency(cc.premiumCollected) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Realized P&L</div>
-              <div className={cn("font-sans text-[13px] font-medium tabular-nums", cc.realizedPnl > 0 ? "text-pos" : cc.realizedPnl < 0 ? "text-neg" : "text-foreground")}>
-                {cc.count > 0 ? formatCurrency(cc.realizedPnl) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">ROI</div>
-              <div className={cn("font-sans text-[13px] font-medium tabular-nums", cc.roi !== null && cc.roi > 0 ? "text-pos" : cc.roi !== null && cc.roi < 0 ? "text-neg" : "text-foreground")}>
-                {cc.roi !== null ? formatPercent(cc.roi, 1) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Win rate</div>
-              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">
-                {cc.winRate !== null ? formatPercent(cc.winRate, 0) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Trades</div>
-              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">{cc.count}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Cash-secured puts */}
-        <div className="rounded-[12px] border border-hairline bg-surface p-3 space-y-2">
-          <div className="font-sans text-[12px] font-semibold text-pos">Cash-secured puts</div>
-          <div className="grid grid-cols-2 gap-y-2 gap-x-3">
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Premium</div>
-              <div className="font-sans text-[13px] font-medium text-pos tabular-nums">
-                {csp.count > 0 ? formatCurrency(csp.premiumCollected) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Realized P&L</div>
-              <div className={cn("font-sans text-[13px] font-medium tabular-nums", csp.realizedPnl > 0 ? "text-pos" : csp.realizedPnl < 0 ? "text-neg" : "text-foreground")}>
-                {csp.count > 0 ? formatCurrency(csp.realizedPnl) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">ROI</div>
-              <div className={cn("font-sans text-[13px] font-medium tabular-nums", csp.roi !== null && csp.roi > 0 ? "text-pos" : csp.roi !== null && csp.roi < 0 ? "text-neg" : "text-foreground")}>
-                {csp.roi !== null ? formatPercent(csp.roi, 1) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Win rate</div>
-              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">
-                {csp.winRate !== null ? formatPercent(csp.winRate, 0) : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Trades</div>
-              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">{csp.count}</div>
-            </div>
-          </div>
-        </div>
+      <div className="flex items-center gap-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">
+          Unresolved closes
+        </h2>
+        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-warn/15 px-1.5 font-sans text-[10px] font-medium tabular-nums text-warn">
+          {rows.length}
+        </span>
       </div>
+      <p className="font-sans text-[12px] text-muted-foreground">
+        These closing legs could not be matched to an opening trade in the imported data.
+        P&amp;L cannot be calculated until the opener is imported.
+      </p>
+      <DataTable
+        rows={rows}
+        columns={columns}
+        empty="No unresolved closes."
+        defaultSort={{ key: "date", direction: "desc" }}
+      />
     </section>
   );
 }
 
-// ── Totals strip component ────────────────────────────────────────────────────
+// ── Whole-book KPI header (4 cards, always visible) ──────────────────────────
 
-function TotalsStrip({
-  premiumLabel,
-  premiumValue,
-  roiValue,
-  roiHelper,
-  roiTooltip,
-  capitalLabel,
-  capitalValue,
-}: {
-  premiumLabel: string;
-  premiumValue: string;
-  roiValue: string;
-  roiHelper: string;
-  roiTooltip: string;
-  capitalLabel: string;
-  capitalValue: string;
-}) {
+function OptionsKpiHeader({ result }: { result: CalculationResult }) {
+  // Realized P/L = Σ over CLOSED lifecycles of (netOptionPnl + (assignmentStockPnl ?? 0))
+  const closedLifecycles = result.optionLifecycles.filter(
+    (l) => l.status === "closed" || l.status === "expired" || l.status === "assigned"
+  );
+  const realizedPnl = closedLifecycles.reduce(
+    (s, l) => s + l.netOptionPnl + (l.assignmentStockPnl ?? 0),
+    0
+  );
+
+  // Premium collected = Σ premiumReceived over SHORT closed lifecycles
+  const premiumCollected = closedLifecycles
+    .filter((l) => l.direction === "short")
+    .reduce((s, l) => s + l.premiumReceived, 0);
+
+  // Win rate = % of closed cycles where net P/L > 0
+  const winners = closedLifecycles.filter(
+    (l) => l.netOptionPnl + (l.assignmentStockPnl ?? 0) > 0
+  ).length;
+  const winRate = closedLifecycles.length > 0
+    ? (winners / closedLifecycles.length) * 100
+    : null;
+
+  // Capital at risk = current open short positions
+  const capitalAtRisk = currentDeployedCapital(result);
+
+  const hasClosed = closedLifecycles.length > 0;
+  const realizedTone = hasClosed ? tone(realizedPnl) : "neutral";
+
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
       <div className="rounded-xl border border-hairline bg-surface p-3">
         <KpiCard
-          label={premiumLabel}
-          value={premiumValue}
-          helper="Option premium received"
-          tooltip="Total option premium received across these positions."
+          label="Realized P/L"
+          value={hasClosed ? formatCurrency(realizedPnl) : "—"}
+          helper={`${closedLifecycles.length} closed cycle${closedLifecycles.length !== 1 ? "s" : ""}`}
+          tooltip="Sum of (net option P&L + assignment stock P&L) across all closed option lifecycles."
+          tone={realizedTone}
+          variant="compact"
+        />
+      </div>
+      <div className="rounded-xl border border-hairline bg-surface p-3">
+        <KpiCard
+          label="Premium collected"
+          value={premiumCollected > 0 ? formatCurrency(premiumCollected) : "—"}
+          helper="Short positions only"
+          tooltip="Total option premium received from sold-to-open (CC/CSP) positions."
           tone="neutral"
           variant="compact"
         />
       </div>
       <div className="rounded-xl border border-hairline bg-surface p-3">
         <KpiCard
-          label="ROI"
-          value={roiValue}
-          helper={roiHelper}
-          tooltip={roiTooltip}
+          label="Win rate"
+          value={winRate !== null ? formatPercent(winRate, 0) : "—"}
+          helper={winRate !== null ? `${winners} of ${closedLifecycles.length} cycles` : "No closed cycles yet"}
+          tooltip="Percentage of closed option cycles with a positive net realized P&L."
           tone="neutral"
           variant="compact"
         />
       </div>
       <div className="rounded-xl border border-hairline bg-surface p-3">
         <KpiCard
-          label={capitalLabel}
-          value={capitalValue}
-          helper={capitalLabel === "Capital at risk" ? "Open positions capital" : "Sum of deployed capital"}
-          tooltip={capitalLabel === "Capital at risk" ? "Total capital deployed across all open wheel positions." : "Sum of capital deployed across closed option cycles."}
+          label="Capital at risk"
+          value={capitalAtRisk > 0 ? formatCurrency(capitalAtRisk) : "—"}
+          helper="Open short positions"
+          tooltip="Total capital deployed across all currently open short option positions (CC/CSP collateral)."
           tone="neutral"
           variant="compact"
         />
@@ -438,12 +529,12 @@ function TotalsStrip({
 
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
-export function WheelsTab({
+export function OptionsTab({
   result,
 }: {
   result: CalculationResult;
 }) {
-  const [wheelView, setWheelView] = useState<WheelView>("Open");
+  const [optionsView, setOptionsView] = useState<OptionsView>("Open");
   const [activeBucket, setActiveBucket] = useState<TriageBucket>("All");
 
   // Derive analytics via shared selector
@@ -451,12 +542,10 @@ export function WheelsTab({
   const premium = analytics.premium;
 
   // Open lifecycles: short direction only (CC/CSP — premium-selling positions).
-  // Long (bought) options are not wheel positions and are excluded from this view.
   const openLifecycles = result.optionLifecycles.filter(
     (lc) => lc.status === "open" && lc.direction === "short"
   );
 
-  // Header strip metrics (kept for triage chip context)
   const distinctUnderlyings = new Set(openLifecycles.map((lc) => lc.underlyingSymbol)).size;
 
   // Bucket counts
@@ -479,79 +568,25 @@ export function WheelsTab({
     (l) => l.status !== "open" && l.status !== "unresolved"
   );
 
-  // ── Open totals strip ─────────────────────────────────────────────────────
-  const openPremiumCollected = openLifecycles.reduce((s, lc) => s + lc.premiumReceived, 0);
-  const capitalAtRisk = currentDeployedCapital(result);
-  const openRoi = capitalAtRisk > 0 ? (openPremiumCollected / capitalAtRisk) * 100 : null;
-
-  // ── Closed totals strip ───────────────────────────────────────────────────
-  // Only count premium from short (sold-to-open) positions; long positions have no received premium.
-  const closedPremiumCollected = closedCyclesLifecycles
-    .filter((l) => l.direction === "short")
-    .reduce((s, l) => s + l.premiumReceived, 0);
-  const closedDeployed = closedCyclesLifecycles.reduce((s, l) => s + (l.capitalDeployed ?? 0), 0);
-  const closedPnl = closedCyclesLifecycles.reduce((s, l) => s + l.netOptionPnl, 0);
-  const closedRoi = closedDeployed > 0 ? (closedPnl / closedDeployed) * 100 : null;
-
   return (
     <div className="space-y-6 py-2">
+      {/* ── Compact KPI header — always visible, whole-book ─────────────────── */}
+      <OptionsKpiHeader result={result} />
+
       {/* ── Open / Closed segmented control ─────────────────────────────────── */}
-      <SegmentedControl<WheelView>
-        value={wheelView}
+      <SegmentedControl<OptionsView>
+        value={optionsView}
         options={["Open", "Closed"]}
-        onChange={setWheelView}
+        onChange={setOptionsView}
       />
 
-      {/* ── Returns by strategy (CC vs CSP) — always visible ─────────────────── */}
-      <ReturnsByStrategy result={result} />
-
-      {/* ── Closed cycles view ──────────────────────────────────────────────── */}
-      {wheelView === "Closed" && (
-        <section className="space-y-4">
-          {/* Closed totals strip */}
-          <TotalsStrip
-            premiumLabel="Premium collected"
-            premiumValue={formatCurrency(closedPremiumCollected)}
-            roiValue={closedRoi !== null ? formatPercent(closedRoi, 1) : "—"}
-            roiHelper="Realized P&L / capital"
-            roiTooltip="Realized P&L as a % of deployed capital."
-            capitalLabel="Deployed capital"
-            capitalValue={closedDeployed > 0 ? formatCurrency(closedDeployed) : "—"}
-          />
-
-          <div className="flex items-center justify-between">
-            <h2 className="font-sans text-[13px] font-medium text-foreground">
-              Closed positions
-            </h2>
-            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-              {closedCyclesLifecycles.length} position{closedCyclesLifecycles.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <ClosedCyclesTable
-            rows={closedCyclesLifecycles}
-            empty="No closed option positions yet."
-          />
-        </section>
-      )}
-
       {/* ── Open positions view ─────────────────────────────────────────────── */}
-      {wheelView === "Open" && (
+      {optionsView === "Open" && (
         <>
-          {/* Open totals strip */}
-          <TotalsStrip
-            premiumLabel="Premium collected"
-            premiumValue={openPremiumCollected > 0 ? formatCurrency(openPremiumCollected) : "—"}
-            roiValue={openRoi !== null ? formatPercent(openRoi, 1) : "—"}
-            roiHelper="Premium / capital"
-            roiTooltip="Option premium as a % of capital at risk."
-            capitalLabel="Capital at risk"
-            capitalValue={capitalAtRisk > 0 ? formatCurrency(capitalAtRisk) : "—"}
-          />
-
-          {/* Active wheels count row */}
+          {/* Open positions count */}
           <div className="rounded-xl border border-hairline bg-surface p-3">
             <KpiCard
-              label="Active wheels"
+              label="Open positions"
               value={String(distinctUnderlyings)}
               helper={`${openLifecycles.length} open position${openLifecycles.length !== 1 ? "s" : ""} · ${premium.assignmentRate != null ? `${(premium.assignmentRate * 100).toFixed(0)}% assignment rate` : "No closed cycles yet"}`}
               tooltip="Distinct underlying symbols with an open option lifecycle"
@@ -582,7 +617,7 @@ export function WheelsTab({
             />
           </div>
 
-          {/* ── Open-wheels table ────────────────────────────────────────────── */}
+          {/* ── Open-positions table ─────────────────────────────────────────── */}
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="font-sans text-[13px] font-medium text-foreground">
@@ -598,9 +633,33 @@ export function WheelsTab({
               are intentionally omitted. See spec note: "OMIT %captured/ITM — no
               live marks, do not fabricate."
             */}
-            <OpenWheelsTable rows={filteredRows} />
+            <OpenPositionsTable rows={filteredRows} />
           </section>
         </>
+      )}
+
+      {/* ── Closed positions view ────────────────────────────────────────────── */}
+      {optionsView === "Closed" && (
+        <section className="space-y-6">
+          {/* Closed cycles table */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="font-sans text-[13px] font-medium text-foreground">
+                Closed positions
+              </h2>
+              <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
+                {closedCyclesLifecycles.length} position{closedCyclesLifecycles.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <ClosedCyclesTable
+              rows={closedCyclesLifecycles}
+              empty="No closed option positions yet."
+            />
+          </div>
+
+          {/* Unresolved closes — orphan closing legs with no matched opener */}
+          <UnresolvedClosesSection result={result} />
+        </section>
       )}
     </div>
   );

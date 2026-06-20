@@ -353,10 +353,12 @@ export function optionTypeLabel(row: OptionLifecycle): string {
 // ── ClosedCyclesTable ─────────────────────────────────────────────────────────
 
 /**
- * Lifecycle-based closed-cycles table for the Wheels tab.
+ * Lifecycle-based closed-cycles table for the Options tab.
  * Displays one row per OptionLifecycle (closed/expired/assigned), newest-first.
  * Includes both short (sold-to-open) and long (bought-to-open) closed positions.
  * Rows are NOT clickable — no DetailDrawer drill-down for cycles.
+ *
+ * Column order: Date · Type · Symbol · Qty · Days held · Outcome · Premium · Shares P/L · Realized P/L · ROI
  */
 export function ClosedCyclesTable({
   rows,
@@ -366,6 +368,32 @@ export function ClosedCyclesTable({
   empty?: string;
 }) {
   const columns: Column<OptionLifecycle>[] = [
+    // 1. Date (close date) — first column, default sort target
+    {
+      key: "closeDate",
+      header: "Date",
+      value: (row) => (row.closeDate ?? row.expirationDate) ?? "",
+      render: (row) => {
+        const date = row.closeDate ?? row.expirationDate;
+        return (
+          <span className="tabular-nums text-muted-foreground">
+            {date ?? <span className="opacity-50">—</span>}
+          </span>
+        );
+      },
+    },
+    // 2. Type
+    {
+      key: "type",
+      header: "Type",
+      value: (row) => optionTypeLabel(row),
+      render: (row) => (
+        <span className="text-[12px] font-medium text-foreground">
+          {optionTypeLabel(row)}
+        </span>
+      ),
+    },
+    // 3. Symbol
     {
       key: "symbol",
       header: "Symbol",
@@ -379,29 +407,20 @@ export function ClosedCyclesTable({
         </div>
       ),
     },
+    // 4. Qty
     {
-      key: "type",
-      header: "Type",
-      value: (row) => optionTypeLabel(row),
+      key: "qty",
+      header: "Qty",
+      value: (row) => row.contracts,
       render: (row) => (
-        <span className="text-[12px] font-medium text-foreground">
-          {optionTypeLabel(row)}
-        </span>
+        <div className="flex flex-col gap-0">
+          <span className="font-medium tabular-nums text-foreground">{row.contracts}</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">· {row.sharesControlled} sh</span>
+        </div>
       ),
+      align: "right",
     },
-    {
-      key: "closeDate",
-      header: "Close date",
-      value: (row) => (row.closeDate ?? row.expirationDate) ?? "",
-      render: (row) => {
-        const date = row.closeDate ?? row.expirationDate;
-        return (
-          <span className="tabular-nums text-muted-foreground">
-            {date ?? <span className="opacity-50">—</span>}
-          </span>
-        );
-      },
-    },
+    // 5. Days held
     {
       key: "daysHeld",
       header: "Days held",
@@ -420,6 +439,7 @@ export function ClosedCyclesTable({
       },
       align: "right",
     },
+    // 6. Outcome
     {
       key: "status",
       header: "Outcome",
@@ -428,18 +448,7 @@ export function ClosedCyclesTable({
         <StatusChip kind={row.status as "closed" | "expired" | "assigned"} />
       ),
     },
-    {
-      key: "qty",
-      header: "Qty",
-      value: (row) => row.contracts,
-      render: (row) => (
-        <div className="flex flex-col gap-0">
-          <span className="font-medium tabular-nums text-foreground">{row.contracts}</span>
-          <span className="text-[11px] tabular-nums text-muted-foreground">· {row.sharesControlled} sh</span>
-        </div>
-      ),
-      align: "right",
-    },
+    // 7. Premium (the option premium received/paid to open)
     {
       key: "premiumReceived",
       header: "Premium",
@@ -460,6 +469,7 @@ export function ClosedCyclesTable({
       },
       align: "right",
     },
+    // 8. Shares P/L (assignment stock gain/loss component)
     {
       key: "assignmentStockPnl",
       header: "Shares P/L",
@@ -472,24 +482,31 @@ export function ClosedCyclesTable({
       },
       align: "right",
     },
+    // 9. Realized P/L = netOptionPnl + (assignmentStockPnl ?? 0) — the NET total
     {
-      key: "netOptionPnl",
-      header: "Net P&L",
-      value: (row) => row.netOptionPnl,
-      render: (row) => signedMoney(row.netOptionPnl),
+      key: "realizedPnl",
+      header: "Realized P/L",
+      value: (row) => row.netOptionPnl + (row.assignmentStockPnl ?? 0),
+      render: (row) => {
+        const net = row.netOptionPnl + (row.assignmentStockPnl ?? 0);
+        return signedMoney(net);
+      },
       align: "right",
     },
+    // 10. ROI — net realized P/L ÷ capitalDeployed
     {
       key: "roi",
       header: "ROI",
       value: (row) => {
         const cap = row.capitalDeployed ?? 0;
-        return cap > 0 ? (row.netOptionPnl / cap) * 100 : -Infinity;
+        const net = row.netOptionPnl + (row.assignmentStockPnl ?? 0);
+        return cap > 0 ? (net / cap) * 100 : -Infinity;
       },
       render: (row) => {
         const cap = row.capitalDeployed ?? 0;
         if (cap <= 0) return <span className="opacity-50">—</span>;
-        return signedPercent((row.netOptionPnl / cap) * 100);
+        const net = row.netOptionPnl + (row.assignmentStockPnl ?? 0);
+        return signedPercent((net / cap) * 100);
       },
       align: "right",
     },

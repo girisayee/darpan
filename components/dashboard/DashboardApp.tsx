@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
-import { WheelsTab } from "@/components/dashboard/tabs/WheelsTab";
+import { OptionsTab } from "@/components/dashboard/tabs/OptionsTab";
 import { PerformanceTab } from "@/components/dashboard/tabs/PerformanceTab";
 import { SwingTradesTab } from "@/components/dashboard/tabs/SwingTradesTab";
 import { AppShell } from "@/components/shell/AppShell";
@@ -44,7 +44,7 @@ import { label, signedMoney } from "@/components/dashboard/tabs/shared";
 
 const tabs = [
   "Overview",
-  "Wheels",
+  "Options",
   "Swing trades",
   "Performance",
 ] as const;
@@ -143,8 +143,8 @@ export function DashboardApp() {
             onReviewTrades={openTrades}
           />
         )}
-        {activeTab === "Wheels" && (
-          <WheelsTab result={result} />
+        {activeTab === "Options" && (
+          <OptionsTab result={result} />
         )}
         {activeTab === "Swing trades" && (
           <SwingTradesTab result={result} onSelectEvent={setSelectedEvent} />
