@@ -443,6 +443,10 @@ function handleCoveredCallAssignment(
   };
   events.push(assignmentEvent);
 
+  // ── Attach share-sale P&L onto the lifecycle for UI display ────────────────
+  // assignmentStockPnl = proceeds − stock cost basis (the called-away gain/loss).
+  lifecycle.assignmentStockPnl = proceeds - allocation.costBasis;
+
   // ── Event 2: share-sale side (COVERED_CALL_ASSIGNMENT_STOCK) ───────────────
   // Carries the proceeds − stock cost basis gain/loss so it flows into
   // totalStockTradingPnl and monthly stockTradingPnl. NOT a SWING_TRADE event,

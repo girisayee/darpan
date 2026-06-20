@@ -111,6 +111,12 @@ export type OptionLifecycle = {
   fees: number;
   netOptionPnl: number;
   capitalDeployed?: number;
+  /**
+   * For assigned covered calls only: realized gain/loss from the called-away share sale
+   * = (strike × sharesControlled) − allocated stock cost basis.
+   * null / undefined for all other outcomes.
+   */
+  assignmentStockPnl?: number | null;
   status: "open" | "expired" | "closed" | "assigned" | "unresolved";
   linkedTransactionIds: string[];
   linkedStockLotIds: string[];

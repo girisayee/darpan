@@ -76,7 +76,7 @@ export function optionCycleCapital(
  */
 export function currentDeployedCapital(result: CalculationResult): number {
   return result.optionLifecycles
-    .filter((l) => l.status === "open")
+    .filter((l) => l.status === "open" && l.direction === "short")
     .reduce(
       (sum, l) => sum + (l.capitalDeployed ?? l.strikePrice * l.sharesControlled),
       0
@@ -457,6 +457,18 @@ export function ClosedCyclesTable({
         return (
           <span className="tabular-nums text-pos">{formatCurrency(row.premiumReceived)}</span>
         );
+      },
+      align: "right",
+    },
+    {
+      key: "assignmentStockPnl",
+      header: "Shares P/L",
+      value: (row) => row.assignmentStockPnl ?? -Infinity,
+      render: (row) => {
+        if (row.assignmentStockPnl == null) {
+          return <span className="opacity-50">—</span>;
+        }
+        return signedMoney(row.assignmentStockPnl);
       },
       align: "right",
     },

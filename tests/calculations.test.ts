@@ -339,6 +339,55 @@ describe("calculation engine", () => {
     expect(lc.netOptionPnl).toBe(-200);
   });
 
+  it("assigned covered-call lifecycle has assignmentStockPnl and unchanged option P&L", () => {
+    // Stock: 100 shares @ $10 = $1000 cost basis. CC strike = $12. Premium = $100.
+    // Assignment: proceeds = 12 × 100 = $1200; stockPnl = $1200 − $1000 = $200.
+    // netOptionPnl = premium($100) − closeCost($0) − fees($0) = $100 — unchanged.
+    const result = calculateDashboard([
+      stockTx("b1", "2025-01-02", "BUY", "AMD", 100, 10),
+      optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "call", 12, "2025-01-31", 100),
+      optionTx("o2", "2025-01-31", "ASSIGNMENT", "AMD", "call", 12, "2025-01-31", 0)
+    ]);
+    const lc = result.optionLifecycles.find((l) => l.status === "assigned");
+    expect(lc).toBeDefined();
+    // assignmentStockPnl = proceeds(1200) − costBasis(1000)
+    expect(lc!.assignmentStockPnl).toBe(200);
+    // option-side P&L is unaffected by the share sale
+    expect(lc!.netOptionPnl).toBe(100);
+    // The COVERED_CALL_ASSIGNMENT_STOCK event carries the same value
+    const stockEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
+    expect(stockEvent!.realizedPnl).toBe(lc!.assignmentStockPnl);
+  });
+
+  it("non-assigned lifecycles have no assignmentStockPnl", () => {
+    // Expired CC: no share sale, so assignmentStockPnl should be absent/null.
+    const result = calculateDashboard([
+      stockTx("b1", "2025-01-02", "BUY", "AMD", 100, 10),
+      optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "call", 12, "2025-01-31", 100),
+      optionTx("o2", "2025-01-31", "EXPIRATION", "AMD", "call", 12, "2025-01-31", 0)
+    ]);
+    const lc = result.optionLifecycles.find((l) => l.status === "expired");
+    expect(lc).toBeDefined();
+    expect(lc!.assignmentStockPnl == null).toBe(true);
+  });
+
+  it("open-wheels filter excludes long (BTO) lifecycles with status=open", () => {
+    // A BTO that has no closing leg stays "open" but must NOT count as a wheel position.
+    // Verify direction==="long" on the stranded lifecycle.
+    const result = calculateDashboard([
+      optionTx("bto1", "2025-06-01", "BUY_TO_OPEN", "AMZN", "call", 200, "2025-09-30", -350)
+    ], defaultSettings, new Date("2025-06-15T12:00:00Z"));
+    expect(result.optionLifecycles).toHaveLength(1);
+    const lc = result.optionLifecycles[0];
+    expect(lc.direction).toBe("long");
+    expect(lc.status).toBe("open");
+    // Active-wheels consumer filters to direction==="short" only — this lc must be excluded.
+    const openWheels = result.optionLifecycles.filter(
+      (l) => l.status === "open" && l.direction === "short"
+    );
+    expect(openWheels).toHaveLength(0);
+  });
+
   it("uses a zero cost basis for the PYPL dividend share lot", () => {
     const result = calculateDashboard(
       [stockTx("s1", "2026-01-10", "SELL", "PYPL", 0.11481, 47.5)],

@@ -48,14 +48,18 @@ function displayCapital(lc: OptionLifecycle): number {
   return lc.strikePrice * lc.sharesControlled;
 }
 
-/** Stage label derived from optionType. */
+/** Stage label derived from direction + optionType. */
 function stageLabel(lc: OptionLifecycle): string {
+  if (lc.direction === "long") {
+    return lc.optionType === "call" ? "Long call" : "Long put";
+  }
   if (lc.optionType === "call") return "Covered call";
   return "Sold put";
 }
 
 /** Stage tone class. */
 function stageToneClass(lc: OptionLifecycle): string {
+  if (lc.direction === "long") return "text-muted-foreground";
   if (lc.optionType === "call") return "text-accent";
   return "text-pos";
 }
@@ -446,8 +450,11 @@ export function WheelsTab({
   const analytics = wheelAnalytics(result);
   const premium = analytics.premium;
 
-  // Open lifecycles only
-  const openLifecycles = result.optionLifecycles.filter((lc) => lc.status === "open");
+  // Open lifecycles: short direction only (CC/CSP — premium-selling positions).
+  // Long (bought) options are not wheel positions and are excluded from this view.
+  const openLifecycles = result.optionLifecycles.filter(
+    (lc) => lc.status === "open" && lc.direction === "short"
+  );
 
   // Header strip metrics (kept for triage chip context)
   const distinctUnderlyings = new Set(openLifecycles.map((lc) => lc.underlyingSymbol)).size;
