@@ -15,22 +15,15 @@ import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, Strategy } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
-import { ClosedTradesTable, SegmentedControl, currentDeployedCapital } from "@/components/dashboard/tabs/shared";
+import { ClosedCyclesTable, SegmentedControl, currentDeployedCapital } from "@/components/dashboard/tabs/shared";
 
 // ── View types ────────────────────────────────────────────────────────────────
 
 type WheelView = "Open" | "Closed";
 type TriageBucket = "All" | "Roll / close soon" | "Working";
-
-const OPTION_STRATEGIES: Strategy[] = [
-  "COVERED_CALL",
-  "COVERED_CALL_ASSIGNMENT",
-  "CASH_SECURED_PUT",
-  "PUT_ASSIGNMENT",
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -152,6 +145,19 @@ function OpenWheelsTable({
 }: {
   rows: OptionLifecycle[];
 }) {
+  // Compute today once for Days held calculation
+  const todayMs = (() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t.getTime();
+  })();
+
+  function daysHeld(openDate: string | undefined): number | null {
+    if (!openDate) return null;
+    const ms = todayMs - new Date(openDate + "T00:00:00").getTime();
+    return Math.round(ms / (1000 * 60 * 60 * 24));
+  }
+
   const columns: Column<OptionLifecycle>[] = [
     {
       key: "position",
@@ -192,6 +198,30 @@ function OpenWheelsTable({
           <span className="text-[11px] text-muted-foreground tabular-nums">· {row.sharesControlled} sh</span>
         </div>
       ),
+      align: "right",
+    },
+    {
+      key: "openDate",
+      header: "Open date",
+      value: (row) => row.openDate ?? "",
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">
+          {row.openDate ?? <span className="opacity-50">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: "daysHeld",
+      header: "Days held",
+      value: (row) => daysHeld(row.openDate) ?? -Infinity,
+      render: (row) => {
+        const d = daysHeld(row.openDate);
+        return d != null ? (
+          <span className="tabular-nums text-foreground">{d}</span>
+        ) : (
+          <span className="opacity-50">—</span>
+        );
+      },
       align: "right",
     },
     {
@@ -296,10 +326,8 @@ function TotalsStrip({
 
 export function WheelsTab({
   result,
-  onSelectEvent,
 }: {
   result: CalculationResult;
-  onSelectEvent: (event: RealizedPnLEvent) => void;
 }) {
   const [wheelView, setWheelView] = useState<WheelView>("Open");
   const [activeBucket, setActiveBucket] = useState<TriageBucket>("All");
@@ -329,9 +357,9 @@ export function WheelsTab({
       ? openLifecycles
       : openLifecycles.filter((lc) => triageBucket(lc) === activeBucket);
 
-  // Closed cycles — option strategies only (exclude SWING_TRADE + DATA_ISSUE)
-  const closedCyclesRows = result.realizedEvents.filter((e) =>
-    OPTION_STRATEGIES.includes(e.strategy)
+  // Closed lifecycles (not open or unresolved)
+  const closedCyclesLifecycles = result.optionLifecycles.filter(
+    (l) => l.status !== "open" && l.status !== "unresolved"
   );
 
   // ── Open totals strip ─────────────────────────────────────────────────────
@@ -340,9 +368,9 @@ export function WheelsTab({
   const openRoi = capitalAtRisk > 0 ? (openPremiumCollected / capitalAtRisk) * 100 : null;
 
   // ── Closed totals strip ───────────────────────────────────────────────────
-  const closedPremiumCollected = closedCyclesRows.reduce((s, e) => s + e.optionPremium, 0);
-  const closedDeployed = closedCyclesRows.reduce((s, e) => s + (e.capitalDeployed ?? 0), 0);
-  const closedPnl = closedCyclesRows.reduce((s, e) => s + e.realizedPnl, 0);
+  const closedPremiumCollected = closedCyclesLifecycles.reduce((s, l) => s + l.premiumReceived, 0);
+  const closedDeployed = closedCyclesLifecycles.reduce((s, l) => s + (l.capitalDeployed ?? 0), 0);
+  const closedPnl = closedCyclesLifecycles.reduce((s, l) => s + l.netOptionPnl, 0);
   const closedRoi = closedDeployed > 0 ? (closedPnl / closedDeployed) * 100 : null;
 
   return (
@@ -373,12 +401,11 @@ export function WheelsTab({
               Closed cycles
             </h2>
             <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-              {closedCyclesRows.length} cycle{closedCyclesRows.length !== 1 ? "s" : ""}
+              {closedCyclesLifecycles.length} cycle{closedCyclesLifecycles.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <ClosedTradesTable
-            rows={closedCyclesRows}
-            onSelectEvent={onSelectEvent}
+          <ClosedCyclesTable
+            rows={closedCyclesLifecycles}
             empty="No closed option cycles yet."
           />
         </section>

@@ -6,6 +6,7 @@
  */
 
 import { Column, DataTable } from "@/components/tables/DataTable";
+import { StatusChip } from "@/components/common/StatusChip";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
@@ -301,17 +302,22 @@ export function ClosedTradesTable({
       align: "right",
     },
     {
+      key: "holdingDays",
+      header: "Days held",
+      value: (row) => row.holdingDays ?? -Infinity,
+      render: (row) =>
+        row.holdingDays != null ? (
+          <span className="tabular-nums text-foreground">{row.holdingDays}</span>
+        ) : (
+          <span className="opacity-50">—</span>
+        ),
+      align: "right",
+    },
+    {
       key: "roiPercent",
       header: "ROI %",
       value: (row) => row.roiPercent ?? -Infinity,
       render: (row) => signedPercent(row.roiPercent),
-      align: "right",
-    },
-    {
-      key: "annualizedRoiPercent",
-      header: "Annualized",
-      value: (row) => row.annualizedRoiPercent ?? -Infinity,
-      render: (row) => signedPercent(row.annualizedRoiPercent),
       align: "right",
     },
   ];
@@ -323,6 +329,131 @@ export function ClosedTradesTable({
       onRowClick={onSelectEvent}
       empty={empty}
       defaultSort={{ key: "date", direction: "desc" }}
+    />
+  );
+}
+
+// ── ClosedCyclesTable ─────────────────────────────────────────────────────────
+
+/**
+ * Lifecycle-based closed-cycles table for the Wheels tab.
+ * Displays one row per OptionLifecycle (closed/expired/assigned), newest-first.
+ * Rows are NOT clickable — no DetailDrawer drill-down for cycles.
+ */
+export function ClosedCyclesTable({
+  rows,
+  empty = "No closed option cycles yet.",
+}: {
+  rows: OptionLifecycle[];
+  empty?: string;
+}) {
+  // Sort newest-first: prefer closeDate, fall back to expirationDate
+  const sorted = [...rows].sort((a, b) =>
+    compareDateDesc(a.closeDate ?? a.expirationDate, b.closeDate ?? b.expirationDate)
+  );
+
+  const columns: Column<OptionLifecycle>[] = [
+    {
+      key: "symbol",
+      header: "Symbol",
+      value: (row) => row.underlyingSymbol,
+      render: (row) => {
+        const tag = row.optionType === "call" ? "CC" : "CSP";
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {tag} ${row.strikePrice.toFixed(2)}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "openDate",
+      header: "Open date",
+      value: (row) => row.openDate ?? "",
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">
+          {row.openDate ?? <span className="opacity-50">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: "daysHeld",
+      header: "Days held",
+      value: (row) => {
+        if (!row.openDate) return -Infinity;
+        const end = row.closeDate ?? row.expirationDate;
+        const ms = new Date(end + "T00:00:00").getTime() - new Date(row.openDate + "T00:00:00").getTime();
+        return Math.round(ms / (1000 * 60 * 60 * 24));
+      },
+      render: (row) => {
+        if (!row.openDate) return <span className="opacity-50">—</span>;
+        const end = row.closeDate ?? row.expirationDate;
+        const ms = new Date(end + "T00:00:00").getTime() - new Date(row.openDate + "T00:00:00").getTime();
+        const days = Math.round(ms / (1000 * 60 * 60 * 24));
+        return <span className="tabular-nums text-foreground">{days}</span>;
+      },
+      align: "right",
+    },
+    {
+      key: "status",
+      header: "Outcome",
+      value: (row) => row.status,
+      render: (row) => (
+        <StatusChip kind={row.status as "closed" | "expired" | "assigned"} />
+      ),
+    },
+    {
+      key: "qty",
+      header: "Qty",
+      value: (row) => row.contracts,
+      render: (row) => (
+        <div className="flex flex-col gap-0">
+          <span className="font-medium tabular-nums text-foreground">{row.contracts}</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">· {row.sharesControlled} sh</span>
+        </div>
+      ),
+      align: "right",
+    },
+    {
+      key: "premiumReceived",
+      header: "Premium",
+      value: (row) => row.premiumReceived,
+      render: (row) => (
+        <span className="tabular-nums text-pos">{formatCurrency(row.premiumReceived)}</span>
+      ),
+      align: "right",
+    },
+    {
+      key: "netOptionPnl",
+      header: "Net P&L",
+      value: (row) => row.netOptionPnl,
+      render: (row) => signedMoney(row.netOptionPnl),
+      align: "right",
+    },
+    {
+      key: "roi",
+      header: "ROI",
+      value: (row) => {
+        const cap = row.capitalDeployed ?? 0;
+        return cap > 0 ? (row.netOptionPnl / cap) * 100 : -Infinity;
+      },
+      render: (row) => {
+        const cap = row.capitalDeployed ?? 0;
+        if (cap <= 0) return <span className="opacity-50">—</span>;
+        return signedPercent((row.netOptionPnl / cap) * 100);
+      },
+      align: "right",
+    },
+  ];
+
+  return (
+    <DataTable
+      rows={sorted}
+      columns={columns}
+      empty={empty}
     />
   );
 }

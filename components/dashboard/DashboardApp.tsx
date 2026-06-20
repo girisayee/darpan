@@ -144,7 +144,7 @@ export function DashboardApp() {
           />
         )}
         {activeTab === "Wheels" && (
-          <WheelsTab result={result} onSelectEvent={setSelectedEvent} />
+          <WheelsTab result={result} />
         )}
         {activeTab === "Swing trades" && (
           <SwingTradesTab result={result} onSelectEvent={setSelectedEvent} />
