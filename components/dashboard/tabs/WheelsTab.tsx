@@ -13,12 +13,12 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, Strategy, TaxLot } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, Strategy } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
-import { ClosedTradesTable, SegmentedControl, taxLotStatusChip } from "@/components/dashboard/tabs/shared";
+import { ClosedTradesTable, SegmentedControl, currentDeployedCapital } from "@/components/dashboard/tabs/shared";
 
 // ── View types ────────────────────────────────────────────────────────────────
 
@@ -237,95 +237,58 @@ function OpenWheelsTable({
   );
 }
 
-// ── Tax lots section (folded) ─────────────────────────────────────────────────
+// ── Totals strip component ────────────────────────────────────────────────────
 
-function TaxLotsSection({ rows }: { rows: TaxLot[] }) {
-  const [open, setOpen] = useState(false);
-
-  const columns: Column<TaxLot>[] = [
-    { key: "symbol", header: "Symbol", value: (row) => row.symbol },
-    { key: "openDate", header: "Open Date", value: (row) => row.openDate },
-    {
-      key: "source",
-      header: "Source",
-      value: (row) => row.source,
-      render: (row) => {
-        const labels: Record<string, string> = {
-          STOCK_BUY: "Stock buy",
-          CASH_SECURED_PUT_ASSIGNMENT: "CSP assignment",
-          MANUAL_ADJUSTMENT: "Manual",
-        };
-        return <span className="text-muted-foreground">{labels[row.source] ?? row.source}</span>;
-      },
-    },
-    {
-      key: "remainingQuantity",
-      header: "Shares",
-      value: (row) => row.remainingQuantity,
-      align: "right",
-    },
-    {
-      key: "costBasisPerShare",
-      header: "Cost / share",
-      value: (row) => row.costBasisPerShare,
-      render: (row) => formatCurrency(row.costBasisPerShare, { maximumFractionDigits: 2 }),
-      align: "right",
-    },
-    {
-      key: "costBasisTotal",
-      header: "Cost basis",
-      value: (row) => row.costBasisTotal,
-      render: (row) => formatCurrency(row.costBasisTotal),
-      align: "right",
-    },
-    {
-      key: "status",
-      header: "Status",
-      value: (row) => row.status,
-      render: (row) => taxLotStatusChip(row),
-      align: "right",
-    },
-  ];
-
+function TotalsStrip({
+  premiumLabel,
+  premiumValue,
+  roiValue,
+  roiHelper,
+  roiTooltip,
+  capitalLabel,
+  capitalValue,
+}: {
+  premiumLabel: string;
+  premiumValue: string;
+  roiValue: string;
+  roiHelper: string;
+  roiTooltip: string;
+  capitalLabel: string;
+  capitalValue: string;
+}) {
   return (
-    <section className="space-y-3">
-      {/* Fold header */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between rounded-[10px] border border-hairline bg-surface px-4 py-3 transition-colors hover:bg-surface-inset"
-        aria-expanded={open}
-      >
-        <div className="flex items-center gap-2">
-          <span className="font-sans text-[13px] font-medium text-foreground">
-            Assigned shares / tax lots
-          </span>
-          <span className="inline-flex items-center rounded-full bg-surface-inset px-2 py-0.5 font-sans text-[11px] font-medium leading-none text-muted-foreground">
-            {rows.length}
-          </span>
-        </div>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {/* Table (shown when expanded) */}
-      {open && (
-        <DataTable
-          rows={rows}
-          columns={columns}
-          empty="No tax lots yet."
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
+      <div className="rounded-xl border border-hairline bg-surface p-3">
+        <KpiCard
+          label={premiumLabel}
+          value={premiumValue}
+          helper="Option premium received"
+          tooltip="Total option premium received across these positions."
+          tone="neutral"
+          variant="compact"
         />
-      )}
-    </section>
+      </div>
+      <div className="rounded-xl border border-hairline bg-surface p-3">
+        <KpiCard
+          label="ROI"
+          value={roiValue}
+          helper={roiHelper}
+          tooltip={roiTooltip}
+          tone="neutral"
+          variant="compact"
+        />
+      </div>
+      <div className="rounded-xl border border-hairline bg-surface p-3">
+        <KpiCard
+          label={capitalLabel}
+          value={capitalValue}
+          helper={capitalLabel === "Capital at risk" ? "Open positions capital" : "Sum of deployed capital"}
+          tooltip={capitalLabel === "Capital at risk" ? "Total capital deployed across all open wheel positions." : "Sum of capital deployed across closed option cycles."}
+          tone="neutral"
+          variant="compact"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -348,9 +311,8 @@ export function WheelsTab({
   // Open lifecycles only
   const openLifecycles = result.optionLifecycles.filter((lc) => lc.status === "open");
 
-  // Header strip metrics
+  // Header strip metrics (kept for triage chip context)
   const distinctUnderlyings = new Set(openLifecycles.map((lc) => lc.underlyingSymbol)).size;
-  const capitalAtRisk = openLifecycles.reduce((sum, lc) => sum + displayCapital(lc), 0);
 
   // Bucket counts
   const bucketCounts: Record<Exclude<TriageBucket, "All">, number> = {
@@ -367,13 +329,21 @@ export function WheelsTab({
       ? openLifecycles
       : openLifecycles.filter((lc) => triageBucket(lc) === activeBucket);
 
-  // Tax lots (open ones are most relevant; show all for completeness)
-  const taxLots = result.taxLots;
-
   // Closed cycles — option strategies only (exclude SWING_TRADE + DATA_ISSUE)
   const closedCyclesRows = result.realizedEvents.filter((e) =>
     OPTION_STRATEGIES.includes(e.strategy)
   );
+
+  // ── Open totals strip ─────────────────────────────────────────────────────
+  const openPremiumCollected = openLifecycles.reduce((s, lc) => s + lc.premiumReceived, 0);
+  const capitalAtRisk = currentDeployedCapital(result);
+  const openRoi = capitalAtRisk > 0 ? (openPremiumCollected / capitalAtRisk) * 100 : null;
+
+  // ── Closed totals strip ───────────────────────────────────────────────────
+  const closedPremiumCollected = closedCyclesRows.reduce((s, e) => s + e.optionPremium, 0);
+  const closedDeployed = closedCyclesRows.reduce((s, e) => s + (e.capitalDeployed ?? 0), 0);
+  const closedPnl = closedCyclesRows.reduce((s, e) => s + e.realizedPnl, 0);
+  const closedRoi = closedDeployed > 0 ? (closedPnl / closedDeployed) * 100 : null;
 
   return (
     <div className="space-y-6 py-2">
@@ -386,7 +356,18 @@ export function WheelsTab({
 
       {/* ── Closed cycles view ──────────────────────────────────────────────── */}
       {wheelView === "Closed" && (
-        <section className="space-y-3">
+        <section className="space-y-4">
+          {/* Closed totals strip */}
+          <TotalsStrip
+            premiumLabel="Premium collected"
+            premiumValue={formatCurrency(closedPremiumCollected)}
+            roiValue={closedRoi !== null ? formatPercent(closedRoi, 1) : "—"}
+            roiHelper="Realized P&L / capital"
+            roiTooltip="Realized P&L as a % of deployed capital."
+            capitalLabel="Deployed capital"
+            capitalValue={closedDeployed > 0 ? formatCurrency(closedDeployed) : "—"}
+          />
+
           <div className="flex items-center justify-between">
             <h2 className="font-sans text-[13px] font-medium text-foreground">
               Closed cycles
@@ -406,87 +387,69 @@ export function WheelsTab({
       {/* ── Open positions view ─────────────────────────────────────────────── */}
       {wheelView === "Open" && (
         <>
-      {/* ── Header strip ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
-        <div className="rounded-xl border border-hairline bg-surface p-3">
-          <KpiCard
-            label="Active wheels"
-            value={String(distinctUnderlyings)}
-            helper={`${openLifecycles.length} open position${openLifecycles.length !== 1 ? "s" : ""}`}
-            tooltip="Distinct underlying symbols with an open option lifecycle"
-            tone="neutral"
-            variant="compact"
+          {/* Open totals strip */}
+          <TotalsStrip
+            premiumLabel="Premium collected"
+            premiumValue={openPremiumCollected > 0 ? formatCurrency(openPremiumCollected) : "—"}
+            roiValue={openRoi !== null ? formatPercent(openRoi, 1) : "—"}
+            roiHelper="Premium / capital"
+            roiTooltip="Option premium as a % of capital at risk."
+            capitalLabel="Capital at risk"
+            capitalValue={capitalAtRisk > 0 ? formatCurrency(capitalAtRisk) : "—"}
           />
-        </div>
-        <div className="rounded-xl border border-hairline bg-surface p-3">
-          <KpiCard
-            label="Capital at risk"
-            value={capitalAtRisk > 0 ? formatCurrency(capitalAtRisk) : "—"}
-            helper="Sum of open position capital"
-            tooltip="Total capital deployed across all open wheel positions (strike × shares for CSPs without recorded capital)"
-            tone="neutral"
-            variant="compact"
-          />
-        </div>
-        <div className="rounded-xl border border-hairline bg-surface p-3">
-          <KpiCard
-            label="Premium · YTD"
-            value={premium.premiumCollected > 0 ? formatCurrency(premium.premiumCollected) : "—"}
-            helper={
-              premium.assignmentRate != null
-                ? `${(premium.assignmentRate * 100).toFixed(0)}% assignment rate`
-                : "No closed cycles yet"
-            }
-            tooltip="Total option premium collected across all cycles (YTD via active filter)"
-            tone={premium.premiumCollected > 0 ? "positive" : "neutral"}
-            variant="compact"
-          />
-        </div>
-      </div>
 
-      {/* ── Triage chips ────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by triage bucket">
-        <TriageChip
-          label="All"
-          count={openLifecycles.length}
-          active={activeBucket === "All"}
-          onClick={() => setActiveBucket("All")}
-        />
-        <TriageChip
-          label="Roll / close soon"
-          count={bucketCounts["Roll / close soon"]}
-          active={activeBucket === "Roll / close soon"}
-          onClick={() => setActiveBucket("Roll / close soon")}
-        />
-        <TriageChip
-          label="Working"
-          count={bucketCounts.Working}
-          active={activeBucket === "Working"}
-          onClick={() => setActiveBucket("Working")}
-        />
-      </div>
+          {/* Active wheels count row */}
+          <div className="rounded-xl border border-hairline bg-surface p-3">
+            <KpiCard
+              label="Active wheels"
+              value={String(distinctUnderlyings)}
+              helper={`${openLifecycles.length} open position${openLifecycles.length !== 1 ? "s" : ""} · ${premium.assignmentRate != null ? `${(premium.assignmentRate * 100).toFixed(0)}% assignment rate` : "No closed cycles yet"}`}
+              tooltip="Distinct underlying symbols with an open option lifecycle"
+              tone="neutral"
+              variant="compact"
+            />
+          </div>
 
-      {/* ── Open-wheels table ────────────────────────────────────────────────── */}
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="font-sans text-[13px] font-medium text-foreground">
-            Open positions
-          </h2>
-          <span className="font-sans text-[12px] text-muted-foreground">
-            {filteredRows.length} of {openLifecycles.length}
-          </span>
-        </div>
-        {/*
-          DATA GAP: "% captured" and ITM/OTM status columns require live option
-          marks which are not available in the current data model. These columns
-          are intentionally omitted. See spec note: "OMIT %captured/ITM — no
-          live marks, do not fabricate."
-        */}
-        <OpenWheelsTable rows={filteredRows} />
-      </section>
+          {/* ── Triage chips ────────────────────────────────────────────────── */}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by triage bucket">
+            <TriageChip
+              label="All"
+              count={openLifecycles.length}
+              active={activeBucket === "All"}
+              onClick={() => setActiveBucket("All")}
+            />
+            <TriageChip
+              label="Roll / close soon"
+              count={bucketCounts["Roll / close soon"]}
+              active={activeBucket === "Roll / close soon"}
+              onClick={() => setActiveBucket("Roll / close soon")}
+            />
+            <TriageChip
+              label="Working"
+              count={bucketCounts.Working}
+              active={activeBucket === "Working"}
+              onClick={() => setActiveBucket("Working")}
+            />
+          </div>
 
-      {/* ── Tax lots ledger (folded) ─────────────────────────────────────────── */}
-      <TaxLotsSection rows={taxLots} />
+          {/* ── Open-wheels table ────────────────────────────────────────────── */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="font-sans text-[13px] font-medium text-foreground">
+                Open positions
+              </h2>
+              <span className="font-sans text-[12px] text-muted-foreground">
+                {filteredRows.length} of {openLifecycles.length}
+              </span>
+            </div>
+            {/*
+              DATA GAP: "% captured" and ITM/OTM status columns require live option
+              marks which are not available in the current data model. These columns
+              are intentionally omitted. See spec note: "OMIT %captured/ITM — no
+              live marks, do not fabricate."
+            */}
+            <OpenWheelsTable rows={filteredRows} />
+          </section>
         </>
       )}
     </div>

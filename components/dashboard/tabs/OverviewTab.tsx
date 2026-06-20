@@ -8,7 +8,7 @@ import { wheelAnalytics } from "@/lib/selectors/analytics";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult, Strategy } from "@/types/trading";
-import { addDaysIso, optionCycleCapital, tone } from "./shared";
+import { addDaysIso, currentDeployedCapital, optionCycleCapital, tone } from "./shared";
 
 type TradeIssueFilter = "unresolved" | "duplicates" | null;
 
@@ -64,11 +64,19 @@ export function OverviewTab({
   const cc = stratGroup(CC_STRATEGIES);
   const swing = stratGroup(SWING_STRATEGIES);
 
-  // ── Utilization (real): peak deployed / maxBuyingPower ────────────────────
+  // ── Buying-power utilization (current open capital / maxBP) ───────────────
   const maxBP = settings.maxBuyingPower ?? 125000;
-  const util = maxBP > 0
-    ? (result.aggregates.peakDeployedCapital / maxBP) * 100
-    : null;
+  const currentDeployed = currentDeployedCapital(result);
+  const util = maxBP > 0 ? (currentDeployed / maxBP) * 100 : null;
+  const utilPct = util !== null ? Math.min(100, util) : 0;
+  const barColor =
+    util === null
+      ? "bg-accent"
+      : util >= 80
+        ? "bg-neg"
+        : util >= 40
+          ? "bg-pos"
+          : "bg-warn";
 
   // ── Insights visibility ────────────────────────────────────────────────────
   const hasInsights =
@@ -82,6 +90,12 @@ export function OverviewTab({
     ) ||
     result.unresolvedTransactions.length > 0 ||
     result.duplicateTransactionIds.length > 0;
+
+  // Return on capital
+  const roc =
+    result.aggregates.averageDeployedCapital > 0
+      ? (result.aggregates.totalRealizedPnl / result.aggregates.averageDeployedCapital) * 100
+      : null;
 
   return (
     <div className="space-y-5">
@@ -135,57 +149,33 @@ export function OverviewTab({
         </p>
       </div>
 
-      {/* ── Hero KPI row ── */}
+      {/* ── Hero KPI row — exactly three tiles ── */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
-        {/* 1. Net P&L · YTD */}
+        {/* 1. Return on capital */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <KpiCard
-            label="Net P&L · YTD"
-            value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
-            helper="Calendar-year realized"
-            tooltip="Current calendar-year realized P&L across all closed events."
-            tone={tone(result.aggregates.currentYearRealizedPnl)}
+            label="Return on capital"
+            value={roc === null ? "—" : formatPercent(roc, 1)}
+            helper="realized P&L ÷ avg deployed"
+            tooltip="Total realized P&L divided by average deployed capital."
+            tone={tone(roc ?? 0)}
             variant="hero"
           />
         </div>
 
-        {/* 2. Return on capital = totalRealizedPnl / averageDeployedCapital */}
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          {(() => {
-            const roc =
-              result.aggregates.averageDeployedCapital > 0
-                ? (result.aggregates.totalRealizedPnl / result.aggregates.averageDeployedCapital) * 100
-                : null;
-            return (
-              <KpiCard
-                label="Return on capital"
-                value={roc === null ? "—" : formatPercent(roc, 1)}
-                helper="realized P&L ÷ avg deployed"
-                tooltip="Total realized P&L divided by average deployed capital."
-                tone={tone(roc ?? 0)}
-                variant="hero"
-              />
-            );
-          })()}
-        </div>
-
-        {/* 3. Premium — captureRate is a fraction → ×100 before formatPercent */}
+        {/* 2. Avg deployed capital */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <KpiCard
-            label="Premium"
-            value={formatCurrency(a.premium.premiumCollected)}
-            helper={
-              a.premium.captureRate === null
-                ? "—"
-                : `${formatPercent(a.premium.captureRate * 100, 0)} capture`
-            }
-            tooltip="Total premium received from opening option sales."
+            label="Avg deployed capital"
+            value={formatCurrency(result.aggregates.averageDeployedCapital)}
+            helper="Average across active months"
+            tooltip="Average capital deployed across all months with activity."
             tone="neutral"
             variant="hero"
           />
         </div>
 
-        {/* 4. Win · PF — winRate is a fraction → ×100 before formatPercent */}
+        {/* 3. Win · PF — winRate is a fraction → ×100 before formatPercent */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <KpiCard
             label="Win · PF"
@@ -230,40 +220,35 @@ export function OverviewTab({
         />
       </MetricGroup>
 
-      {/* ── Income group ── */}
-      <MetricGroup label="Income" cols={3}>
-        <KpiCard
-          label="Options premium"
-          value={formatCurrency(result.aggregates.totalOptionsPremium)}
-          helper="Closed option premium P&L"
-          tooltip="Net realized option premium from all closed cycles."
-          tone={tone(result.aggregates.totalOptionsPremium)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Stock P&L"
-          value={formatCurrency(result.aggregates.totalStockTradingPnl)}
-          helper="Realized stock sales"
-          tooltip="Realized P&L from stock sales (swings and assignments)."
-          tone={tone(result.aggregates.totalStockTradingPnl)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Income / day"
-          value={
-            a.capitalEfficiency.incomePerDay === null
-              ? "—"
-              : formatCurrency(a.capitalEfficiency.incomePerDay)
-          }
-          helper="Option premium per capital-day"
-          tooltip="Total option premium P&L divided by total capital-days."
-          tone="neutral"
-          variant="compact"
-        />
-      </MetricGroup>
+      {/* ── Buying-power utilization bar ── */}
+      <div className="rounded-[12px] border border-hairline bg-surface p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-sans text-[12px] text-muted-foreground">
+            Buying-power utilization
+          </span>
+          <span className="font-sans text-[12px] font-medium tabular-nums text-foreground">
+            {util === null ? "—" : `${formatPercent(util, 0)} · ${formatCurrency(currentDeployed)} of ${formatCurrency(maxBP)}`}
+          </span>
+        </div>
+        <div
+          className="h-2 w-full overflow-hidden rounded-full bg-background"
+          role="progressbar"
+          aria-valuenow={Math.round(utilPct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <div
+            className={`h-full rounded-full transition-all ${barColor}`}
+            style={{ width: `${utilPct}%` }}
+          />
+        </div>
+        <p className="font-sans text-[11px] text-muted-foreground">
+          Current open capital vs max buying power · healthy band 40–80%
+        </p>
+      </div>
 
-      {/* ── Returns & efficiency group ── */}
-      <MetricGroup label="Returns & efficiency" cols={3}>
+      {/* ── Returns & efficiency group (YTD ROI + Expectancy only) ── */}
+      <MetricGroup label="Returns & efficiency" cols={2}>
         {/* ytdRoi is already a % value — pass straight */}
         <KpiCard
           label="YTD ROI"
@@ -287,15 +272,6 @@ export function OverviewTab({
           helper="Mean P&L per trade"
           tooltip="Average realized P&L per closed event."
           tone={tone(a.tradeQuality.expectancy ?? 0)}
-          variant="compact"
-        />
-        {/* Utilization: peak deployed / maxBuyingPower (from Settings) */}
-        <KpiCard
-          label="Utilization"
-          value={util == null ? "—" : formatPercent(util, 0)}
-          helper={`${formatCurrency(result.aggregates.peakDeployedCapital)} of ${formatCurrency(maxBP)}`}
-          tooltip="Peak deployed capital vs max buying power (Settings)."
-          tone="neutral"
           variant="compact"
         />
       </MetricGroup>

@@ -5,15 +5,14 @@
  * Extracted from DashboardApp.tsx to allow parallel tab development.
  */
 
-import { StatusChip } from "@/components/common/StatusChip";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
+  CalculationResult,
   MonthlyCapitalReturn,
   OptionLifecycle,
   RealizedPnLEvent,
-  TaxLot,
 } from "@/types/trading";
 
 // ── Tone helper ──────────────────────────────────────────────────────────────
@@ -70,26 +69,25 @@ export function optionCycleCapital(
   return lifecycle.strikePrice * lifecycle.sharesControlled;
 }
 
+/**
+ * Sum of capital deployed across all currently-open option lifecycles.
+ * Uses capitalDeployed if recorded; falls back to strikePrice × sharesControlled.
+ */
+export function currentDeployedCapital(result: CalculationResult): number {
+  return result.optionLifecycles
+    .filter((l) => l.status === "open")
+    .reduce(
+      (sum, l) => sum + (l.capitalDeployed ?? l.strikePrice * l.sharesControlled),
+      0
+    );
+}
+
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
 export function addDaysIso(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next.toISOString().slice(0, 10);
-}
-
-// ── Status chip helpers ──────────────────────────────────────────────────────
-
-export function taxLotStatusChip(row: TaxLot) {
-  if (row.costBasisPerShare === 0 && row.status === "open") {
-    return <StatusChip kind="zero-basis" />;
-  }
-  const kindMap: Record<string, "open" | "closed"> = {
-    open: "open",
-    closed: "closed",
-    partially_closed: "closed",
-  };
-  return <StatusChip kind={kindMap[row.status] ?? "closed"} />;
 }
 
 // ── SegmentedControl ─────────────────────────────────────────────────────────
@@ -199,69 +197,6 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
   ];
   return (
     <DataTable rows={rows} columns={columns} empty="No monthly ROI rows yet." />
-  );
-}
-
-// ── TaxLotsTable ─────────────────────────────────────────────────────────────
-
-export function TaxLotsTable({ rows }: { rows: TaxLot[] }) {
-  const columns: Column<TaxLot>[] = [
-    { key: "symbol", header: "Symbol", value: (row) => row.symbol },
-    { key: "openDate", header: "Open Date", value: (row) => row.openDate },
-    {
-      key: "closeDate",
-      header: "Close Date",
-      value: (row) => row.closeDate ?? "",
-    },
-    {
-      key: "source",
-      header: "Source",
-      value: (row) => row.source,
-      render: (row) => label(row.source),
-    },
-    {
-      key: "originalQuantity",
-      header: "Original Qty",
-      value: (row) => row.originalQuantity,
-      align: "right",
-    },
-    {
-      key: "remainingQuantity",
-      header: "Remaining",
-      value: (row) => row.remainingQuantity,
-      align: "right",
-    },
-    {
-      key: "costBasisTotal",
-      header: "Cost Basis",
-      value: (row) => row.costBasisTotal,
-      render: (row) => formatCurrency(row.costBasisTotal),
-      align: "right",
-    },
-    {
-      key: "costBasisPerShare",
-      header: "Per Share",
-      value: (row) => row.costBasisPerShare,
-      render: (row) =>
-        formatCurrency(row.costBasisPerShare, { maximumFractionDigits: 2 }),
-      align: "right",
-    },
-    {
-      key: "status",
-      header: "Status",
-      value: (row) => row.status,
-      render: (row) => taxLotStatusChip(row),
-      align: "right",
-    },
-    { key: "notes", header: "Notes", value: (row) => row.notes ?? "" },
-  ];
-  return (
-    <section className="space-y-2">
-      <h2 className="font-sans text-[13px] font-medium text-foreground">
-        Tax Lots
-      </h2>
-      <DataTable rows={rows} columns={columns} empty="No tax lots yet." />
-    </section>
   );
 }
 

@@ -150,7 +150,7 @@ export function DashboardApp() {
           <SwingTradesTab result={result} onSelectEvent={setSelectedEvent} />
         )}
         {activeTab === "Performance" && (
-          <PerformanceTab result={result} annualGoal={settings.annualRealizedPnlGoal} maxBuyingPower={settings.maxBuyingPower ?? 125000} onSelectEvent={setSelectedEvent} />
+          <PerformanceTab result={result} annualGoal={settings.annualRealizedPnlGoal} onSelectEvent={setSelectedEvent} />
         )}
         {activeTab === "Import" && (
           <ImportTab

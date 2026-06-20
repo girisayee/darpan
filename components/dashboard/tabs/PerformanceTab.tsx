@@ -7,10 +7,9 @@
  *   1. Top KPI strip (4 compact KpiCards)
  *   2. Equity curve — recharts line in an h-[200px] ResponsiveContainer
  *   3. Risk strip (compact KpiCards)
- *   4. Buying-power utilization bar (peakDeployedCapital / maxBuyingPower)
- *   5. Monthly realized P&L bar chart
- *   6. Monthly ROI chart + ledger
- *   7. "Benchmark vs SPY/QQQ — coming soon" placeholder card
+ *   4. Monthly realized P&L bar chart
+ *   5. Monthly ROI chart + ledger
+ *   6. "Benchmark vs SPY/QQQ — coming soon" placeholder card
  *
  * DATA GAPS noted inline where a live data source is deferred:
  *   - Benchmark (SPY/QQQ) returns: deferred subsystem → placeholder card
@@ -281,57 +280,6 @@ function MonthlyPnlBarChart({
   );
 }
 
-// ── Buying-power utilization bar ──────────────────────────────────────────────
-//
-// Uses the same formula as Overview: peakDeployedCapital / maxBuyingPower.
-// Healthy band: 40–80%.
-
-function UtilizationBar({ result, maxBuyingPower }: { result: CalculationResult; maxBuyingPower: number }) {
-  const { peakDeployedCapital } = result.aggregates;
-
-  if (maxBuyingPower <= 0) {
-    return (
-      <div className="rounded-[12px] border border-hairline bg-surface p-4">
-        <p className="font-sans text-[12px] text-muted-foreground">
-          Buying-power utilization — set max buying power in Settings
-        </p>
-      </div>
-    );
-  }
-
-  const pct = Math.min(100, (peakDeployedCapital / maxBuyingPower) * 100);
-  const isHealthy = pct >= 40 && pct <= 80;
-  const barColor = isHealthy
-    ? "bg-pos"
-    : pct > 80
-      ? "bg-neg"
-      : "bg-warn";
-
-  return (
-    <div className="rounded-[12px] border border-hairline bg-surface p-4 space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="font-sans text-[12px] text-muted-foreground">
-          Buying-power utilization
-        </span>
-        <span className="font-sans text-[12px] font-medium tabular-nums text-foreground">
-          {formatPercent(pct, 0)}
-        </span>
-      </div>
-      {/* Track */}
-      <div className="h-2 w-full overflow-hidden rounded-full bg-background" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-        <div
-          className={`h-full rounded-full transition-all ${barColor}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className="font-sans text-[11px] text-muted-foreground">
-        Peak deployed {formatCurrency(peakDeployedCapital)} of {formatCurrency(maxBuyingPower)} max buying power ·{" "}
-        healthy band 40–80%
-      </p>
-    </div>
-  );
-}
-
 // ── Benchmark placeholder ─────────────────────────────────────────────────────
 //
 // DATA GAP: SPY / QQQ benchmark returns are a deferred subsystem.
@@ -360,12 +308,10 @@ function BenchmarkPlaceholder() {
 export function PerformanceTab({
   result,
   annualGoal,
-  maxBuyingPower,
   onSelectEvent,
 }: {
   result: CalculationResult;
   annualGoal: number;
-  maxBuyingPower: number;
   onSelectEvent: (event: RealizedPnLEvent) => void;
 }) {
   void onSelectEvent; // DetailDrawer wiring — available for future drill-down
@@ -516,9 +462,6 @@ export function PerformanceTab({
           variant="compact"
         />
       </MetricGroup>
-
-      {/* ── 4. Buying-power utilization bar ── */}
-      <UtilizationBar result={result} maxBuyingPower={maxBuyingPower} />
 
       {/* ── 5b. Monthly realized P&L bar chart ── */}
       <section className="space-y-2">

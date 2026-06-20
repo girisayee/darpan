@@ -160,8 +160,7 @@ export function DetailDrawer({
   return (
     /* Backdrop scrim */
     <div
-      className="fixed inset-0 z-50 flex justify-end"
-      style={{ background: "rgba(8,11,16,0.74)" }}
+      className="fixed inset-0 z-50 flex justify-end bg-black/50"
       onClick={onClose}
       role="presentation"
     >
@@ -171,8 +170,8 @@ export function DetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={`${event.symbol} realized P&L detail`}
-        className="motion-safe:animate-[slideIn_160ms_ease] h-full w-[64%] min-w-[380px] overflow-y-auto bg-surface border-l border-hairline"
-        style={{ maxWidth: "640px" }}
+        className="motion-safe:animate-[slideIn_160ms_ease] relative z-10 h-full w-[64%] min-w-[380px] overflow-y-auto bg-surface border-l border-hairline"
+        style={{ maxWidth: "640px", background: "rgb(var(--surface))" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5">
