@@ -10,6 +10,7 @@ export const defaultSettings: AppSettings = {
   defaultDateRange: "ALL",
   includeFees: true,
   annualRealizedPnlGoal: 40000,
+  maxBuyingPower: 125000,
   costBasisMethod: "FIFO",
   manualCostBasisPerShare: {
     IREN: 49.25,

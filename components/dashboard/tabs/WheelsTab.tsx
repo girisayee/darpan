@@ -183,6 +183,18 @@ function OpenWheelsTable({
       ),
     },
     {
+      key: "qty",
+      header: "Qty",
+      value: (row) => row.contracts,
+      render: (row) => (
+        <div className="flex flex-col gap-0">
+          <span className="font-medium text-foreground tabular-nums">{row.contracts}</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">· {row.sharesControlled} sh</span>
+        </div>
+      ),
+      align: "right",
+    },
+    {
       key: "dte",
       header: "DTE",
       value: (row) => daysToExpiry(row.expirationDate),

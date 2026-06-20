@@ -5,13 +5,17 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { goalPace } from "@/lib/selectors/goal-pace";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import { riskMetrics } from "@/lib/selectors/risk";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { AppSettings, CalculationResult } from "@/types/trading";
+import type { AppSettings, CalculationResult, Strategy } from "@/types/trading";
 import { addDaysIso, optionCycleCapital, tone } from "./shared";
 
 type TradeIssueFilter = "unresolved" | "duplicates" | null;
+
+// Strategies for each "By strategy" bucket
+const CSP_STRATEGIES: Strategy[] = ["CASH_SECURED_PUT", "PUT_ASSIGNMENT"];
+const CC_STRATEGIES: Strategy[] = ["COVERED_CALL", "COVERED_CALL_ASSIGNMENT"];
+const SWING_STRATEGIES: Strategy[] = ["SWING_TRADE"];
 
 export function OverviewTab({
   result,
@@ -40,24 +44,31 @@ export function OverviewTab({
 
   // ── Wheel analytics ────────────────────────────────────────────────────────
   const a = wheelAnalytics(result);
-  const risk = riskMetrics(result);
 
-  // ── Dividends: sum of DIVIDEND transactions ────────────────────────────────
-  const dividends = result.transactions
-    .filter((t) => t.action === "DIVIDEND")
-    .reduce((sum, t) => sum + t.netAmount, 0);
+  // ── By strategy: CSP, CC, Swing ───────────────────────────────────────────
+  function stratGroup(strategies: Strategy[]) {
+    const events = result.realizedEvents.filter((e) =>
+      strategies.includes(e.strategy)
+    );
+    const pnl = events.reduce((s, e) => s + e.realizedPnl, 0);
+    const capital = events.reduce(
+      (s, e) => s + (e.capitalDeployed ?? 0),
+      0
+    );
+    const trades = events.length;
+    const roi = capital > 0 ? (pnl / capital) * 100 : null;
+    return { pnl, capital, trades, roi };
+  }
 
-  // ── Utilization proxy: avg deployed / peak deployed ────────────────────────
-  // Real buying-power data is a deferred subsystem; proxy uses deployed-vs-peak.
-  const utilization =
-    result.aggregates.peakDeployedCapital > 0
-      ? formatPercent(
-          (result.aggregates.averageDeployedCapital /
-            result.aggregates.peakDeployedCapital) *
-            100,
-          0
-        )
-      : "—";
+  const csp = stratGroup(CSP_STRATEGIES);
+  const cc = stratGroup(CC_STRATEGIES);
+  const swing = stratGroup(SWING_STRATEGIES);
+
+  // ── Utilization (real): peak deployed / maxBuyingPower ────────────────────
+  const maxBP = settings.maxBuyingPower ?? 125000;
+  const util = maxBP > 0
+    ? (result.aggregates.peakDeployedCapital / maxBP) * 100
+    : null;
 
   // ── Insights visibility ────────────────────────────────────────────────────
   const hasInsights =
@@ -187,8 +198,36 @@ export function OverviewTab({
         </div>
       </div>
 
+      {/* ── By strategy ── */}
+      <MetricGroup label="By strategy" cols={3}>
+        <KpiCard
+          label="Cash-secured puts"
+          value={formatCurrency(csp.pnl)}
+          helper={`${csp.roi == null ? "—" : formatPercent(csp.roi, 1)} ROI · ${csp.trades} trades`}
+          tooltip="Realized P&L from cash-secured puts and put assignments."
+          tone={tone(csp.pnl)}
+          variant="compact"
+        />
+        <KpiCard
+          label="Covered calls"
+          value={formatCurrency(cc.pnl)}
+          helper={`${cc.roi == null ? "—" : formatPercent(cc.roi, 1)} ROI · ${cc.trades} trades`}
+          tooltip="Realized P&L from covered calls and covered-call assignments."
+          tone={tone(cc.pnl)}
+          variant="compact"
+        />
+        <KpiCard
+          label="Swing"
+          value={formatCurrency(swing.pnl)}
+          helper={`${swing.roi == null ? "—" : formatPercent(swing.roi, 1)} ROI · ${swing.trades} trades`}
+          tooltip="Realized P&L from swing trades."
+          tone={tone(swing.pnl)}
+          variant="compact"
+        />
+      </MetricGroup>
+
       {/* ── Income group ── */}
-      <MetricGroup label="Income" cols={4}>
+      <MetricGroup label="Income" cols={3}>
         <KpiCard
           label="Options premium"
           value={formatCurrency(result.aggregates.totalOptionsPremium)}
@@ -205,15 +244,6 @@ export function OverviewTab({
           tone={tone(result.aggregates.totalStockTradingPnl)}
           variant="compact"
         />
-        {/* Dividends computed from transactions where action === "DIVIDEND" */}
-        <KpiCard
-          label="Dividends"
-          value={formatCurrency(dividends)}
-          helper="Sum of dividend payments"
-          tooltip="Total net amount from DIVIDEND transactions in the current view."
-          tone={tone(dividends)}
-          variant="compact"
-        />
         <KpiCard
           label="Income / day"
           value={
@@ -228,8 +258,8 @@ export function OverviewTab({
         />
       </MetricGroup>
 
-      {/* ── Returns & risk group ── */}
-      <MetricGroup label="Returns & risk" cols={4}>
+      {/* ── Returns & efficiency group ── */}
+      <MetricGroup label="Returns & efficiency" cols={3}>
         {/* ytdRoi is already a % value — pass straight */}
         <KpiCard
           label="YTD ROI"
@@ -255,25 +285,12 @@ export function OverviewTab({
           tone={tone(a.tradeQuality.expectancy ?? 0)}
           variant="compact"
         />
-        {/* Max drawdown — maxDrawdownPct is a fraction → ×100 before formatPercent, negate for display */}
-        <KpiCard
-          label="Max drawdown"
-          value={
-            risk.maxDrawdownPct === null
-              ? "—"
-              : formatPercent(-(risk.maxDrawdownPct * 100), 1)
-          }
-          helper="Peak-to-trough equity decline"
-          tooltip="Largest peak-to-trough decline in cumulative realized equity."
-          tone={risk.maxDrawdownPct ? "negative" : "neutral"}
-          variant="compact"
-        />
-        {/* Utilization proxy: avg deployed / peak deployed (buying-power data deferred) */}
+        {/* Utilization: peak deployed / maxBuyingPower (from Settings) */}
         <KpiCard
           label="Utilization"
-          value={utilization}
-          helper="Avg / peak deployed (proxy)"
-          tooltip="Average deployed capital vs peak deployed; proxy until account buying-power data is available."
+          value={util == null ? "—" : formatPercent(util, 0)}
+          helper={`${formatCurrency(result.aggregates.peakDeployedCapital)} of ${formatCurrency(maxBP)}`}
+          tooltip="Peak deployed capital vs max buying power (Settings)."
           tone="neutral"
           variant="compact"
         />

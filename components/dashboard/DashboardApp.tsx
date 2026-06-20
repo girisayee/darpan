@@ -417,6 +417,32 @@ function SettingsTab({
             {formatCurrency(settings.annualRealizedPnlGoal / 12)}
           </span>
         </label>
+        <label className="grid gap-1">
+          <span className="font-sans text-[11.5px] text-muted-foreground">
+            Max buying power
+          </span>
+          <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
+            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
+              $
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={settings.maxBuyingPower ?? 125000}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  maxBuyingPower: Math.max(0, Number(event.target.value) || 0),
+                })
+              }
+              className="h-10 w-full bg-transparent px-2 font-sans text-[13px] tabular-nums text-foreground outline-none"
+            />
+          </div>
+          <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
+            Used for buying-power utilization
+          </span>
+        </label>
         <div className="rounded-md border border-hairline bg-surface-inset p-3 font-sans text-[11.5px] text-muted-foreground">
           Imported trade data is stored in the local SQLite database at{" "}
           <span className="font-sans text-[11px] tabular-nums">

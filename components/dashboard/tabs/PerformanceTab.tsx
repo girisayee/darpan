@@ -26,9 +26,13 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,7 +44,7 @@ import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
 import { riskMetrics } from "@/lib/selectors/risk";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
+import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
 import { MonthlyRoiTable, tone } from "./shared";
 
 // ── recharts palette via CSS variables ───────────────────────────────────────
@@ -185,121 +189,97 @@ function EquityCurveChart({
   );
 }
 
-// ── Capital-efficiency ranking table ─────────────────────────────────────────
-//
-// Shows open optionLifecycles ranked by Ann. ROC (if computable from
-// realizedEvents on the same underlying symbol; otherwise "—").
-// DATA GAP: live option marks not available → % captured / ITM not shown.
+// ── Monthly realized P&L bar chart ───────────────────────────────────────────
 
-function buildAnnRocBySymbol(events: RealizedPnLEvent[]): Map<string, number | null> {
-  // Capital-weighted annualized ROC per underlying symbol.
-  const acc = new Map<string, { weighted: number; weight: number }>();
-  for (const e of events) {
-    if (e.annualizedRoiPercent === null || e.capitalDeployed === null) continue;
-    if (e.capitalDeployed <= 0) continue;
-    const cur = acc.get(e.symbol) ?? { weighted: 0, weight: 0 };
-    cur.weighted += e.annualizedRoiPercent * e.capitalDeployed;
-    cur.weight += e.capitalDeployed;
-    acc.set(e.symbol, cur);
-  }
-  const result = new Map<string, number | null>();
-  for (const [sym, { weighted, weight }] of acc) {
-    result.set(sym, weight > 0 ? weighted / weight : null);
-  }
-  return result;
-}
+const C_NEG = "rgb(var(--neg))";
 
-function dteFromToday(expirationDate: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const exp = new Date(expirationDate);
-  exp.setHours(0, 0, 0, 0);
-  return Math.round((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function capitalForLifecycle(lc: OptionLifecycle): number {
-  if ((lc.capitalDeployed ?? 0) > 0) return lc.capitalDeployed!;
-  return lc.strikePrice * lc.sharesControlled;
-}
-
-function CapitalEfficiencyTable({
-  lifecycles,
-  annRocBySymbol,
+function MonthlyPnlBarChart({
+  result,
+  annualGoal,
 }: {
-  lifecycles: OptionLifecycle[];
-  annRocBySymbol: Map<string, number | null>;
+  result: CalculationResult;
+  annualGoal: number;
 }) {
-  // Sort by Ann. ROC desc (nulls last), then by capital desc.
-  const rows = [...lifecycles].sort((a, b) => {
-    const ra = annRocBySymbol.get(a.underlyingSymbol) ?? null;
-    const rb = annRocBySymbol.get(b.underlyingSymbol) ?? null;
-    if (ra === null && rb === null) return capitalForLifecycle(b) - capitalForLifecycle(a);
-    if (ra === null) return 1;
-    if (rb === null) return -1;
-    return rb - ra;
-  });
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
 
-  if (rows.length === 0) {
-    return (
-      <p className="py-4 text-center font-sans text-[12px] text-muted-foreground">
-        No open positions.
-      </p>
-    );
+  const data = useMemo(() => {
+    return result.monthlyReturns.map((m) => ({
+      label: `${m.year}-${String(m.month).padStart(2, "0")}`,
+      realizedPnl: m.realizedPnl,
+    }));
+  }, [result.monthlyReturns]);
+
+  const monthlyGoal = annualGoal > 0 ? annualGoal / 12 : undefined;
+
+  if (!mounted) {
+    return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[460px] border-collapse font-sans text-[12px]">
-        <thead>
-          <tr className="border-b border-hairline text-left text-[11px] text-muted-foreground">
-            <th className="pb-1.5 pr-3 font-medium">Symbol</th>
-            <th className="pb-1.5 pr-3 font-medium">Strategy</th>
-            <th className="pb-1.5 pr-3 text-right font-medium">Capital</th>
-            <th className="pb-1.5 pr-3 text-right font-medium">DTE</th>
-            <th className="pb-1.5 text-right font-medium">Ann. ROC</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((lc) => {
-            const dte = dteFromToday(lc.expirationDate);
-            const cap = capitalForLifecycle(lc);
-            const annRoc = annRocBySymbol.get(lc.underlyingSymbol) ?? null;
-            const stratLabel = lc.optionType === "call" ? "CC" : "CSP";
-            const dteClass =
-              dte <= 7
-                ? "text-neg"
-                : dte <= 14
-                  ? "text-warn"
-                  : "text-foreground";
-            return (
-              <tr
-                key={lc.id}
-                className="border-b border-hairline last:border-b-0 hover:bg-surface-inset/40"
-              >
-                <td className="py-1.5 pr-3 font-medium text-foreground">
-                  {lc.underlyingSymbol}
-                </td>
-                <td className="py-1.5 pr-3 text-muted-foreground">{stratLabel}</td>
-                <td className="py-1.5 pr-3 text-right tabular-nums text-foreground">
-                  {formatCurrency(cap)}
-                </td>
-                <td className={`py-1.5 pr-3 text-right tabular-nums ${dteClass}`}>
-                  {dte}
-                </td>
-                <td className="py-1.5 text-right tabular-nums text-foreground">
-                  {annRoc === null ? (
-                    <span className="text-muted-foreground">—</span>
-                  ) : (
-                    <span className={tone(annRoc) === "positive" ? "text-pos" : tone(annRoc) === "negative" ? "text-neg" : undefined}>
-                      {formatPercent(annRoc)}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="h-[200px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
+          <CartesianGrid
+            vertical={false}
+            strokeDasharray="0"
+            stroke={C_HAIRLINE}
+            opacity={1}
+          />
+          <XAxis
+            dataKey="label"
+            tick={TICK_STYLE}
+            axisLine={{ stroke: C_HAIRLINE }}
+            tickLine={false}
+          />
+          <YAxis
+            tick={TICK_STYLE}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) =>
+              v >= 1000 || v <= -1000
+                ? `$${(v / 1000).toFixed(0)}k`
+                : `$${v.toFixed(0)}`
+            }
+            width={52}
+          />
+          <Tooltip
+            formatter={(value: unknown) => [
+              formatCurrency(typeof value === "number" ? value : Number(value)),
+              "Realized P&L",
+            ]}
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
+            cursor={{ fill: C_HAIRLINE, opacity: 0.4 }}
+          />
+          <Bar dataKey="realizedPnl" radius={[3, 3, 0, 0]}>
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.realizedPnl >= 0 ? C_POS : C_NEG}
+              />
+            ))}
+          </Bar>
+          {monthlyGoal !== undefined && (
+            <ReferenceLine
+              y={monthlyGoal}
+              stroke={C_GOAL_PACE}
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
+              opacity={0.7}
+              label={{
+                value: "Monthly goal",
+                position: "insideTopRight",
+                style: { ...TICK_STYLE, fontSize: 10 },
+              }}
+            />
+          )}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -394,18 +374,6 @@ export function PerformanceTab({
 
   const a = wheelAnalytics(result);
   const risk = riskMetrics(result);
-
-  // Open option lifecycles for the capital-efficiency table
-  const openLifecycles = useMemo(
-    () => result.optionLifecycles.filter((lc) => lc.status === "open"),
-    [result.optionLifecycles]
-  );
-
-  // Ann. ROC per symbol from realized events (for capital-efficiency table)
-  const annRocBySymbol = useMemo(
-    () => buildAnnRocBySymbol(result.realizedEvents),
-    [result.realizedEvents]
-  );
 
   // ── Top KPI strip ────────────────────────────────────────────────────────
   // Net P&L YTD, Annualized ROC (already %), Profit factor, Max drawdown
@@ -502,21 +470,7 @@ export function PerformanceTab({
         </div>
       </section>
 
-      {/* ── 3. Capital-efficiency ranking ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Open positions · Capital efficiency ranking
-        </h2>
-        {/* DATA GAP: % captured / ITM requires live option marks — not rendered */}
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <CapitalEfficiencyTable
-            lifecycles={openLifecycles}
-            annRocBySymbol={annRocBySymbol}
-          />
-        </div>
-      </section>
-
-      {/* ── 4. Risk strip ── */}
+      {/* ── 3. Risk strip ── */}
       <MetricGroup label="Risk" cols={4}>
         <KpiCard
           label="Sortino"
@@ -566,6 +520,16 @@ export function PerformanceTab({
 
       {/* ── 5. Buying-power utilization bar ── */}
       <UtilizationBar result={result} />
+
+      {/* ── 5b. Monthly realized P&L bar chart ── */}
+      <section className="space-y-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">
+          Monthly realized P&amp;L
+        </h2>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <MonthlyPnlBarChart result={result} annualGoal={annualGoal} />
+        </div>
+      </section>
 
       {/* ── 6. Monthly ROI chart + ledger ── */}
       <section className="space-y-2">

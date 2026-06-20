@@ -202,6 +202,7 @@ export type AppSettings = {
   defaultDateRange: "ALL" | "YTD" | "THIS_YEAR" | "LAST_YEAR";
   includeFees: boolean;
   annualRealizedPnlGoal: number;
+  maxBuyingPower: number;
   costBasisMethod: CostBasisMethod;
   manualCostBasisPerShare: Record<string, number>;
   manualZeroBasisLots: Array<{ symbol: string; quantity: number; note?: string }>;
