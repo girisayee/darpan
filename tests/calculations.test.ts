@@ -401,4 +401,78 @@ describe("calculation engine", () => {
     expect(result.realizedEvents[0].realizedPnl).toBeCloseTo(5.453475, 5);
     expect(result.realizedEvents[0].warnings).not.toContain("Missing cost basis");
   });
+
+  // ── Key-collision (FIFO queue) tests ────────────────────────────────────────
+
+  it("(a) two STO of the same contract key then two BTC — both lifecycles reach closed", () => {
+    // Two separate opens of the same CAN put, followed by two BTC closings.
+    // Without the queue fix the second STO would overwrite the first, leaving
+    // the first lifecycle permanently at status='open'.
+    const result = calculateDashboard([
+      optionTx("sto1", "2025-01-05", "SELL_TO_OPEN",  "CAN", "put", 20, "2025-02-21", 120),
+      optionTx("sto2", "2025-01-12", "SELL_TO_OPEN",  "CAN", "put", 20, "2025-02-21", 110),
+      optionTx("btc1", "2025-01-28", "BUY_TO_CLOSE",  "CAN", "put", 20, "2025-02-21", -30),
+      optionTx("btc2", "2025-02-10", "BUY_TO_CLOSE",  "CAN", "put", 20, "2025-02-21", -20)
+    ]);
+    const lifecycles = result.optionLifecycles;
+    expect(lifecycles).toHaveLength(2);
+    // Neither lifecycle may remain "open"
+    const openCount = lifecycles.filter((lc) => lc.status === "open").length;
+    expect(openCount).toBe(0);
+    // Both must be closed
+    expect(lifecycles.every((lc) => lc.status === "closed")).toBe(true);
+    // Total realized P&L = (120−30) + (110−20) = 90 + 90 = 180
+    const totalPnl = result.realizedEvents.reduce((acc, e) => acc + e.realizedPnl, 0);
+    expect(totalPnl).toBe(180);
+  });
+
+  it("(b) STO → BTC → STO again (same key): first closes, second stays open", () => {
+    // First open closes correctly; the second open issued after the first close
+    // must remain open (no closing leg exists for it).
+    const result = calculateDashboard([
+      optionTx("sto1", "2025-01-05", "SELL_TO_OPEN",  "AMZN", "put", 180, "2025-01-31", 200),
+      optionTx("btc1", "2025-01-20", "BUY_TO_CLOSE",  "AMZN", "put", 180, "2025-01-31", -50),
+      optionTx("sto2", "2025-02-03", "SELL_TO_OPEN",  "AMZN", "put", 180, "2025-02-28", 180)
+    ], defaultSettings, new Date("2025-02-15T00:00:00Z"));
+    const lifecycles = result.optionLifecycles;
+    expect(lifecycles).toHaveLength(2);
+    const closed = lifecycles.filter((lc) => lc.status === "closed");
+    const open   = lifecycles.filter((lc) => lc.status === "open");
+    // Exactly one closed (first) and one genuinely open (second)
+    expect(closed).toHaveLength(1);
+    expect(open).toHaveLength(1);
+    // The closed one is the first STO, P&L = 200 − 50 = 150
+    expect(closed[0].netOptionPnl).toBe(150);
+  });
+
+  it("(c) BTO long and STO short on same key close to their own direction", () => {
+    // A long and a short on the same contract key are both open; each must
+    // match only its own directional closing leg.
+    const result = calculateDashboard([
+      optionTx("bto1", "2025-03-01", "BUY_TO_OPEN",  "NFLX", "call", 600, "2025-03-31", -400),
+      optionTx("sto1", "2025-03-01", "SELL_TO_OPEN",  "NFLX", "call", 600, "2025-03-31",  300),
+      // STC closes the long (BTO)
+      optionTx("stc1", "2025-03-20", "SELL_TO_CLOSE", "NFLX", "call", 600, "2025-03-31",  600),
+      // BTC closes the short (STO)
+      optionTx("btc1", "2025-03-20", "BUY_TO_CLOSE",  "NFLX", "call", 600, "2025-03-31",  -80)
+    ]);
+    const lifecycles = result.optionLifecycles;
+    expect(lifecycles).toHaveLength(2);
+    // No lifecycle should be stranded open
+    expect(lifecycles.filter((lc) => lc.status === "open")).toHaveLength(0);
+    // Both must be closed
+    expect(lifecycles.every((lc) => lc.status === "closed")).toBe(true);
+
+    const longLc  = lifecycles.find((lc) => lc.direction === "long");
+    const shortLc = lifecycles.find((lc) => lc.direction === "short");
+    expect(longLc).toBeDefined();
+    expect(shortLc).toBeDefined();
+    // Long P&L: proceeds(600) − cost(400) − fees(0) = 200
+    expect(longLc!.netOptionPnl).toBe(200);
+    // Short P&L: premium(300) − closeCost(80) − fees(0) = 220
+    expect(shortLc!.netOptionPnl).toBe(220);
+    // Total = 420
+    const totalPnl = result.realizedEvents.reduce((acc, e) => acc + e.realizedPnl, 0);
+    expect(totalPnl).toBe(420);
+  });
 });

@@ -36,7 +36,9 @@ export function calculateDashboard(
 
   const taxLots: MutableLot[] = [];
   const realizedEvents: RealizedPnLEvent[] = [];
-  const optionMap = new Map<string, MutableLifecycle>();
+  // Per-key queue of open lifecycles. A key maps to an ordered list of open
+  // lifecycles; openers append to the end, closers pop from the front (FIFO).
+  const optionMap = new Map<string, MutableLifecycle[]>();
   const optionLifecycles: MutableLifecycle[] = [];
   const capitalUsage: CapitalUsage[] = [];
   const positionCapital: PositionCapitalRecord[] = [];
@@ -177,7 +179,7 @@ function handleOptionTransaction(
   transaction: TradeTransaction,
   lots: MutableLot[],
   events: RealizedPnLEvent[],
-  optionMap: Map<string, MutableLifecycle>,
+  optionMap: Map<string, MutableLifecycle[]>,
   lifecycles: MutableLifecycle[],
   usage: CapitalUsage[],
   positionCapital: PositionCapitalRecord[],
@@ -187,19 +189,39 @@ function handleOptionTransaction(
   const warnings = optionWarnings(transaction);
   if (transaction.action === "SELL_TO_OPEN") {
     const lifecycle = createLifecycle(transaction, warnings, lots, settings);
-    optionMap.set(optionKey(transaction), lifecycle);
+    const key = optionKey(transaction);
+    const queue = optionMap.get(key) ?? [];
+    queue.push(lifecycle);
+    optionMap.set(key, queue);
     lifecycles.push(lifecycle);
     return;
   }
 
   if (transaction.action === "BUY_TO_OPEN") {
     const lifecycle = createLongLifecycle(transaction, warnings, settings);
-    optionMap.set(optionKey(transaction), lifecycle);
+    const key = optionKey(transaction);
+    const queue = optionMap.get(key) ?? [];
+    queue.push(lifecycle);
+    optionMap.set(key, queue);
     lifecycles.push(lifecycle);
     return;
   }
 
-  const lifecycle = optionMap.get(optionKey(transaction));
+  // For closing actions, find the oldest open lifecycle with a compatible direction
+  // (FIFO). BUY_TO_CLOSE and ASSIGNMENT close SHORT positions; SELL_TO_CLOSE closes
+  // LONG positions; EXPIRATION closes whichever direction is open first.
+  const queue = optionMap.get(optionKey(transaction)) ?? [];
+  let lifecycle: MutableLifecycle | undefined;
+  if (transaction.action === "BUY_TO_CLOSE" || transaction.action === "ASSIGNMENT") {
+    const idx = queue.findIndex((lc) => lc.status === "open" && lc.direction === "short");
+    if (idx !== -1) { lifecycle = queue[idx]; queue.splice(idx, 1); }
+  } else if (transaction.action === "SELL_TO_CLOSE") {
+    const idx = queue.findIndex((lc) => lc.status === "open" && lc.direction === "long");
+    if (idx !== -1) { lifecycle = queue[idx]; queue.splice(idx, 1); }
+  } else if (transaction.action === "EXPIRATION") {
+    const idx = queue.findIndex((lc) => lc.status === "open");
+    if (idx !== -1) { lifecycle = queue[idx]; queue.splice(idx, 1); }
+  }
   if (!lifecycle) {
     events.push(unresolvedOptionEvent(transaction, "Option trade could not be linked to an opening option trade."));
     return;
