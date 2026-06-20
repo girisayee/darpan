@@ -14,6 +14,7 @@ import { MonthlyRoiChart } from "@/components/charts/DashboardCharts";
 import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
 import { GoalSpotlight } from "@/components/dashboard/GoalSpotlight";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { StatStrip } from "@/components/dashboard/StatStrip";
 import { AppHeader } from "@/components/shell/AppHeader";
 import { FilterBar } from "@/components/shell/FilterBar";
@@ -24,6 +25,8 @@ import { calculateDashboard } from "@/lib/calculations/engine";
 import { parseRobinhoodInput, type ImportPreview } from "@/lib/import/robinhood";
 import { sampleTransactions } from "@/lib/sample-data/sample-transactions";
 import { goalPace } from "@/lib/selectors/goal-pace";
+import { wheelAnalytics } from "@/lib/selectors/analytics";
+import { filterResult } from "@/lib/selectors/filter-result";
 import {
   createBackup,
   parseBackup
@@ -82,7 +85,7 @@ export function DashboardApp() {
   );
 
   const baseResult = useMemo(() => calculateDashboard(allTransactions, settings), [allTransactions, settings]);
-  const result = useMemo(() => filterResult(baseResult, { symbol, strategy, year, month, account }), [baseResult, symbol, strategy, year, month, account]);
+  const result = useMemo(() => filterResult(baseResult, { symbol, strategy, year, month, account }, settings), [baseResult, symbol, strategy, year, month, account, settings]);
   const symbols = useMemo(() => ["ALL", ...new Set(allTransactions.map((transaction) => transaction.symbol).filter(Boolean).sort())], [allTransactions]);
   const years = useMemo(() => ["ALL", ...new Set(allTransactions.map((transaction) => transaction.tradeDate.slice(0, 4)).filter(Boolean).sort())], [allTransactions]);
   const accounts = useMemo(() => ["ALL", ...new Set(allTransactions.map((transaction) => transaction.accountName).filter(Boolean).sort())], [allTransactions]);
@@ -123,6 +126,7 @@ export function DashboardApp() {
           tabs={tabs}
           active={activeTab}
           onSelect={(t) => setActiveTab(t as Tab)}
+          panelId="dashboard-tabpanel"
         />
         <div className="p-4">
           <FilterBar
@@ -147,7 +151,13 @@ export function DashboardApp() {
         </div>
       </div>
 
-      <section className="min-h-[60vh]">
+      <section
+        className="min-h-[60vh]"
+        role="tabpanel"
+        id="dashboard-tabpanel"
+        tabIndex={0}
+        aria-label={activeTab}
+      >
         {activeTab === "Overview" && <OverviewTab result={result} settings={settings} onReviewTrades={openTrades} />}
         {activeTab === "Capital & ROI" && <CapitalTab result={result} onSelectEvent={setSelectedEvent} />}
         {activeTab === "Covered Calls" && <OptionsTab result={result} optionType="call" onSelectEvent={setSelectedEvent} />}
@@ -195,26 +205,9 @@ function OverviewTab({
   const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const monthLabel = MONTH_NAMES[currentMonthIndex] ?? "—";
 
-  // All KPIs — all visible in the full metric grid (no toggle)
-  const allKpis = [
-    { label: "Net P&L", value: formatCurrency(result.aggregates.totalRealizedPnl), helper: "All-time realized P&L", tooltip: "All-time total realized P&L across all closed events.", numeric: result.aggregates.totalRealizedPnl },
-    { label: "Tax year P&L", value: formatCurrency(result.aggregates.currentYearRealizedPnl), helper: "Calendar-year realized P&L", tooltip: "Current calendar-year realized P&L.", numeric: result.aggregates.currentYearRealizedPnl },
-    { label: "Monthly ROI", value: formatPercent(latest?.realizedRoiPercent), helper: "Latest month: P&L / avg deployed capital", tooltip: "Monthly realized P&L divided by average deployed capital.", numeric: latest?.realizedRoiPercent ?? 0 },
-    { label: "YTD ROI", value: formatPercent(result.aggregates.ytdRoi), helper: "YTD P&L / YTD avg deployed capital", tooltip: "YTD realized P&L divided by average deployed capital.", numeric: result.aggregates.ytdRoi ?? 0 },
-    { label: "Avg monthly ROI", value: formatPercent(result.aggregates.averageMonthlyRoi), helper: "Average of months with known capital", tooltip: "Only months with known capital are included.", numeric: result.aggregates.averageMonthlyRoi ?? 0 },
-    { label: "Avg deployed", value: formatCurrency(result.aggregates.averageDeployedCapital), helper: "Avg monthly capital-days denominator", tooltip: "Average deployed capital uses daily capital exposure.", numeric: 0 },
-    { label: "Peak deployed", value: formatCurrency(result.aggregates.peakDeployedCapital), helper: "Highest daily deployed capital", tooltip: "Highest deployed capital observed in a month.", numeric: 0 },
-    { label: "Options premium", value: formatCurrency(result.aggregates.totalOptionsPremium), helper: "Closed option premium P&L", tooltip: "Net realized option premium from all closed cycles.", numeric: result.aggregates.totalOptionsPremium },
-    { label: "Stock P&L", value: formatCurrency(result.aggregates.totalStockTradingPnl), helper: "Realized stock sales", tooltip: "Realized P&L from stock sales (swings and assignments).", numeric: result.aggregates.totalStockTradingPnl },
-    { label: "Win rate", value: formatPercent(result.aggregates.winRate), helper: "Winning events / total events", tooltip: "Fraction of realized events that closed profitable.", numeric: result.aggregates.winRate ?? 0 },
-    { label: "Avg win", value: formatCurrency(result.aggregates.averageWin), helper: "Average profitable event", tooltip: "Mean P&L of all winning realized events.", numeric: result.aggregates.averageWin ?? 0 },
-    { label: "Avg loss", value: formatCurrency(result.aggregates.averageLoss), helper: "Average losing event", tooltip: "Mean P&L of all losing realized events.", numeric: result.aggregates.averageLoss ?? 0 },
-    { label: "Best symbol", value: result.aggregates.bestSymbol ?? "N/A", helper: "Highest symbol P&L", tooltip: "Symbol with the largest cumulative realized P&L.", numeric: 0 },
-    { label: "Worst symbol", value: result.aggregates.worstSymbol ?? "N/A", helper: "Lowest symbol P&L", tooltip: "Symbol with the smallest (most negative) cumulative realized P&L.", numeric: 0 },
-    { label: "Best strategy", value: label(bestStrategy?.strategy), helper: "Highest strategy P&L", tooltip: "Strategy group with the largest cumulative realized P&L.", numeric: 0 },
-    { label: "Worst strategy", value: label(worstStrategy?.strategy), helper: "Lowest strategy P&L", tooltip: "Strategy group with the smallest cumulative realized P&L.", numeric: 0 },
-    { label: "Closed trades", value: formatNumber(result.realizedEvents.length), helper: "Total realized P&L events", tooltip: "Count of all realized P&L events in the current view.", numeric: 0 },
-  ];
+  // wheelAnalytics selectors
+  const a = wheelAnalytics(result);
+  const [showMore, setShowMore] = useState(false);
 
   // Mirror the null-check inside Insights to avoid rendering an orphaned divider
   const hasInsights =
@@ -224,7 +217,7 @@ function OverviewTab({
     result.duplicateTransactionIds.length > 0;
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-5">
       {/* ── Goal-hero Spotlight (intentional dark block in both themes) ── */}
       <div className="py-5">
         <GoalSpotlight
@@ -238,30 +231,232 @@ function OverviewTab({
         />
       </div>
 
+      {/* ── Run-rate line ── */}
+      <p className="text-[12px] text-muted-foreground">
+        Projected year-end {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo
+      </p>
+
       {/* ── Hairline ── */}
       <div className="h-px bg-hairline" />
 
-      {/* ── Full metric grid — ALL KPIs visible, no toggle ── */}
-      <div
-        className="py-5"
-        style={{ display: "grid", gap: "12px", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
-      >
-        {allKpis.map((kpi) => (
-          <div
-            key={kpi.label}
-            className="rounded-xl border border-hairline bg-surface p-3.5"
-          >
-            <div className="text-[12px] text-muted-foreground">{kpi.label}</div>
-            <div
-              className={[
-                "mt-1 text-[19px] font-medium tabular-nums leading-snug",
-                kpi.numeric > 0 ? "text-pos" : kpi.numeric < 0 ? "text-neg" : "text-foreground",
-              ].join(" ")}
-            >
-              {kpi.value}
-            </div>
+      {/* ── Hero row ── */}
+      <MetricGroup cols={4}>
+        <KpiCard
+          label="Net P&L · YTD"
+          value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
+          helper="Calendar-year realized"
+          tooltip="Current calendar-year realized P&L across all closed events."
+          tone={tone(result.aggregates.currentYearRealizedPnl)}
+        />
+        <KpiCard
+          label="Annualized ROC"
+          value={a.capitalEfficiency.annualizedRoc === null ? "—" : formatPercent(a.capitalEfficiency.annualizedRoc)}
+          helper="Capital-weighted"
+          tooltip="Capital-weighted mean of per-event annualized ROI."
+          tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
+        />
+        <KpiCard
+          label="Premium collected"
+          value={formatCurrency(a.premium.premiumCollected)}
+          helper={a.premium.captureRate === null ? "—" : `${formatPercent(a.premium.captureRate * 100, 0)} capture`}
+          tooltip="Total premium received from opening option sales."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Win rate"
+          value={a.tradeQuality.winRate === null ? "—" : formatPercent(a.tradeQuality.winRate * 100, 0)}
+          helper={`PF ${a.tradeQuality.profitFactor === null ? "—" : formatNumber(a.tradeQuality.profitFactor, 1)} · exp ${a.tradeQuality.expectancy === null ? "—" : formatCurrency(a.tradeQuality.expectancy)}`}
+          tooltip="Win rate: fraction of realized events that closed profitable."
+          tone="neutral"
+        />
+      </MetricGroup>
+
+      {/* ── Income group ── */}
+      <MetricGroup label="Income" cols={3}>
+        <KpiCard
+          label="Options premium"
+          value={formatCurrency(result.aggregates.totalOptionsPremium)}
+          helper="Closed option premium P&L"
+          tooltip="Net realized option premium from all closed cycles."
+          tone={tone(result.aggregates.totalOptionsPremium)}
+        />
+        <KpiCard
+          label="Stock P&L"
+          value={formatCurrency(result.aggregates.totalStockTradingPnl)}
+          helper="Realized stock sales"
+          tooltip="Realized P&L from stock sales (swings and assignments)."
+          tone={tone(result.aggregates.totalStockTradingPnl)}
+        />
+        <KpiCard
+          label="Income / day"
+          value={a.capitalEfficiency.incomePerDay === null ? "—" : formatCurrency(a.capitalEfficiency.incomePerDay)}
+          helper="Option premium per capital-day"
+          tooltip="Total option premium P&L divided by total capital-days."
+          tone="neutral"
+        />
+      </MetricGroup>
+
+      {/* ── Returns & efficiency group ── */}
+      <MetricGroup label="Returns & efficiency" cols={3}>
+        <KpiCard
+          label="YTD ROI"
+          value={result.aggregates.ytdRoi === null ? "—" : formatPercent(result.aggregates.ytdRoi)}
+          helper="YTD P&L / YTD avg deployed capital"
+          tooltip="YTD realized P&L divided by average deployed capital."
+          tone={tone(result.aggregates.ytdRoi ?? 0)}
+        />
+        <KpiCard
+          label="Avg monthly ROI"
+          value={result.aggregates.averageMonthlyRoi === null ? "—" : formatPercent(result.aggregates.averageMonthlyRoi)}
+          helper="Average of months with known capital"
+          tooltip="Only months with known capital are included."
+          tone={tone(result.aggregates.averageMonthlyRoi ?? 0)}
+        />
+        <KpiCard
+          label="Capital turnover"
+          value={a.capitalEfficiency.capitalTurnover === null ? "—" : `${formatNumber(a.capitalEfficiency.capitalTurnover, 1)}×`}
+          helper="Total closed capital / mean deployed"
+          tooltip="How many times the average deployed capital was cycled through closed trades."
+          tone="neutral"
+        />
+      </MetricGroup>
+
+      {/* ── Trade quality & risk group ── */}
+      <MetricGroup label="Trade quality & risk" cols={4}>
+        <KpiCard
+          label="Profit factor"
+          value={a.tradeQuality.profitFactor === null ? "—" : formatNumber(a.tradeQuality.profitFactor, 2)}
+          helper="Gross profit / gross loss"
+          tooltip="Ratio of gross profit to gross loss. >1 means net profitable."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Expectancy"
+          value={a.tradeQuality.expectancy === null ? "—" : formatCurrency(a.tradeQuality.expectancy)}
+          helper="Mean P&L per trade"
+          tooltip="Average realized P&L per closed event."
+          tone={tone(a.tradeQuality.expectancy ?? 0)}
+        />
+        <KpiCard
+          label="Payoff ratio"
+          value={a.tradeQuality.payoffRatio === null ? "—" : formatNumber(a.tradeQuality.payoffRatio, 2)}
+          helper="Avg win / avg loss"
+          tooltip="Average winning trade divided by average losing trade magnitude."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Assignment rate"
+          value={a.premium.assignmentRate === null ? "—" : formatPercent(a.premium.assignmentRate * 100, 0)}
+          helper="Assigned / terminal options"
+          tooltip="Fraction of terminal option contracts that resulted in assignment."
+          tone="neutral"
+        />
+      </MetricGroup>
+
+      {/* ── Allocation group ── */}
+      <MetricGroup label="Allocation" cols={3}>
+        <KpiCard
+          label="Top symbol"
+          value={result.aggregates.bestSymbol ?? "—"}
+          helper={a.allocation.bySymbol.topShare > 0 ? `${formatPercent(a.allocation.bySymbol.topShare * 100, 0)} of capital` : "No data"}
+          tooltip="Symbol with the largest cumulative realized P&L."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Concentration"
+          value={a.allocation.bySymbol.level.charAt(0).toUpperCase() + a.allocation.bySymbol.level.slice(1)}
+          helper={`HHI ${formatNumber(a.allocation.bySymbol.hhi, 2)}`}
+          tooltip="Herfindahl-Hirschman Index measures portfolio concentration by symbol capital."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Premium capture"
+          value={a.premium.captureRate === null ? "—" : formatPercent(a.premium.captureRate * 100, 0)}
+          helper="Net option P&L / premium received"
+          tooltip="How much of the collected premium was retained as net P&L."
+          tone="neutral"
+        />
+      </MetricGroup>
+
+      {/* ── Show more disclosure ── */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMore((v) => !v)}
+          className="font-sans text-[12px] text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
+        >
+          {showMore ? "Show less" : "Show more"}
+        </button>
+
+        {showMore && (
+          <div className="mt-4">
+            <MetricGroup label="More" cols={4}>
+              <KpiCard
+                label="Tax year P&L"
+                value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
+                helper="Calendar-year realized P&L"
+                tooltip="Current calendar-year realized P&L."
+                tone={tone(result.aggregates.currentYearRealizedPnl)}
+              />
+              <KpiCard
+                label="All-time Net P&L"
+                value={formatCurrency(result.aggregates.totalRealizedPnl)}
+                helper="All-time realized P&L"
+                tooltip="All-time total realized P&L across all closed events."
+                tone={tone(result.aggregates.totalRealizedPnl)}
+              />
+              <KpiCard
+                label="Avg deployed"
+                value={formatCurrency(result.aggregates.averageDeployedCapital)}
+                helper="Avg monthly capital-days denominator"
+                tooltip="Average deployed capital uses daily capital exposure."
+                tone="neutral"
+              />
+              <KpiCard
+                label="Peak deployed"
+                value={formatCurrency(result.aggregates.peakDeployedCapital)}
+                helper="Highest daily deployed capital"
+                tooltip="Highest deployed capital observed in a month."
+                tone="neutral"
+              />
+              <KpiCard
+                label="Avg win"
+                value={a.tradeQuality.averageWin === null ? "—" : formatCurrency(a.tradeQuality.averageWin)}
+                helper="Average profitable event"
+                tooltip="Mean P&L of all winning realized events."
+                tone={tone(a.tradeQuality.averageWin ?? 0)}
+              />
+              <KpiCard
+                label="Avg loss"
+                value={a.tradeQuality.averageLoss === null ? "—" : formatCurrency(a.tradeQuality.averageLoss)}
+                helper="Average losing event"
+                tooltip="Mean P&L of all losing realized events."
+                tone={tone(a.tradeQuality.averageLoss ?? 0)}
+              />
+              <KpiCard
+                label="Best strategy"
+                value={label(bestStrategy?.strategy)}
+                helper="Highest strategy P&L"
+                tooltip="Strategy group with the largest cumulative realized P&L."
+                tone="neutral"
+              />
+              <KpiCard
+                label="Worst strategy"
+                value={label(worstStrategy?.strategy)}
+                helper="Lowest strategy P&L"
+                tooltip="Strategy group with the smallest cumulative realized P&L."
+                tone="neutral"
+              />
+              <KpiCard
+                label="Closed trades"
+                value={formatNumber(result.realizedEvents.length)}
+                helper="Total realized P&L events"
+                tooltip="Count of all realized P&L events in the current view."
+                tone="neutral"
+              />
+            </MetricGroup>
           </div>
-        ))}
+        )}
       </div>
 
       {/* ── Insights (divider suppressed when empty) ── */}
@@ -280,17 +475,67 @@ function OverviewTab({
 
 function CapitalTab({ result, onSelectEvent }: { result: CalculationResult; onSelectEvent: (event: RealizedPnLEvent) => void }) {
   const latest = result.monthlyReturns.at(-1);
-  const efficiency = result.aggregates.averageMonthlyRoi === null ? null : Math.max(0, Math.min(100, 50 + result.aggregates.averageMonthlyRoi * 8));
+  const a = wheelAnalytics(result);
   return (
     <div className="space-y-3">
-      {/* 6-up readout row — mockup 04 */}
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        <KpiCard label="Monthly ROI" value={formatPercent(latest?.realizedRoiPercent)} helper="Latest month realized ROI" tooltip="Monthly realized P&L divided by average deployed capital." tone={tone(latest?.realizedRoiPercent ?? 0)} />
-        <KpiCard label="YTD ROI" value={formatPercent(result.aggregates.ytdRoi)} helper="Current-year capital return" tooltip="YTD realized P&L divided by average deployed capital." tone={tone(result.aggregates.ytdRoi ?? 0)} />
-        <KpiCard label="Avg Monthly" value={formatPercent(result.aggregates.averageMonthlyRoi)} helper="Mean of monthly ROI values" tooltip="Only months with known capital are included." tone={tone(result.aggregates.averageMonthlyRoi ?? 0)} />
-        <KpiCard label="Avg Deployed" value={formatCurrency(result.aggregates.averageDeployedCapital)} helper="Capital-days / days" tooltip="Average deployed capital uses daily capital exposure." />
-        <KpiCard label="Peak Deployed" value={formatCurrency(result.aggregates.peakDeployedCapital)} helper="Largest daily exposure" tooltip="Highest deployed capital observed in a month." />
-        <KpiCard label="Cap. Efficiency" value={efficiency === null ? "N/A" : formatNumber(efficiency, 0)} helper="Directional score" tooltip="Simple score based on average monthly ROI." tone={tone((efficiency ?? 50) - 50)} />
+      {/* 8-up KpiCard readout */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="Annualized ROC"
+          value={a.capitalEfficiency.annualizedRoc === null ? "—" : formatPercent(a.capitalEfficiency.annualizedRoc)}
+          helper="Capital-weighted annualized return"
+          tooltip="Capital-weighted mean of per-event annualized ROI."
+          tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
+        />
+        <KpiCard
+          label="YTD ROI"
+          value={result.aggregates.ytdRoi === null ? "—" : formatPercent(result.aggregates.ytdRoi)}
+          helper="Current-year capital return"
+          tooltip="YTD realized P&L divided by average deployed capital."
+          tone={tone(result.aggregates.ytdRoi ?? 0)}
+        />
+        <KpiCard
+          label="Profit factor"
+          value={a.tradeQuality.profitFactor === null ? "—" : formatNumber(a.tradeQuality.profitFactor, 2)}
+          helper="Gross profit / gross loss"
+          tooltip="Ratio of gross profit to gross loss. >1 means net profitable."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Expectancy"
+          value={a.tradeQuality.expectancy === null ? "—" : formatCurrency(a.tradeQuality.expectancy)}
+          helper="Mean P&L per trade"
+          tooltip="Average realized P&L per closed event."
+          tone={tone(a.tradeQuality.expectancy ?? 0)}
+        />
+        <KpiCard
+          label="Premium capture"
+          value={a.premium.captureRate === null ? "—" : formatPercent(a.premium.captureRate * 100, 0)}
+          helper="Net option P&L / premium received"
+          tooltip="How much of the collected premium was retained as net P&L."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Capital turnover"
+          value={a.capitalEfficiency.capitalTurnover === null ? "—" : `${formatNumber(a.capitalEfficiency.capitalTurnover, 1)}×`}
+          helper="Total closed capital / mean deployed"
+          tooltip="How many times the average deployed capital was cycled through closed trades."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Avg Deployed"
+          value={formatCurrency(result.aggregates.averageDeployedCapital)}
+          helper="Capital-days / days"
+          tooltip="Average deployed capital uses daily capital exposure."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Peak Deployed"
+          value={formatCurrency(result.aggregates.peakDeployedCapital)}
+          helper="Largest daily exposure"
+          tooltip="Highest deployed capital observed in a month."
+          tone="neutral"
+        />
       </div>
 
       {/* Monthly ROI bar chart */}
@@ -915,24 +1160,6 @@ function Segmented({ value, values, onChange }: { value: string; values: string[
       ))}
     </div>
   );
-}
-
-
-function filterResult(result: CalculationResult, filters: { symbol: string; strategy: string; year: string; month: string; account: string }): CalculationResult {
-  const eventFilter = (event: RealizedPnLEvent) =>
-    (filters.symbol === "ALL" || event.symbol === filters.symbol) &&
-    (filters.strategy === "ALL" || event.strategy === filters.strategy) &&
-    (filters.year === "ALL" || event.date.slice(0, 4) === filters.year) &&
-    (filters.month === "ALL" || event.date.slice(5, 7) === filters.month);
-  const transactionFilter = (transaction: TradeTransaction) =>
-    (filters.symbol === "ALL" || transaction.symbol === filters.symbol) &&
-    (filters.year === "ALL" || transaction.tradeDate.slice(0, 4) === filters.year) &&
-    (filters.month === "ALL" || transaction.tradeDate.slice(5, 7) === filters.month) &&
-    (filters.account === "ALL" || transaction.accountName === filters.account);
-  const nextEvents = result.realizedEvents.filter(eventFilter);
-  const nextTransactions = result.transactions.filter(transactionFilter);
-  const recalculated = calculateDashboard(nextTransactions);
-  return { ...recalculated, realizedEvents: nextEvents };
 }
 
 
