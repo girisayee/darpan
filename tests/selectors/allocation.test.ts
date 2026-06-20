@@ -45,3 +45,21 @@ test("respects topN limit and computes strategy concentration", () => {
   expect(out.byStrategy.hhi).toBeCloseTo(0.5, 5); // .5^2 + .5^2
   expect(out.byStrategy.topN).toHaveLength(1);
 });
+
+test("level thresholds are inclusive at the boundaries", () => {
+  // 4 equal holdings -> hhi = 4 * 0.25^2 = 0.25 exactly -> boundary is "moderate"
+  const atQuarter = allocation(
+    Array.from({ length: 4 }, (_, i) => ({ symbol: `S${i}`, capital: 1000 })),
+    [],
+  );
+  expect(atQuarter.bySymbol.hhi).toBeCloseTo(0.25, 5);
+  expect(atQuarter.bySymbol.level).toBe("moderate"); // catches a slip to "<" 0.25
+
+  // 7 equal holdings -> hhi = 1/7 ≈ 0.1429 (<= 0.15) -> "low"
+  const justLow = allocation(
+    Array.from({ length: 7 }, (_, i) => ({ symbol: `S${i}`, capital: 1000 })),
+    [],
+  );
+  expect(justLow.bySymbol.hhi).toBeCloseTo(1 / 7, 5);
+  expect(justLow.bySymbol.level).toBe("low");
+});
