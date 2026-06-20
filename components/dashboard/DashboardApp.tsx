@@ -13,7 +13,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
 import { WheelsTab } from "@/components/dashboard/tabs/WheelsTab";
 import { PerformanceTab } from "@/components/dashboard/tabs/PerformanceTab";
-import { TradesTab } from "@/components/dashboard/tabs/TradesTab";
+import { SwingTradesTab } from "@/components/dashboard/tabs/SwingTradesTab";
 import { AppShell } from "@/components/shell/AppShell";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { calculateDashboard } from "@/lib/calculations/engine";
@@ -45,8 +45,8 @@ import { label, signedMoney } from "@/components/dashboard/tabs/shared";
 const tabs = [
   "Overview",
   "Wheels",
+  "Swing trades",
   "Performance",
-  "Trades",
 ] as const;
 
 type PrimaryTab = (typeof tabs)[number];
@@ -61,8 +61,6 @@ export function DashboardApp() {
   const { theme, toggle } = useTheme();
   const [account, setAccount] = useState("ALL");
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
-  const [tradeSearch, setTradeSearch] = useState("");
-  const [tradeIssueFilter, setTradeIssueFilter] = useState<TradeIssueFilter>(null);
 
   useEffect(() => {
     void loadStore();
@@ -97,10 +95,8 @@ export function DashboardApp() {
     void saveStore({ transactions: next });
   }
 
-  function openTrades(issueFilter: TradeIssueFilter, search = "") {
-    setTradeIssueFilter(issueFilter);
-    setTradeSearch(search);
-    setActiveTab("Trades");
+  function openTrades(_issueFilter: TradeIssueFilter) {
+    setActiveTab("Import");
   }
 
   const primaryTabs = tabs as readonly string[];
@@ -150,18 +146,11 @@ export function DashboardApp() {
         {activeTab === "Wheels" && (
           <WheelsTab result={result} onSelectEvent={setSelectedEvent} />
         )}
-        {activeTab === "Performance" && (
-          <PerformanceTab result={result} annualGoal={settings.annualRealizedPnlGoal} onSelectEvent={setSelectedEvent} />
+        {activeTab === "Swing trades" && (
+          <SwingTradesTab result={result} onSelectEvent={setSelectedEvent} />
         )}
-        {activeTab === "Trades" && (
-          <TradesTab
-            result={result}
-            search={tradeSearch}
-            onSearchChange={setTradeSearch}
-            issueFilter={tradeIssueFilter}
-            onIssueFilterChange={setTradeIssueFilter}
-            onSelectEvent={setSelectedEvent}
-          />
+        {activeTab === "Performance" && (
+          <PerformanceTab result={result} annualGoal={settings.annualRealizedPnlGoal} maxBuyingPower={settings.maxBuyingPower ?? 125000} onSelectEvent={setSelectedEvent} />
         )}
         {activeTab === "Import" && (
           <ImportTab

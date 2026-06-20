@@ -24,7 +24,7 @@ export function OverviewTab({
 }: {
   result: CalculationResult;
   settings: AppSettings;
-  onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void;
+  onReviewTrades: (issueFilter: TradeIssueFilter) => void;
 }) {
   // ── Goal-pace ──────────────────────────────────────────────────────────────
   const annualGoal = settings.annualRealizedPnlGoal;
@@ -149,20 +149,24 @@ export function OverviewTab({
           />
         </div>
 
-        {/* 2. Annualized ROC — already %, pass straight */}
+        {/* 2. Return on capital = totalRealizedPnl / averageDeployedCapital */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <KpiCard
-            label="Annualized ROC"
-            value={
-              a.capitalEfficiency.annualizedRoc === null
-                ? "—"
-                : formatPercent(a.capitalEfficiency.annualizedRoc)
-            }
-            helper="Capital-weighted"
-            tooltip="Capital-weighted mean of per-event annualized ROI."
-            tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
-            variant="hero"
-          />
+          {(() => {
+            const roc =
+              result.aggregates.averageDeployedCapital > 0
+                ? (result.aggregates.totalRealizedPnl / result.aggregates.averageDeployedCapital) * 100
+                : null;
+            return (
+              <KpiCard
+                label="Return on capital"
+                value={roc === null ? "—" : formatPercent(roc, 1)}
+                helper="realized P&L ÷ avg deployed"
+                tooltip="Total realized P&L divided by average deployed capital."
+                tone={tone(roc ?? 0)}
+                variant="hero"
+              />
+            );
+          })()}
         </div>
 
         {/* 3. Premium — captureRate is a fraction → ×100 before formatPercent */}
@@ -314,7 +318,7 @@ function InsightCards({
   onReviewTrades,
 }: {
   result: CalculationResult;
-  onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void;
+  onReviewTrades: (issueFilter: TradeIssueFilter) => void;
 }) {
   const repeatedLosses = result.aggregates.symbolBreakdown
     .filter((row) => row.pnl < 0 && row.trades > 1)
@@ -372,10 +376,6 @@ function InsightCards({
     items.push({
       text: `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} have repeated losses`,
       severity: "neg",
-      action: {
-        label: "Review →",
-        onClick: () => onReviewTrades(null, repeatedLosses[0]),
-      },
     });
   }
 

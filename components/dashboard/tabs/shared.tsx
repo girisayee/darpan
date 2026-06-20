@@ -326,6 +326,29 @@ export function ClosedTradesTable({
       key: "quantity",
       header: "Qty",
       value: (row) => row.quantity,
+      render: (row) => {
+        // Option strategies: quantity is sharesControlled; derive contracts (1 contract = 100 shares)
+        const OPTION_STRATEGIES = [
+          "COVERED_CALL",
+          "CASH_SECURED_PUT",
+          "COVERED_CALL_ASSIGNMENT",
+          "PUT_ASSIGNMENT",
+        ];
+        if (OPTION_STRATEGIES.includes(row.strategy)) {
+          const shares = row.quantity;
+          const contracts = Math.round(shares / 100);
+          return (
+            <div className="flex flex-col gap-0 text-right">
+              <span className="font-medium tabular-nums text-foreground">{contracts}</span>
+              <span className="text-[11px] tabular-nums text-muted-foreground">· {shares} sh</span>
+            </div>
+          );
+        }
+        // SWING_TRADE / other: quantity is share count
+        return (
+          <span className="tabular-nums text-foreground">{row.quantity}</span>
+        );
+      },
       align: "right",
     },
     {

@@ -202,6 +202,15 @@ function OpenWheelsTable({
       align: "right",
     },
     {
+      key: "premium",
+      header: "Premium",
+      value: (row) => row.premiumReceived,
+      render: (row) => (
+        <span className="tabular-nums text-pos">{formatCurrency(row.premiumReceived)}</span>
+      ),
+      align: "right",
+    },
+    {
       key: "capital",
       header: "Capital",
       value: (row) => displayCapital(row),

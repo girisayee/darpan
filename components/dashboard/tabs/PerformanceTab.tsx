@@ -3,24 +3,21 @@
 /**
  * PerformanceTab — Phase 2.
  *
- * Sections (per aurora_performance mockup):
+ * Sections:
  *   1. Top KPI strip (4 compact KpiCards)
  *   2. Equity curve — recharts line in an h-[200px] ResponsiveContainer
- *   3. Capital-efficiency ranking table (open optionLifecycles)
- *   4. Risk strip (compact KpiCards)
- *   5. Buying-power utilization bar (proxy: deployed vs peak)
+ *   3. Risk strip (compact KpiCards)
+ *   4. Buying-power utilization bar (peakDeployedCapital / maxBuyingPower)
+ *   5. Monthly realized P&L bar chart
  *   6. Monthly ROI chart + ledger
  *   7. "Benchmark vs SPY/QQQ — coming soon" placeholder card
  *
  * DATA GAPS noted inline where a live data source is deferred:
  *   - Benchmark (SPY/QQQ) returns: deferred subsystem → placeholder card
  *   - Income calendar: deferred subsystem → not rendered
- *   - Buying-power (account): proxy only (avg deployed / peak deployed)
- *   - Ann. ROC per open position: uses event annualizedRoiPercent on the
- *     underlying symbol; if no matching event it renders "—"
  *
  * Token classes only; fraction selectors ×100 before formatPercent;
- * already-% values (annualizedRoc, ytdRoi, averageMonthlyRoi) passed straight.
+ * already-% values (ytdRoi, averageMonthlyRoi) passed straight.
  * Nulls render "—".
  */
 
@@ -286,24 +283,23 @@ function MonthlyPnlBarChart({
 
 // ── Buying-power utilization bar ──────────────────────────────────────────────
 //
-// DATA GAP: Real account buying-power is a deferred subsystem.
-// Proxy: averageDeployedCapital / peakDeployedCapital.
+// Uses the same formula as Overview: peakDeployedCapital / maxBuyingPower.
 // Healthy band: 40–80%.
 
-function UtilizationBar({ result }: { result: CalculationResult }) {
-  const { averageDeployedCapital, peakDeployedCapital } = result.aggregates;
+function UtilizationBar({ result, maxBuyingPower }: { result: CalculationResult; maxBuyingPower: number }) {
+  const { peakDeployedCapital } = result.aggregates;
 
-  if (peakDeployedCapital <= 0) {
+  if (maxBuyingPower <= 0) {
     return (
       <div className="rounded-[12px] border border-hairline bg-surface p-4">
         <p className="font-sans text-[12px] text-muted-foreground">
-          Buying-power utilization — no deployed capital data
+          Buying-power utilization — set max buying power in Settings
         </p>
       </div>
     );
   }
 
-  const pct = Math.min(100, (averageDeployedCapital / peakDeployedCapital) * 100);
+  const pct = Math.min(100, (peakDeployedCapital / maxBuyingPower) * 100);
   const isHealthy = pct >= 40 && pct <= 80;
   const barColor = isHealthy
     ? "bg-pos"
@@ -329,8 +325,8 @@ function UtilizationBar({ result }: { result: CalculationResult }) {
         />
       </div>
       <p className="font-sans text-[11px] text-muted-foreground">
-        Avg deployed {formatCurrency(averageDeployedCapital)} vs peak {formatCurrency(peakDeployedCapital)} ·{" "}
-        healthy band 40–80% · proxy until account buying-power data available
+        Peak deployed {formatCurrency(peakDeployedCapital)} of {formatCurrency(maxBuyingPower)} max buying power ·{" "}
+        healthy band 40–80%
       </p>
     </div>
   );
@@ -364,10 +360,12 @@ function BenchmarkPlaceholder() {
 export function PerformanceTab({
   result,
   annualGoal,
+  maxBuyingPower,
   onSelectEvent,
 }: {
   result: CalculationResult;
   annualGoal: number;
+  maxBuyingPower: number;
   onSelectEvent: (event: RealizedPnLEvent) => void;
 }) {
   void onSelectEvent; // DetailDrawer wiring — available for future drill-down
@@ -376,18 +374,19 @@ export function PerformanceTab({
   const risk = riskMetrics(result);
 
   // ── Top KPI strip ────────────────────────────────────────────────────────
-  // Net P&L YTD, Annualized ROC (already %), Profit factor, Max drawdown
+  // Net P&L YTD, Return on capital, Profit factor, Max drawdown
   // maxDrawdownPct is fraction → ×100 before formatPercent; negate for display
   const maxDdDisplay =
     risk.maxDrawdownPct === null
       ? "—"
       : formatPercent(-(risk.maxDrawdownPct * 100), 1);
 
-  // Annualized ROC — already %, pass straight
-  const annRocDisplay =
-    a.capitalEfficiency.annualizedRoc === null
-      ? "—"
-      : formatPercent(a.capitalEfficiency.annualizedRoc);
+  // Return on capital = totalRealizedPnl / averageDeployedCapital × 100
+  const roc =
+    result.aggregates.averageDeployedCapital > 0
+      ? (result.aggregates.totalRealizedPnl / result.aggregates.averageDeployedCapital) * 100
+      : null;
+  const rocDisplay = roc === null ? "—" : formatPercent(roc, 1);
 
   // Profit factor
   const pfDisplay =
@@ -429,11 +428,11 @@ export function PerformanceTab({
           variant="compact"
         />
         <KpiCard
-          label="Annualized ROC"
-          value={annRocDisplay}
-          helper="Capital-weighted"
-          tooltip="Capital-weighted mean of per-event annualized ROI%. Passed straight — already expressed as a percentage."
-          tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
+          label="Return on capital"
+          value={rocDisplay}
+          helper="realized P&L ÷ avg deployed"
+          tooltip="Total realized P&L divided by average deployed capital."
+          tone={tone(roc ?? 0)}
           variant="compact"
         />
         <KpiCard
@@ -518,8 +517,8 @@ export function PerformanceTab({
         />
       </MetricGroup>
 
-      {/* ── 5. Buying-power utilization bar ── */}
-      <UtilizationBar result={result} />
+      {/* ── 4. Buying-power utilization bar ── */}
+      <UtilizationBar result={result} maxBuyingPower={maxBuyingPower} />
 
       {/* ── 5b. Monthly realized P&L bar chart ── */}
       <section className="space-y-2">
