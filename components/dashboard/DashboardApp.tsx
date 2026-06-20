@@ -15,10 +15,8 @@ import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
 import { GoalSpotlight } from "@/components/dashboard/GoalSpotlight";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
-import { StatStrip } from "@/components/dashboard/StatStrip";
-import { AppHeader } from "@/components/shell/AppHeader";
+import { AppShell } from "@/components/shell/AppShell";
 import { FilterBar } from "@/components/shell/FilterBar";
-import { TabNav } from "@/components/shell/TabNav";
 import { StatusChip } from "@/components/common/StatusChip";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { calculateDashboard } from "@/lib/calculations/engine";
@@ -48,12 +46,9 @@ import type {
 
 const tabs = [
   "Overview",
-  "Capital & ROI",
-  "Covered Calls",
-  "Cash-Secured Puts",
-  "Swing Trades",
-  "Tax Lots",
-  "Trades"
+  "Wheels",
+  "Performance",
+  "Trades",
 ] as const;
 
 type PrimaryTab = (typeof tabs)[number];
@@ -105,9 +100,18 @@ export function DashboardApp() {
     setActiveTab("Trades");
   }
 
+  const primaryTabs = tabs as readonly string[];
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
-      <AppHeader
+    <main className="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 py-0 sm:px-6 lg:px-8">
+      {/* Unified chrome: logo + nav pills + account switcher + actions */}
+      <AppShell
+        tabs={primaryTabs}
+        activeTab={activeTab === "Import" || activeTab === "Settings" ? "Overview" : activeTab}
+        onSelectTab={(t) => setActiveTab(t as Tab)}
+        accounts={accounts}
+        account={account}
+        onAccount={setAccount}
         theme={theme}
         onToggleTheme={toggle}
         onImport={() => setActiveTab("Import")}
@@ -116,56 +120,66 @@ export function DashboardApp() {
       />
 
       {!store.loaded && (
-        <div className="rounded-lg border border-hairline bg-surface p-3 text-sm text-muted-foreground">Loading SQLite data...</div>
+        <div className="mt-3 rounded-lg border border-hairline bg-surface p-3 text-sm text-muted-foreground">Loading SQLite data...</div>
       )}
       {store.error && (
-        <div className="rounded-lg border border-neg/30 bg-neg/10 p-3 text-sm text-neg">{store.error}</div>
+        <div className="mt-3 rounded-lg border border-neg/30 bg-neg/10 p-3 text-sm text-neg">{store.error}</div>
       )}
 
-      <div className="rounded-[14px] border border-hairline bg-surface overflow-hidden">
-        <TabNav
-          tabs={tabs}
-          active={activeTab}
-          onSelect={(t) => setActiveTab(t as Tab)}
-          panelId="dashboard-tabpanel"
+      {/* Secondary row: filter bar */}
+      <div className="border-b border-hairline px-0 py-2">
+        <FilterBar
+          year={year}
+          month={month}
+          symbol={symbol}
+          strategy={strategy}
+          account={account}
+          years={years}
+          symbols={symbols}
+          accounts={accounts}
+          summaryCount={result.realizedEvents.length}
+          summaryPnl={result.aggregates.totalRealizedPnl}
+          onChange={(partial) => {
+            if (partial.year !== undefined) setYear(partial.year);
+            if (partial.month !== undefined) setMonth(partial.month);
+            if (partial.symbol !== undefined) setSymbol(partial.symbol);
+            if (partial.strategy !== undefined) setStrategy(partial.strategy);
+            if (partial.account !== undefined) setAccount(partial.account);
+          }}
         />
-        <div className="p-4">
-          <FilterBar
-            year={year}
-            month={month}
-            symbol={symbol}
-            strategy={strategy}
-            account={account}
-            years={years}
-            symbols={symbols}
-            accounts={accounts}
-            summaryCount={result.realizedEvents.length}
-            summaryPnl={result.aggregates.totalRealizedPnl}
-            onChange={(partial) => {
-              if (partial.year !== undefined) setYear(partial.year);
-              if (partial.month !== undefined) setMonth(partial.month);
-              if (partial.symbol !== undefined) setSymbol(partial.symbol);
-              if (partial.strategy !== undefined) setStrategy(partial.strategy);
-              if (partial.account !== undefined) setAccount(partial.account);
-            }}
-          />
-        </div>
       </div>
 
       <section
-        className="min-h-[60vh]"
+        className="min-h-[60vh] py-4"
         role="tabpanel"
         id="dashboard-tabpanel"
         tabIndex={0}
         aria-label={activeTab}
       >
         {activeTab === "Overview" && <OverviewTab result={result} settings={settings} onReviewTrades={openTrades} />}
-        {activeTab === "Capital & ROI" && <CapitalTab result={result} onSelectEvent={setSelectedEvent} />}
-        {activeTab === "Covered Calls" && <OptionsTab result={result} optionType="call" onSelectEvent={setSelectedEvent} />}
-        {activeTab === "Cash-Secured Puts" && <OptionsTab result={result} optionType="put" onSelectEvent={setSelectedEvent} />}
-        {activeTab === "Swing Trades" && <SwingTab result={result} onSelectEvent={setSelectedEvent} />}
-        {activeTab === "Tax Lots" && <TaxLotsTab result={result} />}
-        {activeTab === "Trades" && <TradesTab result={result} search={tradeSearch} onSearchChange={setTradeSearch} issueFilter={tradeIssueFilter} onIssueFilterChange={setTradeIssueFilter} />}
+        {/* D2 replaces this with the campaign/triage view */}
+        {activeTab === "Wheels" && (
+          <div className="space-y-8">
+            <section>
+              <h2 className="mb-4 font-sans text-[13px] font-medium text-foreground">Covered Calls</h2>
+              <OptionsTab result={result} optionType="call" onSelectEvent={setSelectedEvent} />
+            </section>
+            <section>
+              <h2 className="mb-4 font-sans text-[13px] font-medium text-foreground">Cash-Secured Puts</h2>
+              <OptionsTab result={result} optionType="put" onSelectEvent={setSelectedEvent} />
+            </section>
+            <section>
+              <h2 className="mb-4 font-sans text-[13px] font-medium text-foreground">Tax Lots</h2>
+              <TaxLotsTab result={result} />
+            </section>
+          </div>
+        )}
+        {activeTab === "Performance" && <CapitalTab result={result} onSelectEvent={setSelectedEvent} />}
+        {activeTab === "Trades" && (
+          <div className="space-y-8">
+            <TradesTab result={result} search={tradeSearch} onSearchChange={setTradeSearch} issueFilter={tradeIssueFilter} onIssueFilterChange={setTradeIssueFilter} />
+          </div>
+        )}
         {activeTab === "Import" && <ImportTab existing={storedTransactions} onSave={(rows) => replaceTransactions([...storedTransactions, ...rows])} />}
         {activeTab === "Settings" && <SettingsTab transactions={storedTransactions} settings={settings} onChange={updateSettings} onImport={(rows, importedSettings) => { void saveStore({ transactions: rows, settings: importedSettings }); }} onClear={() => { void clearStore(); }} />}
       </section>
@@ -217,64 +231,107 @@ function OverviewTab({
     result.unresolvedTransactions.length > 0 ||
     result.duplicateTransactionIds.length > 0;
 
+  const isAhead = pace.aheadBy >= 0;
+  const progressPct = annualGoal > 0 ? Math.max(0, Math.min(100, (pace.actual / annualGoal) * 100)) : 0;
+
   return (
     <div className="space-y-5">
-      {/* ── Goal-hero Spotlight (intentional dark block in both themes) ── */}
-      <div className="py-5">
-        <GoalSpotlight
-          pace={pace}
-          year={currentYear}
-          annualGoal={annualGoal}
-          monthlyActual={monthlyActual}
-          monthlyTarget={monthlyTarget}
-          monthLabel={monthLabel}
-          monthIndex={currentMonthIndex}
-        />
+      {/* ── Goal-hero CARD ── */}
+      <div className="rounded-[14px] border border-hairline bg-surface p-4">
+        {/* Top row: label + big value + ahead/behind pill */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-muted-foreground">Annual goal · {currentYear}</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[30px] font-semibold tabular-nums leading-none text-foreground">
+                {formatCurrency(pace.actual)}
+              </span>
+              <span className="text-[13px] tabular-nums text-dim">
+                / {formatCurrency(annualGoal)}
+              </span>
+            </div>
+          </div>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-[8px] px-2.5 py-[5px] text-[11px] font-semibold",
+              isAhead ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg"
+            )}
+          >
+            {isAhead ? "▲" : "▼"} {formatCurrency(Math.abs(pace.aheadBy))} {isAhead ? "ahead" : "behind"}
+          </span>
+        </div>
+
+        {/* Gradient progress bar */}
+        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
+          <div
+            className="h-full rounded-full bg-aurora transition-all"
+            style={{ width: `${progressPct}%` }}
+            aria-label={`${progressPct.toFixed(0)}% of annual goal`}
+          />
+        </div>
+
+        {/* Run-rate line */}
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {formatPercent(pace.pct, 0)} of goal · Projected year-end {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo
+        </p>
+
+        {/* GoalSpotlight trajectory (keep the SVG inside the card) */}
+        <div className="mt-4">
+          <GoalSpotlight
+            pace={pace}
+            year={currentYear}
+            annualGoal={annualGoal}
+            monthlyActual={monthlyActual}
+            monthlyTarget={monthlyTarget}
+            monthLabel={monthLabel}
+            monthIndex={currentMonthIndex}
+          />
+        </div>
       </div>
 
-      {/* ── Run-rate line ── */}
-      <p className="text-[12px] text-muted-foreground">
-        Projected year-end {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo
-      </p>
-
-      {/* ── Hairline ── */}
-      <div className="h-px bg-hairline" />
-
-      {/* ── Hero row ── */}
-      <MetricGroup cols={4}>
-        <KpiCard
-          label="Net P&L · YTD"
-          value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
-          helper="Calendar-year realized"
-          tooltip="Current calendar-year realized P&L across all closed events."
-          tone={tone(result.aggregates.currentYearRealizedPnl)}
-          variant="hero"
-        />
-        <KpiCard
-          label="Annualized ROC"
-          value={a.capitalEfficiency.annualizedRoc === null ? "—" : formatPercent(a.capitalEfficiency.annualizedRoc)}
-          helper="Capital-weighted"
-          tooltip="Capital-weighted mean of per-event annualized ROI."
-          tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
-          variant="hero"
-        />
-        <KpiCard
-          label="Premium collected"
-          value={formatCurrency(a.premium.premiumCollected)}
-          helper={a.premium.captureRate === null ? "—" : `${formatPercent(a.premium.captureRate * 100, 0)} capture`}
-          tooltip="Total premium received from opening option sales."
-          tone="neutral"
-          variant="hero"
-        />
-        <KpiCard
-          label="Win rate"
-          value={a.tradeQuality.winRate === null ? "—" : formatPercent(a.tradeQuality.winRate * 100, 0)}
-          helper={`PF ${a.tradeQuality.profitFactor === null ? "—" : formatNumber(a.tradeQuality.profitFactor, 1)} · exp ${a.tradeQuality.expectancy === null ? "—" : formatCurrency(a.tradeQuality.expectancy)}`}
-          tooltip="Win rate: fraction of realized events that closed profitable."
-          tone="neutral"
-          variant="hero"
-        />
-      </MetricGroup>
+      {/* ── Hero KPI row ── */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <KpiCard
+            label="Net P&L · YTD"
+            value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
+            helper="Calendar-year realized"
+            tooltip="Current calendar-year realized P&L across all closed events."
+            tone={tone(result.aggregates.currentYearRealizedPnl)}
+            variant="hero"
+          />
+        </div>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <KpiCard
+            label="Annualized ROC"
+            value={a.capitalEfficiency.annualizedRoc === null ? "—" : formatPercent(a.capitalEfficiency.annualizedRoc)}
+            helper="Capital-weighted"
+            tooltip="Capital-weighted mean of per-event annualized ROI."
+            tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
+            variant="hero"
+          />
+        </div>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <KpiCard
+            label="Premium collected"
+            value={formatCurrency(a.premium.premiumCollected)}
+            helper={a.premium.captureRate === null ? "—" : `${formatPercent(a.premium.captureRate * 100, 0)} capture`}
+            tooltip="Total premium received from opening option sales."
+            tone="neutral"
+            variant="hero"
+          />
+        </div>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <KpiCard
+            label="Win rate"
+            value={a.tradeQuality.winRate === null ? "—" : formatPercent(a.tradeQuality.winRate * 100, 0)}
+            helper={`PF ${a.tradeQuality.profitFactor === null ? "—" : formatNumber(a.tradeQuality.profitFactor, 1)} · exp ${a.tradeQuality.expectancy === null ? "—" : formatCurrency(a.tradeQuality.expectancy)}`}
+            tooltip="Win rate: fraction of realized events that closed profitable."
+            tone="neutral"
+            variant="hero"
+          />
+        </div>
+      </div>
 
       {/* ── Income group ── */}
       <MetricGroup label="Income" cols={3}>
@@ -396,6 +453,14 @@ function OverviewTab({
         />
       </MetricGroup>
 
+      {/* ── Insights (styled as left-border accent cards) ── */}
+      {hasInsights && (
+        <>
+          <div className="h-px bg-hairline" />
+          <InsightCards result={result} onReviewTrades={onReviewTrades} />
+        </>
+      )}
+
       {/* ── Show more disclosure ── */}
       <div>
         <button
@@ -485,16 +550,6 @@ function OverviewTab({
           </div>
         )}
       </div>
-
-      {/* ── Insights (divider suppressed when empty) ── */}
-      {hasInsights && (
-        <>
-          <div className="h-px bg-hairline" />
-          <div className="py-5">
-            <Insights result={result} onReviewTrades={onReviewTrades} />
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -656,34 +711,6 @@ function OptionsTab({ result, optionType, onSelectEvent }: { result: Calculation
         </h2>
         <EventsTable rows={events} onSelectEvent={onSelectEvent} />
       </section>
-    </div>
-  );
-}
-
-function SwingTab({ result, onSelectEvent }: { result: CalculationResult; onSelectEvent: (event: RealizedPnLEvent) => void }) {
-  const swingEvents = result.realizedEvents.filter((event) => event.strategy === "SWING_TRADE");
-  const swingPnl = swingEvents.reduce((sum, ev) => sum + ev.realizedPnl, 0);
-  const closedCount = swingEvents.length;
-  const winners = swingEvents.filter((ev) => ev.realizedPnl > 0).length;
-  const winRate = closedCount > 0 ? (winners / closedCount) * 100 : null;
-
-  // Avg hold — only include events that have a holdingDays value
-  const eventsWithDays = swingEvents.filter((ev) => ev.holdingDays != null);
-  const avgHold = eventsWithDays.length > 0
-    ? eventsWithDays.reduce((sum, ev) => sum + (ev.holdingDays ?? 0), 0) / eventsWithDays.length
-    : null;
-
-  const stripItems = [
-    { label: "Swing P&L", value: formatCurrency(swingPnl), tone: tone(swingPnl) },
-    { label: "Closed Swings", value: formatNumber(closedCount), tone: "neutral" as const },
-    { label: "Win Rate", value: winRate !== null ? `${formatNumber(winRate, 0)}%` : "N/A", tone: winRate !== null ? tone(winRate - 50) : "neutral" as const },
-    ...(avgHold !== null ? [{ label: "Avg Hold", value: `${formatNumber(Math.round(avgHold), 0)} d`, tone: "neutral" as const }] : []),
-  ];
-
-  return (
-    <div className="space-y-3">
-      <StatStrip items={stripItems} />
-      <EventsTable title="Swing Trade Ledger" rows={swingEvents} onSelectEvent={onSelectEvent} />
     </div>
   );
 }
@@ -1082,63 +1109,75 @@ function ImportIssues({ issues }: { issues: ImportPreview["issues"] }) {
   );
 }
 
-function Insights({ result, onReviewTrades }: { result: CalculationResult; onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void }) {
+/**
+ * Aurora-styled insight cards — left-border colored by severity, per the mockup.
+ */
+function InsightCards({ result, onReviewTrades }: { result: CalculationResult; onReviewTrades: (issueFilter: TradeIssueFilter, search?: string) => void }) {
   const repeatedLosses = result.aggregates.symbolBreakdown.filter((row) => row.pnl < 0 && row.trades > 1).map((row) => row.symbol);
   const openCycles = result.optionLifecycles.filter((cycle) => cycle.status === "open");
   const nearTermCutoff = addDaysIso(new Date(), 14);
   const nearTermCycles = openCycles.filter((cycle) => cycle.expirationDate <= nearTermCutoff);
   const nearTermContracts = nearTermCycles.reduce((sum, cycle) => sum + cycle.contracts, 0);
-  const repeatedLosersText = repeatedLosses.length
-    ? `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} have repeated losses`
-    : null;
-
-  const nearTermText = nearTermCycles.length
-    ? `${formatNumber(nearTermContracts)} ${nearTermContracts === 1 ? "contract" : "contracts"} expiring within 14 days · ${formatCurrency(
-        nearTermCycles.reduce((sum, cycle) => sum + optionCycleCapital(cycle, true), 0)
-      )} exposure`
-    : null;
-
   const unresolvedCount = result.unresolvedTransactions.length;
   const duplicateCount = result.duplicateTransactionIds.length;
 
-  const lines: { text: string; action?: { label: string; onClick: () => void } }[] = [];
+  type InsightItem = {
+    text: string;
+    severity: "neg" | "warn";
+    action?: { label: string; onClick: () => void };
+  };
 
-  if (repeatedLosersText) {
-    lines.push({
-      text: repeatedLosersText,
-      action: { label: "Review trades →", onClick: () => onReviewTrades(null, repeatedLosses[0]) }
+  const items: InsightItem[] = [];
+
+  if (nearTermCycles.length) {
+    items.push({
+      text: `${formatNumber(nearTermContracts)} ${nearTermContracts === 1 ? "contract" : "contracts"} expiring within 14 days · ${formatCurrency(nearTermCycles.reduce((sum, cycle) => sum + optionCycleCapital(cycle, true), 0))} exposure`,
+      severity: "neg",
     });
   }
-  if (nearTermText) {
-    lines.push({ text: nearTermText });
-  }
   if (unresolvedCount > 0) {
-    lines.push({
+    items.push({
       text: `${formatNumber(unresolvedCount)} unresolved ${unresolvedCount === 1 ? "row" : "rows"} need classification.`,
-      action: { label: "Review rows →", onClick: () => onReviewTrades("unresolved") }
+      severity: "warn",
+      action: { label: "Resolve →", onClick: () => onReviewTrades("unresolved") },
     });
   }
   if (duplicateCount > 0) {
-    lines.push({
+    items.push({
       text: `${formatNumber(duplicateCount)} potential duplicate ${duplicateCount === 1 ? "row" : "rows"} preserved.`,
-      action: { label: "Review rows →", onClick: () => onReviewTrades("duplicates") }
+      severity: "warn",
+      action: { label: "Review →", onClick: () => onReviewTrades("duplicates") },
+    });
+  }
+  if (repeatedLosses.length) {
+    items.push({
+      text: `${repeatedLosses.slice(0, 4).join(", ")}${repeatedLosses.length > 4 ? ` +${repeatedLosses.length - 4}` : ""} have repeated losses`,
+      severity: "neg",
+      action: { label: "Review →", onClick: () => onReviewTrades(null, repeatedLosses[0]) },
     });
   }
 
-  if (lines.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
-    <ul className="space-y-2" aria-label="Insights">
-      {lines.map((line, i) => (
-        <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-muted-foreground">
-          <span>{line.text}</span>
-          {line.action && (
+    <ul className="space-y-2" aria-label="Needs attention">
+      {items.map((item, i) => (
+        <li
+          key={i}
+          className={cn(
+            "flex flex-wrap items-baseline gap-x-2 rounded-[10px] border border-hairline p-2.5",
+            "border-l-[3px] bg-surface text-[12.5px] text-muted-foreground",
+            item.severity === "neg" ? "border-l-neg" : "border-l-warn"
+          )}
+        >
+          <span>{item.text}</span>
+          {item.action && (
             <button
               type="button"
-              onClick={line.action.onClick}
+              onClick={item.action.onClick}
               className="text-accent underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
             >
-              {line.action.label}
+              {item.action.label}
             </button>
           )}
         </li>
@@ -1146,7 +1185,6 @@ function Insights({ result, onReviewTrades }: { result: CalculationResult; onRev
     </ul>
   );
 }
-
 
 function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (

@@ -14,12 +14,12 @@ describe("resolveInitialTheme", () => {
     expect(resolveInitialTheme(null, true)).toBe("dark");
   });
 
-  test('returns "light" when stored is null and prefersDark is false', () => {
-    expect(resolveInitialTheme(null, false)).toBe("light");
+  test('returns "dark" when stored is null and prefersDark is false (dark-first default)', () => {
+    expect(resolveInitialTheme(null, false)).toBe("dark");
   });
 
-  test('returns "light" when stored is garbage and prefersDark is false', () => {
-    expect(resolveInitialTheme("garbage", false)).toBe("light");
+  test('returns "dark" when stored is garbage and prefersDark is false (dark-first default)', () => {
+    expect(resolveInitialTheme("garbage", false)).toBe("dark");
   });
 });
 

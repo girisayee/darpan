@@ -7,13 +7,13 @@ const KEY = "positioniq.theme";
 
 /**
  * Pure helper: resolve the initial theme from a stored string and a media query result.
- * Returns stored when it is exactly "light" or "dark"; otherwise uses prefersDark.
- * Light is the default (prefersDark=false → "light"). Mirrors the no-flash script in the
- * root layout, which is the code path that actually runs at startup.
+ * Returns stored when it is exactly "light" or "dark"; otherwise returns "dark" (dark-first default).
+ * Mirrors the no-flash script in the root layout, which is the code path that actually runs at startup.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function resolveInitialTheme(stored: string | null, prefersDark: boolean): Theme {
   if (stored === "light" || stored === "dark") return stored;
-  return prefersDark ? "dark" : "light";
+  return "dark";
 }
 
 /**
@@ -26,7 +26,7 @@ export function nextTheme(t: Theme): Theme {
 // ── External theme store ───────────────────────────────────────────────────────
 // The source of truth is the `.dark` class on <html>, set before paint by the
 // no-flash inline script in the root layout. useSyncExternalStore reads it in a
-// hydration-safe way (server + first client render use getServerSnapshot → "light",
+// hydration-safe way (server + first client render use getServerSnapshot → "dark",
 // matching the SSR HTML), so there is no hydration mismatch and no setState-in-effect.
 const listeners = new Set<() => void>();
 
@@ -40,7 +40,7 @@ function getSnapshot(): Theme {
 }
 
 function getServerSnapshot(): Theme {
-  return "light";
+  return "dark";
 }
 
 /**
