@@ -4,11 +4,11 @@
  * PerformanceTab — Phase 2.
  *
  * Sections:
- *   1. Top KPI strip (4 compact KpiCards)
+ *   1. Top KPI strip (3 compact KpiCards: Net P&L · Return on capital · Profit factor)
  *   2. Equity curve — recharts line in an h-[200px] ResponsiveContainer
- *   3. Risk strip (compact KpiCards)
- *   4. Monthly realized P&L bar chart
- *   5. Monthly ROI chart + ledger
+ *   3. Risk strip (Concentration + Assignment rate only)
+ *   4. Monthly P&L + ROI ComposedChart (bars left $ axis, line right % axis, ReferenceLine at monthly goal)
+ *   5. Monthly ledger table
  *   6. "Benchmark vs SPY/QQQ — coming soon" placeholder card
  *
  * DATA GAPS noted inline where a live data source is deferred:
@@ -23,9 +23,10 @@
 import { useMemo, useSyncExternalStore } from "react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -34,20 +35,20 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { MonthlyRoiChart } from "@/components/charts/DashboardCharts";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import { riskMetrics } from "@/lib/selectors/risk";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
 import { MonthlyRoiTable, tone } from "./shared";
 
 // ── recharts palette via CSS variables ───────────────────────────────────────
 const C_POS      = "rgb(var(--pos))";
+const C_NEG      = "rgb(var(--neg))";
 const C_MUTED    = "rgb(var(--text-muted))";
 const C_HAIRLINE = "rgb(var(--hairline))";
 const C_SURFACE  = "rgb(var(--surface))";
+const C_ACCENT   = "rgb(var(--accent))";
 
 const TICK_STYLE = {
   fontFamily: "var(--font-sans)",
@@ -185,11 +186,13 @@ function EquityCurveChart({
   );
 }
 
-// ── Monthly realized P&L bar chart ───────────────────────────────────────────
+// ── Monthly P&L + ROI ComposedChart ──────────────────────────────────────────
+//
+// Left Y-axis ($): realized P&L bars (green ≥0, red <0, per-bar Cell)
+// Right Y-axis (%): monthly ROI line
+// ReferenceLine on $ axis at annualGoal/12, labelled "Monthly goal"
 
-const C_NEG = "rgb(var(--neg))";
-
-function MonthlyPnlBarChart({
+function MonthlyComposedChart({
   result,
   annualGoal,
 }: {
@@ -206,76 +209,128 @@ function MonthlyPnlBarChart({
     return result.monthlyReturns.map((m) => ({
       label: `${m.year}-${String(m.month).padStart(2, "0")}`,
       realizedPnl: m.realizedPnl,
+      // realizedRoiPercent is already a % value — pass straight
+      roi: m.realizedRoiPercent,
     }));
   }, [result.monthlyReturns]);
 
   const monthlyGoal = annualGoal > 0 ? annualGoal / 12 : undefined;
 
   if (!mounted) {
-    return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
+    return <div className="h-[220px] animate-pulse rounded-md bg-surface-inset" />;
   }
 
   return (
-    <div className="h-[200px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
-          <CartesianGrid
-            vertical={false}
-            strokeDasharray="0"
-            stroke={C_HAIRLINE}
-            opacity={1}
-          />
-          <XAxis
-            dataKey="label"
-            tick={TICK_STYLE}
-            axisLine={{ stroke: C_HAIRLINE }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={TICK_STYLE}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) =>
-              v >= 1000 || v <= -1000
-                ? `$${(v / 1000).toFixed(0)}k`
-                : `$${v.toFixed(0)}`
-            }
-            width={52}
-          />
-          <Tooltip
-            formatter={(value: unknown) => [
-              formatCurrency(typeof value === "number" ? value : Number(value)),
-              "Realized P&L",
-            ]}
-            contentStyle={TOOLTIP_CONTENT_STYLE}
-            itemStyle={TOOLTIP_ITEM_STYLE}
-            labelStyle={TOOLTIP_LABEL_STYLE}
-            cursor={{ fill: C_HAIRLINE, opacity: 0.4 }}
-          />
-          <Bar dataKey="realizedPnl" radius={[3, 3, 0, 0]}>
-            {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={entry.realizedPnl >= 0 ? C_POS : C_NEG}
-              />
-            ))}
-          </Bar>
-          {monthlyGoal !== undefined && (
-            <ReferenceLine
-              y={monthlyGoal}
-              stroke={C_GOAL_PACE}
-              strokeDasharray="4 4"
-              strokeWidth={1.5}
-              opacity={0.7}
-              label={{
-                value: "Monthly goal",
-                position: "insideTopRight",
-                style: { ...TICK_STYLE, fontSize: 10 },
-              }}
+    <div className="space-y-2">
+      {/* Custom legend */}
+      <div className="flex items-center gap-4 px-1">
+        <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
+          <span className="inline-block h-3 w-3 rounded-sm bg-pos opacity-80" />
+          P&amp;L
+        </span>
+        <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
+          <span className="inline-block h-0.5 w-5 rounded-full" style={{ background: C_ACCENT }} />
+          ROI
+        </span>
+        {monthlyGoal !== undefined && (
+          <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
+            <span className="inline-block h-0.5 w-5 rounded-full opacity-60" style={{ borderTop: `2px dashed ${C_GOAL_PACE}` }} />
+            Monthly goal
+          </span>
+        )}
+      </div>
+
+      <div className="h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 4, right: 40, left: 4, bottom: 4 }}>
+            <CartesianGrid
+              vertical={false}
+              strokeDasharray="0"
+              stroke={C_HAIRLINE}
+              opacity={1}
             />
-          )}
-        </BarChart>
-      </ResponsiveContainer>
+            <XAxis
+              dataKey="label"
+              tick={TICK_STYLE}
+              axisLine={{ stroke: C_HAIRLINE }}
+              tickLine={false}
+            />
+            {/* Left Y-axis: dollar P&L */}
+            <YAxis
+              yAxisId="pnl"
+              orientation="left"
+              tick={TICK_STYLE}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) =>
+                v >= 1000 || v <= -1000
+                  ? `$${(v / 1000).toFixed(0)}k`
+                  : `$${v.toFixed(0)}`
+              }
+              width={52}
+            />
+            {/* Right Y-axis: ROI % */}
+            <YAxis
+              yAxisId="roi"
+              orientation="right"
+              tick={TICK_STYLE}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+              width={44}
+            />
+            <Tooltip
+              formatter={(value: unknown, name: string | number | undefined) => {
+                const n = typeof value === "number" ? value : Number(value);
+                if (name === "roi") return [formatPercent(n, 1), "ROI"];
+                return [formatCurrency(n), "Realized P&L"];
+              }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
+              itemStyle={TOOLTIP_ITEM_STYLE}
+              labelStyle={TOOLTIP_LABEL_STYLE}
+              cursor={{ fill: C_HAIRLINE, opacity: 0.3 }}
+            />
+            {/* Suppress recharts default legend — we use our own */}
+            <Legend content={() => null} />
+            {/* Monthly goal reference line on $ axis */}
+            {monthlyGoal !== undefined && (
+              <ReferenceLine
+                yAxisId="pnl"
+                y={monthlyGoal}
+                stroke={C_GOAL_PACE}
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                opacity={0.7}
+                label={{
+                  value: "Monthly goal",
+                  position: "insideTopRight",
+                  style: { ...TICK_STYLE, fontSize: 10 },
+                }}
+              />
+            )}
+            {/* P&L bars with per-bar color */}
+            <Bar yAxisId="pnl" dataKey="realizedPnl" radius={[3, 3, 0, 0]}>
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.realizedPnl >= 0 ? C_POS : C_NEG}
+                />
+              ))}
+            </Bar>
+            {/* ROI line */}
+            <Line
+              yAxisId="roi"
+              type="monotone"
+              dataKey="roi"
+              stroke={C_ACCENT}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, stroke: C_ACCENT, fill: C_SURFACE }}
+              connectNulls
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -317,15 +372,9 @@ export function PerformanceTab({
   void onSelectEvent; // DetailDrawer wiring — available for future drill-down
 
   const a = wheelAnalytics(result);
-  const risk = riskMetrics(result);
 
   // ── Top KPI strip ────────────────────────────────────────────────────────
-  // Net P&L YTD, Return on capital, Profit factor, Max drawdown
-  // maxDrawdownPct is fraction → ×100 before formatPercent; negate for display
-  const maxDdDisplay =
-    risk.maxDrawdownPct === null
-      ? "—"
-      : formatPercent(-(risk.maxDrawdownPct * 100), 1);
+  // Net P&L YTD, Return on capital, Profit factor
 
   // Return on capital = totalRealizedPnl / averageDeployedCapital × 100
   const roc =
@@ -340,12 +389,7 @@ export function PerformanceTab({
       ? "—"
       : formatNumber(a.tradeQuality.profitFactor, 2);
 
-  // Risk strip: Sortino, Calmar, Concentration level, Assignment rate
-  // sortino / calmar — raw numbers, format to 2dp
-  const sortinoDisplay =
-    risk.sortino === null ? "—" : formatNumber(risk.sortino, 2);
-  const calmarDisplay =
-    risk.calmar === null ? "—" : formatNumber(risk.calmar, 2);
+  // ── Risk strip: Concentration + Assignment rate ───────────────────────────
 
   // assignmentRate is fraction → ×100 before formatPercent
   const assignmentRateDisplay =
@@ -364,7 +408,7 @@ export function PerformanceTab({
   return (
     <div className="space-y-5 py-2">
       {/* ── 1. Top KPI strip ── */}
-      <MetricGroup cols={4}>
+      <MetricGroup cols={3}>
         <KpiCard
           label="Net P&L · YTD"
           value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
@@ -395,14 +439,6 @@ export function PerformanceTab({
           }
           variant="compact"
         />
-        <KpiCard
-          label="Max drawdown"
-          value={maxDdDisplay}
-          helper="Peak-to-trough equity decline"
-          tooltip="Largest peak-to-trough decline in cumulative realized equity. Expressed as a negative percentage."
-          tone={risk.maxDrawdownPct ? "negative" : "neutral"}
-          variant="compact"
-        />
       </MetricGroup>
 
       {/* ── 2. Equity curve ── */}
@@ -415,36 +451,8 @@ export function PerformanceTab({
         </div>
       </section>
 
-      {/* ── 3. Risk strip ── */}
-      <MetricGroup label="Risk" cols={4}>
-        <KpiCard
-          label="Sortino"
-          value={sortinoDisplay}
-          helper="Return / downside σ"
-          tooltip="Sortino ratio: mean monthly return divided by downside standard deviation. Higher is better."
-          tone={
-            risk.sortino !== null && risk.sortino > 0
-              ? "positive"
-              : risk.sortino !== null && risk.sortino < 0
-                ? "negative"
-                : "neutral"
-          }
-          variant="compact"
-        />
-        <KpiCard
-          label="Calmar"
-          value={calmarDisplay}
-          helper="Ann. return / max drawdown"
-          tooltip="Calmar ratio: annualized return divided by max drawdown magnitude. Higher is better."
-          tone={
-            risk.calmar !== null && risk.calmar > 0
-              ? "positive"
-              : risk.calmar !== null && risk.calmar < 0
-                ? "negative"
-                : "neutral"
-          }
-          variant="compact"
-        />
+      {/* ── 3. Risk strip: Concentration + Assignment rate ── */}
+      <MetricGroup label="Risk" cols={2}>
         <KpiCard
           label="Concentration"
           value={concentrationLevel.charAt(0).toUpperCase() + concentrationLevel.slice(1)}
@@ -463,28 +471,18 @@ export function PerformanceTab({
         />
       </MetricGroup>
 
-      {/* ── 5b. Monthly realized P&L bar chart ── */}
+      {/* ── 4. Monthly realized P&L + ROI ComposedChart ── */}
       <section className="space-y-2">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Monthly realized P&amp;L
+          Monthly realized P&amp;L &amp; ROI
         </h2>
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <MonthlyPnlBarChart result={result} annualGoal={annualGoal} />
-        </div>
-      </section>
-
-      {/* ── 6. Monthly ROI chart + ledger ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Monthly ROI
-        </h2>
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <MonthlyRoiChart result={result} />
+          <MonthlyComposedChart result={result} annualGoal={annualGoal} />
         </div>
         <MonthlyRoiTable rows={result.monthlyReturns} />
       </section>
 
-      {/* ── 7. Benchmark placeholder ── */}
+      {/* ── 5. Benchmark placeholder ── */}
       {/* DATA GAP: SPY/QQQ benchmark returns require a market-data feed (deferred) */}
       <BenchmarkPlaceholder />
     </div>

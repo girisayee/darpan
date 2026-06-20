@@ -335,32 +335,67 @@ function handleCoveredCallAssignment(
   const proceeds = lifecycle.strikePrice * lifecycle.sharesControlled;
   const allocation = allocateLots(lots, lifecycle.underlyingSymbol, lifecycle.sharesControlled, settings, transaction.tradeDate);
   lifecycle.linkedStockLotIds = allocation.linkedLotIds;
-  const realizedPnl = proceeds - allocation.costBasis + lifecycle.netOptionPnl - lifecycle.fees;
-  const roiPercent = allocation.costBasis > 0 ? (realizedPnl / allocation.costBasis) * 100 : null;
+  const allLinkedIds = [...lifecycle.linkedTransactionIds, ...allocation.linkedTransactionIds];
   const holdingDays = allocation.openDate ? dateDiffDays(allocation.openDate, transaction.tradeDate) : null;
-  const annualizedRoiPercent = roiPercent !== null && settings.annualizedReturn && holdingDays && holdingDays > 0 ? roiPercent * (365 / holdingDays) : null;
   const warnings = [...lifecycle.warnings, ...allocation.warnings];
   if (!allocation.costBasisKnown) warnings.push("Missing cost basis");
-  const event: RealizedPnLEvent = {
+
+  // ── Event 1: option-premium side (COVERED_CALL_ASSIGNMENT) ─────────────────
+  // realizedPnl is the option premium net of fees only; the stock-sale gain/loss
+  // is split into a separate COVERED_CALL_ASSIGNMENT_STOCK event below so that
+  // totalStockTradingPnl receives it without creating a SWING_TRADE event.
+  const optionPnl = lifecycle.netOptionPnl;
+  const capital = allocation.costBasisKnown ? allocation.costBasis : null;
+  const roiPercent = capital !== null && capital > 0 ? (optionPnl / capital) * 100 : null;
+  const annualizedRoiPercent = roiPercent !== null && settings.annualizedReturn && holdingDays && holdingDays > 0 ? roiPercent * (365 / holdingDays) : null;
+  const assignmentEvent: RealizedPnLEvent = {
     id: `pnl-${lifecycle.id}-assignment`,
     date: transaction.tradeDate,
     symbol: lifecycle.underlyingSymbol,
     strategy: "COVERED_CALL_ASSIGNMENT",
-    grossProceeds: proceeds,
-    costBasis: allocation.costBasisKnown ? allocation.costBasis : null,
+    grossProceeds: lifecycle.premiumReceived,
+    costBasis: lifecycle.closeCost,
     optionPremium: lifecycle.netOptionPnl,
     fees: lifecycle.fees,
-    realizedPnl,
+    realizedPnl: optionPnl,
     quantity: lifecycle.sharesControlled,
-    capitalDeployed: allocation.costBasisKnown ? allocation.costBasis : null,
+    capitalDeployed: capital,
     roiPercent,
     annualizedRoiPercent,
     holdingDays,
-    linkedTransactionIds: [...lifecycle.linkedTransactionIds, ...allocation.linkedTransactionIds],
-    explanation: `Assigned ${lifecycle.sharesControlled} shares of ${lifecycle.underlyingSymbol} at ${money(lifecycle.strikePrice)} strike. Sale proceeds were ${money(proceeds)}, allocated stock basis was ${money(allocation.costBasis)}, and net option premium was ${money(lifecycle.netOptionPnl)}.`,
+    linkedTransactionIds: allLinkedIds,
+    explanation: `Assigned ${lifecycle.sharesControlled} shares of ${lifecycle.underlyingSymbol} at ${money(lifecycle.strikePrice)} strike. Net option premium (premium minus fees) was ${money(optionPnl)}. Stock sale gain/loss is tracked separately.`,
     warnings
   };
-  events.push(event);
+  events.push(assignmentEvent);
+
+  // ── Event 2: share-sale side (COVERED_CALL_ASSIGNMENT_STOCK) ───────────────
+  // Carries the proceeds − stock cost basis gain/loss so it flows into
+  // totalStockTradingPnl and monthly stockTradingPnl. NOT a SWING_TRADE event,
+  // so it does not appear in the Swing-trades tab.
+  const stockPnl = proceeds - allocation.costBasis;
+  const stockEvent: RealizedPnLEvent = {
+    id: `pnl-${lifecycle.id}-assignment-stock`,
+    date: transaction.tradeDate,
+    symbol: lifecycle.underlyingSymbol,
+    strategy: "COVERED_CALL_ASSIGNMENT_STOCK",
+    grossProceeds: proceeds,
+    costBasis: allocation.costBasisKnown ? allocation.costBasis : null,
+    optionPremium: 0,
+    fees: 0,
+    realizedPnl: stockPnl,
+    quantity: lifecycle.sharesControlled,
+    capitalDeployed: null,
+    roiPercent: null,
+    annualizedRoiPercent: null,
+    holdingDays,
+    linkedTransactionIds: allLinkedIds,
+    explanation: `Called-away stock sale for ${lifecycle.sharesControlled} shares of ${lifecycle.underlyingSymbol}. Strike proceeds were ${money(proceeds)}, allocated stock basis was ${money(allocation.costBasis)}.`,
+    warnings: [...allocation.warnings]
+  };
+  events.push(stockEvent);
+
+  // ── Capital usage ───────────────────────────────────────────────────────────
   usage.push({
     id: `cap-${lifecycle.id}-assignment`,
     strategy: "COVERED_CALL_ASSIGNMENT",
@@ -370,10 +405,11 @@ function handleCoveredCallAssignment(
     capitalType: "ASSIGNMENT_COLLATERAL",
     amount: allocation.costBasis,
     quantity: lifecycle.sharesControlled,
-    linkedTransactionIds: event.linkedTransactionIds,
+    linkedTransactionIds: allLinkedIds,
     notes: "Underlying stock capital tied up until covered call assignment."
   });
-  positionCapital.push(eventToPosition(event, allocation.openDate ?? lifecycle.openDate));
+  positionCapital.push(eventToPosition(assignmentEvent, allocation.openDate ?? lifecycle.openDate));
+  positionCapital.push(eventToPosition(stockEvent, allocation.openDate ?? lifecycle.openDate));
 }
 
 function handlePutAssignment(
@@ -552,7 +588,7 @@ export function calculateMonthlyReturns(
     const realizedPnl = sum(monthlyEvents.map((event) => event.realizedPnl));
     const closedTradeCapital = sum(monthlyEvents.map((event) => event.capitalDeployed ?? 0));
     const optionsPremiumPnl = sum(monthlyEvents.filter((event) => ["COVERED_CALL", "CASH_SECURED_PUT", "PUT_ASSIGNMENT"].includes(event.strategy)).map((event) => event.realizedPnl));
-    const stockTradingPnl = sum(monthlyEvents.filter((event) => event.strategy === "SWING_TRADE").map((event) => event.realizedPnl));
+    const stockTradingPnl = sum(monthlyEvents.filter((event) => event.strategy === "SWING_TRADE" || event.strategy === "COVERED_CALL_ASSIGNMENT_STOCK").map((event) => event.realizedPnl));
     const assignmentPnl = sum(monthlyEvents.filter((event) => event.strategy === "COVERED_CALL_ASSIGNMENT").map((event) => event.realizedPnl));
     const strategyCapital = {
       coveredCallCapital: averageCapitalByStrategy(usage, year, month, asOfDate, "COVERED_CALL"),
@@ -624,7 +660,7 @@ function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapital
     monthlyRealizedPnl,
     cumulativeRealizedPnl: cumulative,
     totalOptionsPremium: sum(events.filter((event) => ["COVERED_CALL", "CASH_SECURED_PUT", "PUT_ASSIGNMENT"].includes(event.strategy)).map((event) => event.realizedPnl)),
-    totalStockTradingPnl: sum(events.filter((event) => event.strategy === "SWING_TRADE").map((event) => event.realizedPnl)),
+    totalStockTradingPnl: sum(events.filter((event) => event.strategy === "SWING_TRADE" || event.strategy === "COVERED_CALL_ASSIGNMENT_STOCK").map((event) => event.realizedPnl)),
     totalAssignmentPnl: sum(events.filter((event) => event.strategy === "COVERED_CALL_ASSIGNMENT").map((event) => event.realizedPnl)),
     winRate: events.length ? (wins.length / events.length) * 100 : null,
     averageWin: wins.length ? sum(wins.map((event) => event.realizedPnl)) / wins.length : null,

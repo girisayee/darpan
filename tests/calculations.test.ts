@@ -67,8 +67,56 @@ describe("calculation engine", () => {
       optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "call", 12, "2025-01-31", 100),
       optionTx("o2", "2025-01-31", "ASSIGNMENT", "AMD", "call", 12, "2025-01-31", 0)
     ]);
-    expect(result.realizedEvents[0].realizedPnl).toBe(300);
-    expect(result.realizedEvents[0].roiPercent).toBe(30);
+    // Two events emitted: option premium side + stock sale side
+    const assignEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT");
+    const stockEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
+    expect(assignEvent).toBeDefined();
+    expect(stockEvent).toBeDefined();
+
+    // (a) COVERED_CALL_ASSIGNMENT realizedPnl = option premium − fees only
+    expect(assignEvent!.realizedPnl).toBe(100); // netOptionPnl(100) − fees(0)
+    expect(assignEvent!.grossProceeds).toBe(100); // premiumReceived
+    expect(assignEvent!.costBasis).toBe(0);        // closeCost (no BTC)
+
+    // (b) share-sale gain/loss flows into totalStockTradingPnl
+    expect(stockEvent!.realizedPnl).toBe(200);  // 1200 proceeds − 1000 cost basis
+    expect(result.aggregates.totalStockTradingPnl).toBe(200);
+
+    // (c) no new SWING_TRADE event was created
+    const swingCount = result.realizedEvents.filter((e) => e.strategy === "SWING_TRADE").length;
+    expect(swingCount).toBe(0);
+
+    // (d) grand total realized P&L is unchanged (300 = 100 premium + 200 stock gain)
+    expect(result.aggregates.totalRealizedPnl).toBe(300);
+  });
+
+  it("covered-call assignment with fees > 0: no double-counting", () => {
+    // SELL_TO_OPEN: premium = $150, fees = $5 → netOptionPnl = 150 − 5 = $145
+    // ASSIGNMENT: fees = $2 → netOptionPnl = 150 − 0 (closeCost) − (5+2) = $143
+    // stockBuy: 100 shares @ $10 = $1000 cost basis; strike = $12 → proceeds = $1200
+    const result = calculateDashboard([
+      stockTx("b1", "2025-01-02", "BUY", "AMD", 100, 10),
+      optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "call", 12, "2025-01-31", 150, 5),
+      optionTx("o2", "2025-01-31", "ASSIGNMENT", "AMD", "call", 12, "2025-01-31", 0, 2)
+    ]);
+    const assignEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT");
+    const stockEvent  = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
+    expect(assignEvent).toBeDefined();
+    expect(stockEvent).toBeDefined();
+
+    // (a) COVERED_CALL_ASSIGNMENT.realizedPnl === netOptionPnl (premium − fees, NOT premium − 2×fees)
+    // netOptionPnl = 150 − 0 − 7 = 143
+    expect(assignEvent!.realizedPnl).toBe(143);
+
+    // (b) COVERED_CALL_ASSIGNMENT_STOCK.realizedPnl === proceeds − costBasis
+    // 1200 − 1000 = 200; capitalDeployed/roiPercent must be null (no double-count)
+    expect(stockEvent!.realizedPnl).toBe(200);
+    expect(stockEvent!.capitalDeployed).toBeNull();
+    expect(stockEvent!.roiPercent).toBeNull();
+
+    // (c) grand total = netOptionPnl + (proceeds − costBasis) = 143 + 200 = 343
+    // Old buggy total would have been 143 − 7 + 200 = 336 (extra fee subtracted twice)
+    expect(result.aggregates.totalRealizedPnl).toBe(343);
   });
 
   it("calculates cash-secured put expiration return on collateral", () => {
@@ -222,10 +270,27 @@ describe("calculation engine", () => {
       ],
       { ...defaultSettings, manualCostBasisPerShare: { IREN: 49.25 } }
     );
-    expect(result.realizedEvents[0].strategy).toBe("COVERED_CALL_ASSIGNMENT");
-    expect(result.realizedEvents[0].costBasis).toBe(4925);
-    expect(result.realizedEvents[0].realizedPnl).toBe(-1325);
-    expect(result.realizedEvents[0].warnings).toContain("Manual cost basis override used for IREN.");
+    const assignEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT");
+    const stockEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
+    expect(assignEvent).toBeDefined();
+    expect(stockEvent).toBeDefined();
+
+    // Option-premium event: realizedPnl = netOptionPnl − fees = 100 − 0
+    expect(assignEvent!.strategy).toBe("COVERED_CALL_ASSIGNMENT");
+    expect(assignEvent!.realizedPnl).toBe(100);
+    // closeCost for option = 0 (no BTC); grossProceeds = premiumReceived = 100
+    expect(assignEvent!.grossProceeds).toBe(100);
+
+    // Stock-sale event: proceeds(3500) − costBasis(4925) = −1425
+    expect(stockEvent!.costBasis).toBe(4925);
+    expect(stockEvent!.realizedPnl).toBe(-1425);
+    expect(stockEvent!.warnings).toContain("Manual cost basis override used for IREN.");
+
+    // Grand total unchanged: 100 + (−1425) = −1325
+    expect(result.aggregates.totalRealizedPnl).toBe(-1325);
+
+    // Share-sale loss flows into totalStockTradingPnl
+    expect(result.aggregates.totalStockTradingPnl).toBe(-1425);
   });
 
   it("uses manual cost basis for stock sells when opening lots are absent", () => {

@@ -27,6 +27,7 @@ function strategyLabel(strategy: string) {
   const labels: Record<string, string> = {
     COVERED_CALL: "Covered call",
     COVERED_CALL_ASSIGNMENT: "CC assignment",
+    COVERED_CALL_ASSIGNMENT_STOCK: "CC assignment (stock sale)",
     CASH_SECURED_PUT: "Cash-secured put",
     PUT_ASSIGNMENT: "Put assignment",
     SWING_TRADE: "Swing trade",

@@ -15,7 +15,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
-import type { CalculationResult, OptionLifecycle } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import { ClosedCyclesTable, SegmentedControl, currentDeployedCapital } from "@/components/dashboard/tabs/shared";
@@ -267,6 +267,116 @@ function OpenWheelsTable({
   );
 }
 
+// ── Returns by strategy section ───────────────────────────────────────────────
+
+const CC_STRATEGIES: RealizedPnLEvent["strategy"][] = ["COVERED_CALL", "COVERED_CALL_ASSIGNMENT"];
+const CSP_STRATEGIES: RealizedPnLEvent["strategy"][] = ["CASH_SECURED_PUT", "PUT_ASSIGNMENT"];
+
+interface StrategyStats {
+  premiumCollected: number;
+  realizedPnl: number;
+  roi: number | null;
+  winRate: number | null;
+  count: number;
+}
+
+function strategyStats(events: RealizedPnLEvent[], strategies: RealizedPnLEvent["strategy"][]): StrategyStats {
+  const filtered = events.filter((e) => strategies.includes(e.strategy));
+  const count = filtered.length;
+  const premiumCollected = filtered.reduce((s, e) => s + e.optionPremium, 0);
+  const realizedPnl = filtered.reduce((s, e) => s + e.realizedPnl, 0);
+  const capitalDeployed = filtered.reduce((s, e) => s + (e.capitalDeployed ?? 0), 0);
+  const roi = capitalDeployed > 0 ? (realizedPnl / capitalDeployed) * 100 : null;
+  const winners = filtered.filter((e) => e.realizedPnl > 0).length;
+  const winRate = count > 0 ? (winners / count) * 100 : null;
+  return { premiumCollected, realizedPnl, roi, winRate, count };
+}
+
+function ReturnsByStrategy({ result }: { result: CalculationResult }) {
+  const events = result.realizedEvents.filter((e) => e.strategy !== "DATA_ISSUE");
+  const cc = strategyStats(events, CC_STRATEGIES);
+  const csp = strategyStats(events, CSP_STRATEGIES);
+
+  if (cc.count === 0 && csp.count === 0) return null;
+
+  return (
+    <section className="space-y-2">
+      <h2 className="font-sans text-[13px] font-medium text-foreground">Returns by strategy</h2>
+      <div className="grid grid-cols-2 gap-3">
+        {/* Covered calls */}
+        <div className="rounded-[12px] border border-hairline bg-surface p-3 space-y-2">
+          <div className="font-sans text-[12px] font-semibold text-accent">Covered calls</div>
+          <div className="grid grid-cols-2 gap-y-2 gap-x-3">
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Premium</div>
+              <div className="font-sans text-[13px] font-medium text-pos tabular-nums">
+                {cc.count > 0 ? formatCurrency(cc.premiumCollected) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Realized P&L</div>
+              <div className={cn("font-sans text-[13px] font-medium tabular-nums", cc.realizedPnl > 0 ? "text-pos" : cc.realizedPnl < 0 ? "text-neg" : "text-foreground")}>
+                {cc.count > 0 ? formatCurrency(cc.realizedPnl) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">ROI</div>
+              <div className={cn("font-sans text-[13px] font-medium tabular-nums", cc.roi !== null && cc.roi > 0 ? "text-pos" : cc.roi !== null && cc.roi < 0 ? "text-neg" : "text-foreground")}>
+                {cc.roi !== null ? formatPercent(cc.roi, 1) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Win rate</div>
+              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">
+                {cc.winRate !== null ? formatPercent(cc.winRate, 0) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Trades</div>
+              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">{cc.count}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Cash-secured puts */}
+        <div className="rounded-[12px] border border-hairline bg-surface p-3 space-y-2">
+          <div className="font-sans text-[12px] font-semibold text-pos">Cash-secured puts</div>
+          <div className="grid grid-cols-2 gap-y-2 gap-x-3">
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Premium</div>
+              <div className="font-sans text-[13px] font-medium text-pos tabular-nums">
+                {csp.count > 0 ? formatCurrency(csp.premiumCollected) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Realized P&L</div>
+              <div className={cn("font-sans text-[13px] font-medium tabular-nums", csp.realizedPnl > 0 ? "text-pos" : csp.realizedPnl < 0 ? "text-neg" : "text-foreground")}>
+                {csp.count > 0 ? formatCurrency(csp.realizedPnl) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">ROI</div>
+              <div className={cn("font-sans text-[13px] font-medium tabular-nums", csp.roi !== null && csp.roi > 0 ? "text-pos" : csp.roi !== null && csp.roi < 0 ? "text-neg" : "text-foreground")}>
+                {csp.roi !== null ? formatPercent(csp.roi, 1) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Win rate</div>
+              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">
+                {csp.winRate !== null ? formatPercent(csp.winRate, 0) : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="font-sans text-[10px] text-muted-foreground uppercase tracking-wide">Trades</div>
+              <div className="font-sans text-[13px] font-medium text-foreground tabular-nums">{csp.count}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Totals strip component ────────────────────────────────────────────────────
 
 function TotalsStrip({
@@ -381,6 +491,9 @@ export function WheelsTab({
         options={["Open", "Closed"]}
         onChange={setWheelView}
       />
+
+      {/* ── Returns by strategy (CC vs CSP) — always visible ─────────────────── */}
+      <ReturnsByStrategy result={result} />
 
       {/* ── Closed cycles view ──────────────────────────────────────────────── */}
       {wheelView === "Closed" && (
