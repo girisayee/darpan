@@ -171,7 +171,7 @@ export function DetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={`${event.symbol} realized P&L detail`}
-        className="motion-safe:animate-[slideIn_160ms_ease] h-full w-[64%] min-w-[380px] overflow-y-auto bg-bg border-l border-hairline"
+        className="motion-safe:animate-[slideIn_160ms_ease] h-full w-[64%] min-w-[380px] overflow-y-auto bg-surface border-l border-hairline"
         style={{ maxWidth: "640px" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -211,7 +211,7 @@ export function DetailDrawer({
           {/* ── Hero: Realized P&L + ROI ── */}
           <div className="flex items-baseline gap-3 mt-4 mb-2">
             <div>
-              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
+              <div className="font-sans text-[11px] text-muted-foreground">
                 Realized P&amp;L
               </div>
               <div
@@ -224,7 +224,7 @@ export function DetailDrawer({
               </div>
             </div>
             <div className="ml-auto text-right">
-              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
+              <div className="font-sans text-[11px] text-muted-foreground">
                 ROI
               </div>
               <div
@@ -241,7 +241,7 @@ export function DetailDrawer({
           </div>
 
           {/* ── Calculation waterfall ── */}
-          <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground mt-4">
+          <div className="font-sans text-[11px] text-muted-foreground mt-4">
             How this was calculated
           </div>
           <div className="mt-1.5">
@@ -350,7 +350,7 @@ export function DetailDrawer({
           {/* ── Warnings (if any) ── */}
           {event.warnings.length > 0 && (
             <div className="mt-3.5 space-y-1.5">
-              <div className="font-sans text-[10px] uppercase tracking-[.12em] text-muted-foreground">
+              <div className="font-sans text-[11px] text-muted-foreground">
                 Warnings
               </div>
               {event.warnings.map((w, i) => (
