@@ -25,6 +25,7 @@ export type Strategy =
   | "COVERED_CALL_ASSIGNMENT_STOCK"
   | "PUT_ASSIGNMENT"
   | "SWING_TRADE"
+  | "LONG_OPTION"
   | "DATA_ISSUE";
 
 export type CostBasisMethod = "FIFO" | "LIFO" | "AVERAGE";
@@ -96,6 +97,8 @@ export type OptionLifecycle = {
   id: string;
   underlyingSymbol: string;
   optionType: Exclude<OptionType, null>;
+  /** "short" = sold-to-open (CC/CSP); "long" = bought-to-open (speculative long call/put). */
+  direction: "long" | "short";
   strategy: "COVERED_CALL" | "CASH_SECURED_PUT" | "UNKNOWN";
   openDate: string;
   closeDate?: string;

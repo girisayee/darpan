@@ -27,7 +27,7 @@ export function stockTx(id: string, date: string, action: "BUY" | "SELL", symbol
 export function optionTx(
   id: string,
   date: string,
-  action: "SELL_TO_OPEN" | "BUY_TO_CLOSE" | "EXPIRATION" | "ASSIGNMENT",
+  action: "SELL_TO_OPEN" | "BUY_TO_CLOSE" | "EXPIRATION" | "ASSIGNMENT" | "BUY_TO_OPEN" | "SELL_TO_CLOSE",
   symbol: string,
   optionType: "call" | "put",
   strike: number,

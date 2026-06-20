@@ -478,7 +478,10 @@ export function WheelsTab({
   const openRoi = capitalAtRisk > 0 ? (openPremiumCollected / capitalAtRisk) * 100 : null;
 
   // ── Closed totals strip ───────────────────────────────────────────────────
-  const closedPremiumCollected = closedCyclesLifecycles.reduce((s, l) => s + l.premiumReceived, 0);
+  // Only count premium from short (sold-to-open) positions; long positions have no received premium.
+  const closedPremiumCollected = closedCyclesLifecycles
+    .filter((l) => l.direction === "short")
+    .reduce((s, l) => s + l.premiumReceived, 0);
   const closedDeployed = closedCyclesLifecycles.reduce((s, l) => s + (l.capitalDeployed ?? 0), 0);
   const closedPnl = closedCyclesLifecycles.reduce((s, l) => s + l.netOptionPnl, 0);
   const closedRoi = closedDeployed > 0 ? (closedPnl / closedDeployed) * 100 : null;
@@ -511,15 +514,15 @@ export function WheelsTab({
 
           <div className="flex items-center justify-between">
             <h2 className="font-sans text-[13px] font-medium text-foreground">
-              Closed cycles
+              Closed positions
             </h2>
             <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-              {closedCyclesLifecycles.length} cycle{closedCyclesLifecycles.length !== 1 ? "s" : ""}
+              {closedCyclesLifecycles.length} position{closedCyclesLifecycles.length !== 1 ? "s" : ""}
             </span>
           </div>
           <ClosedCyclesTable
             rows={closedCyclesLifecycles}
-            empty="No closed option cycles yet."
+            empty="No closed option positions yet."
           />
         </section>
       )}

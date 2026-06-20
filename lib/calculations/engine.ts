@@ -192,6 +192,13 @@ function handleOptionTransaction(
     return;
   }
 
+  if (transaction.action === "BUY_TO_OPEN") {
+    const lifecycle = createLongLifecycle(transaction, warnings, settings);
+    optionMap.set(optionKey(transaction), lifecycle);
+    lifecycles.push(lifecycle);
+    return;
+  }
+
   const lifecycle = optionMap.get(optionKey(transaction));
   if (!lifecycle) {
     events.push(unresolvedOptionEvent(transaction, "Option trade could not be linked to an opening option trade."));
@@ -210,9 +217,27 @@ function handleOptionTransaction(
     return;
   }
 
+  if (transaction.action === "SELL_TO_CLOSE") {
+    lifecycle.status = "closed";
+    // For a long (BTO) position: proceeds received on close minus cost paid to open.
+    // lifecycle.fees was already updated on line above (close-leg fees accumulated).
+    const proceeds = Math.abs(transaction.netAmount || transaction.grossAmount);
+    lifecycle.closeCost = lifecycle.premiumReceived; // cost paid to open (stored in premiumReceived)
+    lifecycle.premiumReceived = proceeds;            // repurpose field: closing proceeds for display
+    lifecycle.netOptionPnl = proceeds - lifecycle.closeCost - lifecycle.fees;
+    addOptionRealizedEvent(lifecycle, transaction.tradeDate, events, usage, positionCapital, settings, "closed");
+    return;
+  }
+
   if (transaction.action === "EXPIRATION") {
     lifecycle.status = "expired";
-    lifecycle.netOptionPnl = lifecycle.premiumReceived - lifecycle.fees;
+    if (lifecycle.direction === "long") {
+      // Long option expires worthless: lose the entire debit paid plus fees.
+      lifecycle.netOptionPnl = -(lifecycle.premiumReceived + lifecycle.fees);
+    } else {
+      // Short option expires worthless: keep all premium minus fees.
+      lifecycle.netOptionPnl = lifecycle.premiumReceived - lifecycle.fees;
+    }
     addOptionRealizedEvent(lifecycle, transaction.tradeDate, events, usage, positionCapital, settings, "expired");
     return;
   }
@@ -253,6 +278,7 @@ function createLifecycle(transaction: TradeTransaction, warnings: string[], lots
     id: `opt-${transaction.id}`,
     underlyingSymbol: transaction.underlyingSymbol || transaction.symbol,
     optionType,
+    direction: "short" as const,
     strategy: optionType === "call" ? "COVERED_CALL" : "CASH_SECURED_PUT",
     openDate: transaction.tradeDate,
     expirationDate: transaction.expirationDate || transaction.tradeDate,
@@ -272,6 +298,39 @@ function createLifecycle(transaction: TradeTransaction, warnings: string[], lots
   };
 }
 
+function createLongLifecycle(transaction: TradeTransaction, warnings: string[], settings: AppSettings): MutableLifecycle {
+  const optionType = transaction.optionType ?? "call";
+  const contracts = Math.abs(transaction.quantity);
+  const sharesControlled = contracts * 100;
+  // For a long option, the debit paid to open is treated as cost basis.
+  const costPaid = Math.abs(transaction.netAmount || transaction.grossAmount);
+  const openFees = settings.includeFees ? transaction.fees : 0;
+  return {
+    id: `opt-${transaction.id}`,
+    underlyingSymbol: transaction.underlyingSymbol || transaction.symbol,
+    optionType,
+    direction: "long" as const,
+    strategy: "UNKNOWN",
+    openDate: transaction.tradeDate,
+    expirationDate: transaction.expirationDate || transaction.tradeDate,
+    strikePrice: transaction.strikePrice || 0,
+    contracts,
+    sharesControlled,
+    // premiumReceived stores the cost paid to open the long position.
+    // On SELL_TO_CLOSE, the engine swaps it to hold the closing proceeds.
+    premiumReceived: costPaid,
+    closeCost: 0,
+    fees: openFees,
+    netOptionPnl: -(costPaid + openFees),
+    capitalDeployed: costPaid,
+    status: "open",
+    linkedTransactionIds: [transaction.id],
+    linkedStockLotIds: [],
+    explanation: `Opened long ${optionType} on ${transaction.underlyingSymbol || transaction.symbol} for ${money(costPaid)} debit.`,
+    warnings
+  };
+}
+
 function addOptionRealizedEvent(
   lifecycle: MutableLifecycle,
   closeDate: string,
@@ -281,7 +340,12 @@ function addOptionRealizedEvent(
   settings: AppSettings,
   outcome: "closed" | "expired"
 ) {
-  const strategy: Strategy = lifecycle.optionType === "call" ? "COVERED_CALL" : "CASH_SECURED_PUT";
+  const strategy: Strategy =
+    lifecycle.direction === "long"
+      ? "LONG_OPTION"
+      : lifecycle.optionType === "call"
+        ? "COVERED_CALL"
+        : "CASH_SECURED_PUT";
   const capital = optionCapital(lifecycle, settings);
   const roiPercent = capital > 0 ? (lifecycle.netOptionPnl / capital) * 100 : null;
   const holdingDays = dateDiffDays(lifecycle.openDate, closeDate);
@@ -314,11 +378,21 @@ function addOptionRealizedEvent(
     symbol: lifecycle.underlyingSymbol,
     startDate: lifecycle.openDate,
     endDate: closeDate,
-    capitalType: lifecycle.optionType === "call" ? "STOCK_CAPITAL" : "OPTION_COLLATERAL",
+    capitalType:
+      lifecycle.direction === "long"
+        ? "OPTION_COLLATERAL"
+        : lifecycle.optionType === "call"
+          ? "STOCK_CAPITAL"
+          : "OPTION_COLLATERAL",
     amount: capital,
     quantity: lifecycle.sharesControlled,
     linkedTransactionIds: lifecycle.linkedTransactionIds,
-    notes: lifecycle.optionType === "call" ? "Underlying stock cost basis used for covered call denominator." : "Strike times shares used as conservative put collateral."
+    notes:
+      lifecycle.direction === "long"
+        ? "Debit paid to open long option position."
+        : lifecycle.optionType === "call"
+          ? "Underlying stock cost basis used for covered call denominator."
+          : "Strike times shares used as conservative put collateral."
   });
   positionCapital.push(eventToPosition(event, lifecycle.openDate));
 }

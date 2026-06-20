@@ -303,6 +303,42 @@ describe("calculation engine", () => {
     expect(result.realizedEvents[0].warnings).toContain("Manual cost basis override used for PYPL.");
   });
 
+  it("creates a closed lifecycle for a bought-then-sold (long) option with correct P&L", () => {
+    // AMZN call: BTO 1 contract at $3.50/share debit ($350 total), STC at $5.00/share ($500 total)
+    // netOptionPnl = $500 − $350 − $0 fees = $150
+    const result = calculateDashboard([
+      optionTx("bto1", "2025-06-01", "BUY_TO_OPEN", "AMZN", "call", 200, "2025-06-30", -350),
+      optionTx("stc1", "2025-06-20", "SELL_TO_CLOSE", "AMZN", "call", 200, "2025-06-30", 500)
+    ]);
+    expect(result.optionLifecycles).toHaveLength(1);
+    const lc = result.optionLifecycles[0];
+    expect(lc.direction).toBe("long");
+    expect(lc.strategy).toBe("UNKNOWN");
+    expect(lc.status).toBe("closed");
+    expect(lc.optionType).toBe("call");
+    expect(lc.netOptionPnl).toBe(150);
+    // After STC, premiumReceived holds the closing proceeds; closeCost holds the open cost
+    expect(lc.premiumReceived).toBe(500);
+    expect(lc.closeCost).toBe(350);
+    // A realized event should be emitted with LONG_OPTION strategy
+    expect(result.realizedEvents).toHaveLength(1);
+    expect(result.realizedEvents[0].strategy).toBe("LONG_OPTION");
+    expect(result.realizedEvents[0].realizedPnl).toBe(150);
+  });
+
+  it("creates a losing long option lifecycle (bought call that expires worthless)", () => {
+    // BTO for $200 debit, expires worthless → netOptionPnl = −$200
+    const result = calculateDashboard([
+      optionTx("bto2", "2025-07-01", "BUY_TO_OPEN", "NVDA", "put", 100, "2025-07-31", -200),
+      optionTx("exp2", "2025-07-31", "EXPIRATION", "NVDA", "put", 100, "2025-07-31", 0)
+    ]);
+    expect(result.optionLifecycles).toHaveLength(1);
+    const lc = result.optionLifecycles[0];
+    expect(lc.direction).toBe("long");
+    expect(lc.status).toBe("expired");
+    expect(lc.netOptionPnl).toBe(-200);
+  });
+
   it("uses a zero cost basis for the PYPL dividend share lot", () => {
     const result = calculateDashboard(
       [stockTx("s1", "2026-01-10", "SELL", "PYPL", 0.11481, 47.5)],

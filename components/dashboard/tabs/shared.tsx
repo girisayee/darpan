@@ -333,11 +333,29 @@ export function ClosedTradesTable({
   );
 }
 
+// ── Option type label ────────────────────────────────────────────────────────
+
+/**
+ * Returns a human-readable type label for an OptionLifecycle row.
+ * "Sold Put" | "Covered Call" | "Bought Call" | "Bought Put"
+ */
+export function optionTypeLabel(row: OptionLifecycle): string {
+  if (row.direction === "long") {
+    return row.optionType === "call" ? "Bought Call" : "Bought Put";
+  }
+  // Short direction: distinguish by strategy
+  if (row.strategy === "COVERED_CALL") return "Covered Call";
+  if (row.strategy === "CASH_SECURED_PUT") return "Sold Put";
+  // Fallback: infer from optionType
+  return row.optionType === "call" ? "Covered Call" : "Sold Put";
+}
+
 // ── ClosedCyclesTable ─────────────────────────────────────────────────────────
 
 /**
  * Lifecycle-based closed-cycles table for the Wheels tab.
  * Displays one row per OptionLifecycle (closed/expired/assigned), newest-first.
+ * Includes both short (sold-to-open) and long (bought-to-open) closed positions.
  * Rows are NOT clickable — no DetailDrawer drill-down for cycles.
  */
 export function ClosedCyclesTable({
@@ -347,37 +365,42 @@ export function ClosedCyclesTable({
   rows: OptionLifecycle[];
   empty?: string;
 }) {
-  // Sort newest-first: prefer closeDate, fall back to expirationDate
-  const sorted = [...rows].sort((a, b) =>
-    compareDateDesc(a.closeDate ?? a.expirationDate, b.closeDate ?? b.expirationDate)
-  );
-
   const columns: Column<OptionLifecycle>[] = [
     {
       key: "symbol",
       header: "Symbol",
       value: (row) => row.underlyingSymbol,
-      render: (row) => {
-        const tag = row.optionType === "call" ? "CC" : "CSP";
-        return (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
-            <span className="text-[11px] text-muted-foreground">
-              {tag} ${row.strikePrice.toFixed(2)}
-            </span>
-          </div>
-        );
-      },
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
+          <span className="text-[11px] text-muted-foreground">
+            ${row.strikePrice.toFixed(2)}
+          </span>
+        </div>
+      ),
     },
     {
-      key: "openDate",
-      header: "Open date",
-      value: (row) => row.openDate ?? "",
+      key: "type",
+      header: "Type",
+      value: (row) => optionTypeLabel(row),
       render: (row) => (
-        <span className="tabular-nums text-muted-foreground">
-          {row.openDate ?? <span className="opacity-50">—</span>}
+        <span className="text-[12px] font-medium text-foreground">
+          {optionTypeLabel(row)}
         </span>
       ),
+    },
+    {
+      key: "closeDate",
+      header: "Close date",
+      value: (row) => (row.closeDate ?? row.expirationDate) ?? "",
+      render: (row) => {
+        const date = row.closeDate ?? row.expirationDate;
+        return (
+          <span className="tabular-nums text-muted-foreground">
+            {date ?? <span className="opacity-50">—</span>}
+          </span>
+        );
+      },
     },
     {
       key: "daysHeld",
@@ -421,9 +444,20 @@ export function ClosedCyclesTable({
       key: "premiumReceived",
       header: "Premium",
       value: (row) => row.premiumReceived,
-      render: (row) => (
-        <span className="tabular-nums text-pos">{formatCurrency(row.premiumReceived)}</span>
-      ),
+      render: (row) => {
+        if (row.direction === "long") {
+          // Show the debit paid to open (negative cost).
+          // For STC-closed longs: open cost is in closeCost (swapped by engine).
+          // For expired longs: open cost is still in premiumReceived.
+          const openCost = row.status === "closed" ? row.closeCost : row.premiumReceived;
+          return (
+            <span className="tabular-nums text-neg">({formatCurrency(openCost)})</span>
+          );
+        }
+        return (
+          <span className="tabular-nums text-pos">{formatCurrency(row.premiumReceived)}</span>
+        );
+      },
       align: "right",
     },
     {
@@ -451,9 +485,10 @@ export function ClosedCyclesTable({
 
   return (
     <DataTable
-      rows={sorted}
+      rows={rows}
       columns={columns}
       empty={empty}
+      defaultSort={{ key: "closeDate", direction: "desc" }}
     />
   );
 }
