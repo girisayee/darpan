@@ -50,7 +50,7 @@ export function AppHeader({
     <header className="flex items-center gap-4 border-b border-hairline px-4 py-3">
       {/* Wordmark */}
       <span className="font-sans text-[15px] font-semibold tracking-tight text-foreground shrink-0 select-none">
-        PositionIQ
+        RealizedEdge
       </span>
 
       {/* Spacer */}

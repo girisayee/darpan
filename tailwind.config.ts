@@ -19,10 +19,15 @@ const config: Config = {
         "muted-foreground": "rgb(var(--text-muted) / <alpha-value>)",
         dim:                "rgb(var(--text-dim) / <alpha-value>)",
         accent:             "rgb(var(--accent) / <alpha-value>)",
+        "accent-2":         "rgb(var(--accent-2) / <alpha-value>)",
+        "border-strong":    "rgb(var(--border-strong) / <alpha-value>)",
         pos:                "rgb(var(--pos) / <alpha-value>)",
         neg:                "rgb(var(--neg) / <alpha-value>)",
         warn:               "rgb(var(--warn) / <alpha-value>)",
 
+      },
+      backgroundImage: {
+        aurora: "linear-gradient(135deg, rgb(var(--accent-2)), rgb(var(--accent)))",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

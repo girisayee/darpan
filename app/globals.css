@@ -4,36 +4,40 @@
 
 /* ── Light theme (default) ─────────────────────────────────────── */
 :root {
-  --bg:              251 251 252;  /* #FBFBFC */
-  --surface:         255 255 255;  /* #FFFFFF */
-  --surface-inset:   242 243 245;  /* #F2F3F5 */
-  --hairline:        236 237 239;  /* #ECEDEF */
-  --hairline-soft:   242 243 245;  /* #F2F3F5 */
-  --text:            23 24 27;     /* #17181B */
-  --text-muted:      110 113 120;  /* #6E7178 */
-  --text-dim:        154 157 164;  /* #9A9DA4 */
-  --accent:          47 107 228;   /* #2F6BE4 */
-  --pos:             24 137 90;    /* #18895A */
-  --neg:             194 69 59;    /* #C2453B */
-  --warn:            180 83 9;     /* #B45309 */
-  --spotlight:       22 24 31;     /* #16181F */
+  --bg:              251 252 253;
+  --surface:         255 255 255;
+  --surface-inset:   244 246 250;
+  --hairline:        236 238 242;
+  --hairline-soft:   242 244 247;
+  --border-strong:   220 224 230;
+  --text:            11 18 32;
+  --text-muted:      90 100 114;
+  --text-dim:        154 162 173;
+  --accent:          79 70 229;
+  --accent-2:        124 92 255;
+  --pos:             11 122 85;
+  --neg:             214 69 61;
+  --warn:            180 83 9;
+  --spotlight:       13 16 22;
 }
 
 /* ── Dark theme ────────────────────────────────────────────────── */
 .dark {
-  --bg:              14 15 18;     /* #0E0F12 */
-  --surface:         22 24 29;     /* #16181D */
-  --surface-inset:   28 31 37;     /* #1C1F25 */
-  --hairline:        35 38 44;     /* #23262C */
-  --hairline-soft:   28 31 37;     /* #1C1F25 */
-  --text:            232 233 236;  /* #E8E9EC */
-  --text-muted:      138 143 152;  /* #8A8F98 */
-  --text-dim:        90 95 104;    /* #5A5F68 */
-  --accent:          91 141 239;   /* #5B8DEF */
-  --pos:             52 178 123;   /* #34B27B */
-  --neg:             224 106 96;   /* #E06A60 */
-  --warn:            217 145 47;   /* #D9912F */
-  --spotlight:       28 31 40;     /* #1C1F28 */
+  --bg:              13 16 22;
+  --surface:         20 26 35;
+  --surface-inset:   17 22 30;
+  --hairline:        34 43 57;
+  --hairline-soft:   26 31 40;
+  --border-strong:   44 54 71;
+  --text:            244 246 250;
+  --text-muted:      138 147 163;
+  --text-dim:        94 104 119;
+  --accent:          110 139 255;
+  --accent-2:        124 92 255;
+  --pos:             52 211 153;
+  --neg:             251 113 133;
+  --warn:            227 168 87;
+  --spotlight:       13 16 22;
 }
 
 * {
