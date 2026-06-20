@@ -138,7 +138,6 @@ function handleStockTransaction(
     const roiPercent = allocation.costBasis > 0 ? (realizedPnl / allocation.costBasis) * 100 : null;
     const annualizedRoiPercent = roiPercent !== null && settings.annualizedReturn && holdingDays && holdingDays > 0 ? roiPercent * (365 / holdingDays) : null;
     const warnings = allocation.warnings;
-    if (!allocation.costBasisKnown) warnings.push("Missing cost basis");
     const event: RealizedPnLEvent = {
       id: `pnl-${transaction.id}`,
       date: transaction.tradeDate,
@@ -593,9 +592,7 @@ function allocateLots(lots: MutableLot[], symbol: string, quantity: number, sett
   const warnings: string[] = [];
   const availableQuantity = available.reduce((sum, lot) => sum + lot.remainingQuantity, 0);
   const missingQuantity = Math.max(0, quantity - availableQuantity);
-  const manualBasisPerShare = manualCostBasisForSymbol(settings, symbol);
-  const zeroBasisSale = availableQuantity === 0 && isManualZeroBasisSale(settings, symbol, quantity);
-  const costBasisKnown = missingQuantity <= 0 || manualBasisPerShare > 0 || zeroBasisSale;
+  const costBasisKnown = missingQuantity <= 0;
   if (!costBasisKnown) {
     warnings.push("Missing cost basis");
   }
@@ -623,15 +620,12 @@ function allocateLots(lots: MutableLot[], symbol: string, quantity: number, sett
       openDate ??= lot.openDate;
       remaining -= used;
     }
-    const manualBasis = missingQuantity > 0 && !zeroBasisSale ? manualBasisPerShare * missingQuantity : 0;
-    if (manualBasis > 0) warnings.push(`Manual cost basis override used for ${symbol}.`);
-    if (zeroBasisSale) warnings.push(`Manual zero cost basis used for ${symbol}.`);
     return {
-      costBasis: avg * Math.min(quantity, availableQuantity) + manualBasis,
+      costBasis: avg * Math.min(quantity, availableQuantity),
       costBasisKnown,
       linkedTransactionIds: unique(linkedTransactionIds),
       linkedLotIds: unique(linkedLotIds),
-      openDate: openDate ?? (manualBasis > 0 || zeroBasisSale ? closeDate : null),
+      openDate,
       warnings
     };
   }
@@ -654,16 +648,6 @@ function allocateLots(lots: MutableLot[], symbol: string, quantity: number, sett
     linkedLotIds.push(lot.id);
     openDate ??= lot.openDate;
     remaining -= used;
-  }
-  if (remaining > 0) {
-    if (zeroBasisSale) {
-      warnings.push(`Manual zero cost basis used for ${symbol}.`);
-      openDate ??= closeDate;
-    } else if (manualBasisPerShare > 0) {
-      costBasis += remaining * manualBasisPerShare;
-      warnings.push(`Manual cost basis override used for ${symbol}.`);
-      openDate ??= closeDate;
-    }
   }
   return { costBasis, costBasisKnown, linkedTransactionIds: unique(linkedTransactionIds), linkedLotIds: unique(linkedLotIds), openDate, warnings };
 }
@@ -829,13 +813,12 @@ function currentOpenOptionCapital(lifecycle: MutableLifecycle, settings: AppSett
 function costBasisForOpenShares(lots: MutableLot[], symbol: string, quantity: number, settings: AppSettings) {
   const method = settings.costBasisMethod;
   const openLots = lots.filter((lot) => lot.symbol === symbol && lot.remainingQuantity > 0);
-  if (!openLots.length) return manualCostBasisForSymbol(settings, symbol) * quantity;
+  if (!openLots.length) return 0;
   const ordered = [...openLots].sort((a, b) => (method === "LIFO" ? b.openDate.localeCompare(a.openDate) : a.openDate.localeCompare(b.openDate)));
   if (method === "AVERAGE") {
     const totalQty = sum(openLots.map((lot) => lot.remainingQuantity));
     const totalBasis = sum(openLots.map((lot) => lot.remainingCostBasis));
-    const manualQty = Math.max(0, quantity - totalQty);
-    return (totalQty > 0 ? (totalBasis / totalQty) * Math.min(quantity, totalQty) : 0) + manualCostBasisForSymbol(settings, symbol) * manualQty;
+    return totalQty > 0 ? (totalBasis / totalQty) * Math.min(quantity, totalQty) : 0;
   }
   let remaining = quantity;
   let basis = 0;
@@ -845,23 +828,11 @@ function costBasisForOpenShares(lots: MutableLot[], symbol: string, quantity: nu
     basis += used * lot.costBasisPerShare;
     remaining -= used;
   }
-  return basis + manualCostBasisForSymbol(settings, symbol) * remaining;
+  return basis;
 }
 
 function strikeCollateral(transaction: TradeTransaction, sharesControlled: number) {
   return (transaction.strikePrice || 0) * sharesControlled;
-}
-
-function manualCostBasisForSymbol(settings: AppSettings, symbol: string) {
-  const normalized = symbol.trim().toUpperCase();
-  return settings.manualCostBasisPerShare?.[normalized] ?? 0;
-}
-
-function isManualZeroBasisSale(settings: AppSettings, symbol: string, quantity: number) {
-  const normalized = symbol.trim().toUpperCase();
-  return (settings.manualZeroBasisLots ?? []).some(
-    (lot) => lot.symbol.trim().toUpperCase() === normalized && Math.abs(lot.quantity - quantity) < 0.000001
-  );
 }
 
 function optionKey(transaction: Pick<TradeTransaction, "underlyingSymbol" | "symbol" | "optionType" | "strikePrice" | "expirationDate">) {

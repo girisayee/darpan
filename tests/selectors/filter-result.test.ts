@@ -2,31 +2,27 @@ import { describe, expect, it } from "vitest";
 import { calculateDashboard } from "@/lib/calculations/engine";
 import { defaultSettings } from "@/lib/storage/local-store";
 import { filterResult, type DashboardFilters } from "@/lib/selectors/filter-result";
-import { optionTx } from "../helpers";
+import { stockTx } from "../helpers";
 
 const ALL: DashboardFilters = { symbol: "ALL", strategy: "ALL", year: "ALL", month: "ALL", account: "ALL" };
 
 describe("filterResult", () => {
-  it("applies manual cost-basis settings when recomputing filtered aggregates", () => {
-    // Covered call on a symbol absent from defaultSettings, assigned with no opening
-    // stock lot: the per-call manual override ($50/sh) is the only source of cost
-    // basis. If settings are dropped during the filtered recompute, the fallback to
-    // defaultSettings has no override for this symbol, basis collapses to 0, and P&L
-    // is overstated (the SNOW-style phantom gain).
-    const settings = {
-      ...defaultSettings,
-      manualCostBasisPerShare: { ...defaultSettings.manualCostBasisPerShare, ZZZ: 50 }
-    };
+  it("forwards cost-basis settings when recomputing filtered aggregates", () => {
+    // Two BUY lots at different prices then a SELL of one lot's worth. Under LIFO the
+    // most recent (higher) lot is consumed, so the realized cost basis is 2000 and the
+    // gain is 1000. If settings were dropped during the filtered recompute, the
+    // fallback to FIFO would consume the cheaper lot (basis 1000) and overstate the gain.
+    const settings = { ...defaultSettings, costBasisMethod: "LIFO" as const };
     const transactions = [
-      optionTx("o1", "2026-02-01", "SELL_TO_OPEN", "ZZZ", "call", 35, "2026-02-27", 100),
-      optionTx("o2", "2026-02-27", "ASSIGNMENT", "ZZZ", "call", 35, "2026-02-27", 0)
+      stockTx("b1", "2026-02-01", "BUY", "ZZZ", 100, 10),
+      stockTx("b2", "2026-02-02", "BUY", "ZZZ", 100, 20),
+      stockTx("s1", "2026-02-27", "SELL", "ZZZ", 100, 30)
     ];
     const base = calculateDashboard(transactions, settings);
 
     const filtered = filterResult(base, ALL, settings);
 
-    // strike 3500 - basis 5000 + premium 100 = -1400 (override applied)
-    // Without forwarding settings, default basis 0 would yield +3600.
-    expect(filtered.aggregates.totalRealizedPnl).toBeCloseTo(-1400, 2);
+    // LIFO basis 2000, proceeds 3000 → gain 1000. FIFO fallback would yield 2000.
+    expect(filtered.aggregates.totalRealizedPnl).toBeCloseTo(1000, 2);
   });
 });

@@ -7,7 +7,7 @@ import {
 import { calculateDashboard } from "@/lib/calculations/engine";
 import { defaultSettings } from "@/lib/storage/local-store";
 import type { OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
-import { optionTx } from "./helpers";
+import { optionTx, stockTx } from "./helpers";
 
 // ── lifecycleToEvent ──────────────────────────────────────────────────────────
 
@@ -128,6 +128,10 @@ describe("inferOpenerAction", () => {
   it("maps ASSIGNMENT → SELL_TO_OPEN", () => {
     expect(inferOpenerAction("ASSIGNMENT")).toBe("SELL_TO_OPEN");
   });
+
+  it("maps stock SELL → BUY", () => {
+    expect(inferOpenerAction("SELL")).toBe("BUY");
+  });
 });
 
 // ── buildManualOpenTransaction ────────────────────────────────────────────────
@@ -193,6 +197,93 @@ describe("buildManualOpenTransaction", () => {
     const tx = buildManualOpenTransaction({ ...baseInput, action: "SELL_TO_OPEN", contracts: 3 });
     expect(tx.quantity).toBe(3);
     expect(tx.grossAmount).toBe(450); // 1.5 × 3 × 100
+  });
+
+  it("stock path: builds a BUY stock opener with correct fields and debit signs", () => {
+    const tx = buildManualOpenTransaction({
+      kind: "stock",
+      baseId: "sell-close",
+      openDate: "2025-01-02",
+      symbol: "AMD",
+      underlyingSymbol: "AMD",
+      action: "BUY",
+      pricePerShare: 10,
+      shares: 100,
+      fees: 0,
+      sourceBroker: "Robinhood",
+      accountName: "Test",
+    });
+    expect(tx.instrumentType).toBe("stock");
+    expect(tx.action).toBe("BUY");
+    expect(tx.optionType).toBeNull();
+    expect(tx.strikePrice).toBeUndefined();
+    expect(tx.expirationDate).toBeUndefined();
+    expect(tx.quantity).toBe(100);
+    expect(tx.price).toBe(10);
+    // BUY is a debit: gross negative, net = gross − fees (still negative)
+    expect(tx.grossAmount).toBe(-1000);
+    expect(tx.netAmount).toBe(-1000);
+    expect(tx.importBatchId).toBe("manual");
+    expect(tx.tags).toContain("manual");
+    expect(tx.id).toMatch(/^manual-/);
+  });
+
+  it("stock path: fees increase the debit magnitude of netAmount", () => {
+    const tx = buildManualOpenTransaction({
+      kind: "stock",
+      baseId: "sell-close",
+      openDate: "2025-01-02",
+      symbol: "AMD",
+      underlyingSymbol: "AMD",
+      action: "BUY",
+      pricePerShare: 10,
+      shares: 100,
+      fees: 5,
+      sourceBroker: "Robinhood",
+      accountName: "Test",
+    });
+    expect(tx.grossAmount).toBe(-1000);
+    expect(tx.netAmount).toBe(-1005); // −1000 − 5
+    expect(tx.fees).toBe(5);
+  });
+});
+
+// ── HIGH-VALUE INTEGRATION TEST: orphan stock sell + manual buy opener resolves ─
+
+describe("integration: orphan stock sell + manual buy opener resolves", () => {
+  it("stock SELL with no prior BUY is unresolved (costBasis null), then resolves after adding the opener", () => {
+    const sell = stockTx("sell-1", "2025-02-15", "SELL", "AMD", 100, 12);
+
+    // Before: orphan SELL → SWING_TRADE with costBasis null
+    const before = calculateDashboard([sell], defaultSettings);
+    const orphanEvent = before.realizedEvents.find((e) => e.strategy === "SWING_TRADE");
+    expect(orphanEvent).toBeDefined();
+    expect(orphanEvent!.costBasis).toBeNull();
+    expect(orphanEvent!.warnings).toContain("Missing cost basis");
+
+    // Add the manual BUY opener before the sell date
+    const opener = buildManualOpenTransaction({
+      kind: "stock",
+      baseId: "sell-1",
+      openDate: "2025-01-15",
+      symbol: "AMD",
+      underlyingSymbol: "AMD",
+      action: "BUY",
+      pricePerShare: 10,
+      shares: 100,
+      fees: 0,
+      sourceBroker: "Robinhood",
+      accountName: "Test",
+    });
+
+    // After: SELL now has a known basis and the expected P&L (proceeds − basis − fees)
+    const after = calculateDashboard([opener, sell], defaultSettings);
+    const resolved = after.realizedEvents.find((e) => e.strategy === "SWING_TRADE");
+    expect(resolved).toBeDefined();
+    expect(resolved!.costBasis).toBe(1000); // 100 × 10
+    // proceeds 1200 − basis 1000 − fees 0 = 200
+    expect(resolved!.realizedPnl).toBe(200);
+    expect(resolved!.warnings).not.toContain("Missing cost basis");
   });
 });
 

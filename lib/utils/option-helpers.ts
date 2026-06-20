@@ -87,21 +87,24 @@ export function lifecycleToEvent(
 /**
  * Infer the opening action from a closing action.
  *
- * SELL_TO_CLOSE → BUY_TO_OPEN (long position)
- * BUY_TO_CLOSE  → SELL_TO_OPEN (short position)
+ * SELL_TO_CLOSE → BUY_TO_OPEN (long option)
+ * BUY_TO_CLOSE  → SELL_TO_OPEN (short option)
  * EXPIRATION / ASSIGNMENT → SELL_TO_OPEN (short; typical wheel)
+ * SELL (stock)  → BUY (the opening stock purchase)
  */
 export function inferOpenerAction(
   closeAction: TradeAction
-): "BUY_TO_OPEN" | "SELL_TO_OPEN" {
+): "BUY_TO_OPEN" | "SELL_TO_OPEN" | "BUY" {
   if (closeAction === "SELL_TO_CLOSE") return "BUY_TO_OPEN";
+  if (closeAction === "SELL") return "BUY";
   // BUY_TO_CLOSE, EXPIRATION, ASSIGNMENT → short
   return "SELL_TO_OPEN";
 }
 
 // ── Feature 2: buildManualOpenTransaction ─────────────────────────────────────
 
-export interface ManualOpenInput {
+export interface ManualOpenOptionInput {
+  kind?: "option";
   /** Base for id derivation (e.g. close tx id). */
   baseId: string;
   openDate: string;
@@ -118,18 +121,65 @@ export interface ManualOpenInput {
   accountName: string;
 }
 
+export interface ManualOpenStockInput {
+  kind: "stock";
+  /** Base for id derivation (e.g. close tx id). */
+  baseId: string;
+  openDate: string;
+  symbol: string;
+  underlyingSymbol: string;
+  /** Opener for a stock close is always a BUY. */
+  action: "BUY";
+  pricePerShare: number;
+  shares: number;
+  fees: number;
+  sourceBroker: string;
+  accountName: string;
+}
+
+export type ManualOpenInput = ManualOpenOptionInput | ManualOpenStockInput;
+
 /**
- * Build a manual TradeTransaction for an opening option leg.
+ * Build a manual TradeTransaction for an opening leg (option or stock).
  *
  * Sign convention matches lib/import/robinhood.ts:
- *   SELL_TO_OPEN → grossAmount positive (credit received)
- *   BUY_TO_OPEN  → grossAmount negative (debit paid)
+ *   Option SELL_TO_OPEN → grossAmount positive (credit received)
+ *   Option BUY_TO_OPEN  → grossAmount negative (debit paid)
+ *   Stock  BUY          → grossAmount negative (debit paid)
  *
- * netAmount = grossAmount − fees  (fees always reduce net)
+ * netAmount = grossAmount − fees  (fees always reduce net toward / past zero)
  */
 export function buildManualOpenTransaction(
   input: ManualOpenInput
 ): TradeTransaction {
+  if (input.kind === "stock") {
+    const rawAmount = input.pricePerShare * input.shares;
+    // Stock BUY is a debit (matches Robinhood's negative `amount` for buys).
+    const grossAmount = -rawAmount;
+    const netAmount = grossAmount - input.fees;
+
+    return {
+      id: `manual-${crypto.randomUUID()}`,
+      sourceBroker: input.sourceBroker as "Robinhood",
+      accountName: input.accountName,
+      tradeDate: input.openDate,
+      symbol: input.symbol,
+      underlyingSymbol: input.underlyingSymbol,
+      instrumentType: "stock",
+      action: "BUY",
+      quantity: input.shares,
+      price: input.pricePerShare,
+      grossAmount,
+      fees: input.fees,
+      netAmount,
+      optionType: null,
+      rawDescription: `Manually added opening buy for ${input.shares} ${input.symbol} @ $${input.pricePerShare}`,
+      importBatchId: "manual",
+      tags: ["manual"],
+      status: "normalized",
+    };
+  }
+
   const rawAmount = input.pricePerContract * input.contracts * 100;
   const grossAmount =
     input.action === "SELL_TO_OPEN" ? rawAmount : -rawAmount;

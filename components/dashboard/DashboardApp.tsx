@@ -157,7 +157,11 @@ export function DashboardApp() {
           />
         )}
         {activeTab === "Swing trades" && (
-          <SwingTradesTab result={result} onSelectEvent={setSelectedEvent} />
+          <SwingTradesTab
+            result={result}
+            onSelectEvent={setSelectedEvent}
+            onReviewFix={() => setReviewFixOpen(true)}
+          />
         )}
         {activeTab === "Performance" && (
           <PerformanceTab result={result} annualGoal={settings.annualRealizedPnlGoal} onSelectEvent={setSelectedEvent} />
@@ -468,53 +472,6 @@ function SettingsTab({
             })
           }
         />
-        <div className="rounded-md border border-hairline bg-surface-inset p-3">
-          <div className="font-sans text-[12px] font-medium text-foreground">
-            Manual basis overrides
-          </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {Object.entries(settings.manualCostBasisPerShare)
-              .filter(([sym]) => sym !== "PAYPAL")
-              .map(([sym, basis]) => (
-                <div
-                  key={sym}
-                  className="flex items-center justify-between rounded-md border border-hairline bg-surface px-3 py-2"
-                >
-                  <span className="font-sans text-[11px] font-medium text-foreground">
-                    {sym}
-                  </span>
-                  <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
-                    {formatCurrency(basis, { maximumFractionDigits: 2 })}/share
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-        <div className="rounded-md border border-hairline bg-surface-inset p-3">
-          <div className="font-sans text-[12px] font-medium text-foreground">
-            Zero-basis lots
-          </div>
-          <div className="mt-2 grid gap-2">
-            {settings.manualZeroBasisLots.map((lot) => (
-              <div
-                key={`${lot.symbol}-${lot.quantity}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-3 py-2"
-              >
-                <span className="font-sans text-[11px] font-medium text-foreground">
-                  {lot.symbol}
-                </span>
-                <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
-                  {formatNumber(lot.quantity, 5)} shares at $0 basis
-                </span>
-                {lot.note && (
-                  <span className="w-full font-sans text-[11px] text-muted-foreground">
-                    {lot.note}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
       </SettingsPanel>
       <SettingsPanel title="Capital Calculation">
         <label className="grid gap-1">

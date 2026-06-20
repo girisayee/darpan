@@ -76,13 +76,16 @@ function SwingMetricsStrip({ rows }: { rows: RealizedPnLEvent[] }) {
 export function SwingTradesTab({
   result,
   onSelectEvent,
+  onReviewFix,
 }: {
   result: CalculationResult;
   onSelectEvent: (e: RealizedPnLEvent) => void;
+  onReviewFix?: () => void;
 }) {
   const swingRows = result.realizedEvents.filter(
     (e) => e.strategy === "SWING_TRADE"
   );
+  const unresolvedCount = swingRows.filter((e) => e.costBasis === null).length;
 
   return (
     <div className="space-y-4 py-2">
@@ -90,13 +93,27 @@ export function SwingTradesTab({
       <SwingMetricsStrip rows={swingRows} />
 
       {/* ── Ledger ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
           Swing trades
         </h2>
-        <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
-          {swingRows.length} trade{swingRows.length !== 1 ? "s" : ""}
-        </span>
+        <div className="flex items-center gap-2">
+          {unresolvedCount > 0 && onReviewFix && (
+            <button
+              type="button"
+              onClick={onReviewFix}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-warn/15 px-1 text-[10px] tabular-nums text-warn">
+                {unresolvedCount}
+              </span>
+              Fix →
+            </button>
+          )}
+          <span className="font-sans text-[12px] tabular-nums text-muted-foreground">
+            {swingRows.length} trade{swingRows.length !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
       <ClosedTradesTable
         rows={swingRows}

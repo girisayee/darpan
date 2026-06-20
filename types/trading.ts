@@ -214,8 +214,6 @@ export type AppSettings = {
   annualRealizedPnlGoal: number;
   maxBuyingPower: number;
   costBasisMethod: CostBasisMethod;
-  manualCostBasisPerShare: Record<string, number>;
-  manualZeroBasisLots: Array<{ symbol: string; quantity: number; note?: string }>;
   coveredCallDenominator: "UNDERLYING_COST_BASIS" | "CURRENT_MARKET_VALUE" | "ASSIGNMENT_PROCEEDS";
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL" | "NET_COLLATERAL_AFTER_PREMIUM";
   monthlyRoiDenominator: "AVERAGE_DEPLOYED_CAPITAL" | "PEAK_DEPLOYED_CAPITAL" | "CLOSED_TRADE_CAPITAL";

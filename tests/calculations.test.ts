@@ -262,13 +262,22 @@ describe("calculation engine", () => {
     expect(result.aggregates.strategyBreakdown[0].roiPercent).toBe(10);
   });
 
-  it("uses manual cost basis for covered call assignments when opening lots are absent", () => {
+  it("produces an unresolved SWING_TRADE event (costBasis null + Missing cost basis warning) for a stock SELL with no opening BUY", () => {
+    const result = calculateDashboard([stockTx("s1", "2026-01-10", "SELL", "PYPL", 10, 80)]);
+    const event = result.realizedEvents.find((e) => e.strategy === "SWING_TRADE");
+    expect(event).toBeDefined();
+    expect(event!.costBasis).toBeNull();
+    expect(event!.warnings).toContain("Missing cost basis");
+    // The warning appears exactly once (deduped).
+    expect(event!.warnings.filter((w) => w === "Missing cost basis")).toHaveLength(1);
+  });
+
+  it("legacy manual-basis covered call assignment now relies on real opening lots", () => {
     const result = calculateDashboard(
       [
         optionTx("o1", "2026-02-01", "SELL_TO_OPEN", "IREN", "call", 35, "2026-02-27", 100),
         optionTx("o2", "2026-02-27", "ASSIGNMENT", "IREN", "call", 35, "2026-02-27", 0)
-      ],
-      { ...defaultSettings, manualCostBasisPerShare: { IREN: 49.25 } }
+      ]
     );
     const assignEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT");
     const stockEvent = result.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
@@ -281,26 +290,17 @@ describe("calculation engine", () => {
     // closeCost for option = 0 (no BTC); grossProceeds = premiumReceived = 100
     expect(assignEvent!.grossProceeds).toBe(100);
 
-    // Stock-sale event: proceeds(3500) − costBasis(4925) = −1425
-    expect(stockEvent!.costBasis).toBe(4925);
-    expect(stockEvent!.realizedPnl).toBe(-1425);
-    expect(stockEvent!.warnings).toContain("Manual cost basis override used for IREN.");
+    // With no opening stock lot and no manual override, basis is unknown:
+    // costBasis is null and the stock-sale P&L falls back to full proceeds.
+    expect(stockEvent!.costBasis).toBeNull();
+    expect(stockEvent!.realizedPnl).toBe(3500);
+    expect(stockEvent!.warnings).toContain("Missing cost basis");
 
-    // Grand total unchanged: 100 + (−1425) = −1325
-    expect(result.aggregates.totalRealizedPnl).toBe(-1325);
+    // Grand total: 100 (premium) + 3500 (proceeds, no basis) = 3600
+    expect(result.aggregates.totalRealizedPnl).toBe(3600);
 
-    // Share-sale loss flows into totalStockTradingPnl
-    expect(result.aggregates.totalStockTradingPnl).toBe(-1425);
-  });
-
-  it("uses manual cost basis for stock sells when opening lots are absent", () => {
-    const result = calculateDashboard(
-      [stockTx("s1", "2026-01-10", "SELL", "PYPL", 10, 80)],
-      { ...defaultSettings, manualCostBasisPerShare: { PYPL: 79 }, manualZeroBasisLots: [] }
-    );
-    expect(result.realizedEvents[0].costBasis).toBe(790);
-    expect(result.realizedEvents[0].realizedPnl).toBe(10);
-    expect(result.realizedEvents[0].warnings).toContain("Manual cost basis override used for PYPL.");
+    // Share-sale flows into totalStockTradingPnl
+    expect(result.aggregates.totalStockTradingPnl).toBe(3500);
   });
 
   it("creates a closed lifecycle for a bought-then-sold (long) option with correct P&L", () => {
@@ -388,17 +388,13 @@ describe("calculation engine", () => {
     expect(openWheels).toHaveLength(0);
   });
 
-  it("uses a zero cost basis for the PYPL dividend share lot", () => {
-    const result = calculateDashboard(
-      [stockTx("s1", "2026-01-10", "SELL", "PYPL", 0.11481, 47.5)],
-      {
-        ...defaultSettings,
-        manualCostBasisPerShare: { PYPL: 79 },
-        manualZeroBasisLots: [{ symbol: "PYPL", quantity: 0.11481, note: "Dividend share with zero cost basis." }]
-      }
-    );
-    expect(result.realizedEvents[0].costBasis).toBe(0);
-    expect(result.realizedEvents[0].realizedPnl).toBeCloseTo(5.453475, 5);
+  it("a stock SELL covered by a prior BUY lot resolves with a known cost basis", () => {
+    const result = calculateDashboard([
+      stockTx("b1", "2026-01-02", "BUY", "PYPL", 10, 79),
+      stockTx("s1", "2026-01-10", "SELL", "PYPL", 10, 80)
+    ]);
+    expect(result.realizedEvents[0].costBasis).toBe(790);
+    expect(result.realizedEvents[0].realizedPnl).toBe(10);
     expect(result.realizedEvents[0].warnings).not.toContain("Missing cost basis");
   });
 

@@ -51,7 +51,7 @@ For frontend changes, verify in the in-app browser at `http://localhost:3000/` w
 - Assignment stock settlement rows from Robinhood are intentionally ignored to avoid double counting the linked option assignment.
 - Assignment events still exist in the ledger and calculations, but the dashboard should not promote separate assignment stat cards or chart series.
 - LEU-style same-day option open/close rows must process opens before closes.
-- Manual basis defaults matter: IREN, AGQ, SLV, PYPL/PAYPAL, plus the PYPL zero-basis fractional dividend lot.
+- A stock sell with no matching opening buy yields an unresolved SWING_TRADE event (`costBasis === null`, "Missing cost basis" warning); the opener is added via Review & fix.
 - Current covered-call capital uses known stock basis when available and strike exposure as a fallback for open-cycle display.
 - The annual realized P&L goal is configurable in settings and defaults to `40000`.
 

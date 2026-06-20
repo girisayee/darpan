@@ -16,6 +16,7 @@ const OPTION_CLOSE_ACTIONS = new Set([
 ]);
 
 interface OrphanRow {
+  kind: "option" | "stock";
   eventId: string;
   date: string;
   symbol: string;
@@ -32,6 +33,8 @@ function buildOrphanRows(result: CalculationResult): OrphanRow[] {
     result.transactions.map((t) => [t.id, t])
   );
   const rows: OrphanRow[] = [];
+
+  // Option-close orphans: DATA_ISSUE events tied to an option closing leg.
   for (const event of result.realizedEvents) {
     if (event.strategy !== "DATA_ISSUE") continue;
     const txId = event.linkedTransactionIds[0];
@@ -39,6 +42,7 @@ function buildOrphanRows(result: CalculationResult): OrphanRow[] {
     if (tx && !OPTION_CLOSE_ACTIONS.has(tx.action)) continue;
     if (!tx && event.quantity === 0) continue;
     rows.push({
+      kind: "option",
       eventId: event.id,
       date: event.date,
       symbol: event.symbol,
@@ -50,6 +54,26 @@ function buildOrphanRows(result: CalculationResult): OrphanRow[] {
       sourceTx: tx,
     });
   }
+
+  // Stock orphans: SWING_TRADE events with no resolvable cost basis (no opening BUY).
+  for (const event of result.realizedEvents) {
+    if (event.strategy !== "SWING_TRADE" || event.costBasis !== null) continue;
+    const txId = event.linkedTransactionIds[0];
+    const tx = txId ? txById.get(txId) : undefined;
+    rows.push({
+      kind: "stock",
+      eventId: event.id,
+      date: event.date,
+      symbol: event.symbol,
+      action: "SELL",
+      optionType: null,
+      strikePrice: null,
+      expirationDate: null,
+      qty: Math.abs(event.quantity),
+      sourceTx: tx,
+    });
+  }
+
   rows.sort((a, b) => b.date.localeCompare(a.date));
   return rows;
 }
@@ -60,6 +84,7 @@ function actionLabel(action: TradeAction | string): string {
     BUY_TO_CLOSE: "BTC",
     EXPIRATION: "Expiration",
     ASSIGNMENT: "Assignment",
+    SELL: "Sell",
   };
   return map[action] ?? action;
 }
@@ -73,20 +98,23 @@ function openerActionLabel(action: "BUY_TO_OPEN" | "SELL_TO_OPEN"): string {
 interface FormState {
   openerAction: "BUY_TO_OPEN" | "SELL_TO_OPEN";
   openDate: string;
-  premium: string;
-  contracts: string;
+  /** Premium per contract (option) or price per share (stock). */
+  price: string;
+  /** Contracts (option) or shares (stock). */
+  qty: string;
   fees: string;
 }
 
 interface FormErrors {
   openDate?: string;
-  premium?: string;
-  contracts?: string;
+  price?: string;
+  qty?: string;
 }
 
 function validateForm(
   state: FormState,
-  closeDate: string
+  closeDate: string,
+  kind: "option" | "stock"
 ): FormErrors {
   const errs: FormErrors = {};
   if (!state.openDate) {
@@ -94,13 +122,18 @@ function validateForm(
   } else if (state.openDate > closeDate) {
     errs.openDate = `Open date must be on or before close date (${closeDate}).`;
   }
-  const premNum = Number(state.premium);
-  if (state.premium === "" || isNaN(premNum) || premNum < 0) {
-    errs.premium = "Premium must be ≥ 0.";
+  const priceNum = Number(state.price);
+  if (state.price === "" || isNaN(priceNum) || priceNum < 0) {
+    errs.price = kind === "stock" ? "Price must be ≥ 0." : "Premium must be ≥ 0.";
   }
-  const ctrNum = Number(state.contracts);
-  if (state.contracts === "" || isNaN(ctrNum) || !Number.isInteger(ctrNum) || ctrNum < 1) {
-    errs.contracts = "Contracts must be a whole number ≥ 1.";
+  const qtyNum = Number(state.qty);
+  if (kind === "stock") {
+    // Shares may be fractional; just require > 0.
+    if (state.qty === "" || isNaN(qtyNum) || qtyNum <= 0) {
+      errs.qty = "Shares must be greater than 0.";
+    }
+  } else if (state.qty === "" || isNaN(qtyNum) || !Number.isInteger(qtyNum) || qtyNum < 1) {
+    errs.qty = "Contracts must be a whole number ≥ 1.";
   }
   return errs;
 }
@@ -113,71 +146,97 @@ function AddOpenForm({
   onSubmit: (tx: TradeTransaction) => void;
 }) {
   const inferredAction = row.action && OPTION_CLOSE_ACTIONS.has(row.action)
-    ? inferOpenerAction(row.action as TradeAction)
+    ? (inferOpenerAction(row.action as TradeAction) as "BUY_TO_OPEN" | "SELL_TO_OPEN")
     : "SELL_TO_OPEN";
 
   const [state, setState] = useState<FormState>({
     openerAction: inferredAction,
     openDate: "",
-    premium: "",
-    contracts: row.qty > 0 ? String(row.qty) : "1",
+    price: "",
+    qty: row.qty > 0 ? String(row.qty) : "1",
     fees: "0",
   });
 
   const [submitted, setSubmitted] = useState(false);
 
-  const errors = submitted ? validateForm(state, row.date) : {};
-  const isValid = Object.keys(validateForm(state, row.date)).length === 0;
+  const errors = submitted ? validateForm(state, row.date, row.kind) : {};
+  const isValid = Object.keys(validateForm(state, row.date, row.kind)).length === 0;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitted(true);
     if (!isValid) return;
 
-    const tx = buildManualOpenTransaction({
-      baseId: row.eventId,
-      openDate: state.openDate,
-      symbol: row.symbol,
-      underlyingSymbol: row.sourceTx?.underlyingSymbol ?? row.symbol,
-      optionType: row.optionType ?? "put",
-      strikePrice: row.strikePrice ?? 0,
-      expirationDate: row.expirationDate ?? row.date,
-      action: state.openerAction,
-      pricePerContract: Number(state.premium),
-      contracts: Number(state.contracts),
-      fees: Number(state.fees) || 0,
-      sourceBroker: row.sourceTx?.sourceBroker ?? "Robinhood",
-      accountName: row.sourceTx?.accountName ?? "",
-    });
+    const tx =
+      row.kind === "stock"
+        ? buildManualOpenTransaction({
+            kind: "stock",
+            baseId: row.eventId,
+            openDate: state.openDate,
+            symbol: row.symbol,
+            underlyingSymbol: row.sourceTx?.underlyingSymbol ?? row.symbol,
+            action: "BUY",
+            pricePerShare: Number(state.price),
+            shares: Number(state.qty),
+            fees: Number(state.fees) || 0,
+            sourceBroker: row.sourceTx?.sourceBroker ?? "Robinhood",
+            accountName: row.sourceTx?.accountName ?? "",
+          })
+        : buildManualOpenTransaction({
+            baseId: row.eventId,
+            openDate: state.openDate,
+            symbol: row.symbol,
+            underlyingSymbol: row.sourceTx?.underlyingSymbol ?? row.symbol,
+            optionType: row.optionType ?? "put",
+            strikePrice: row.strikePrice ?? 0,
+            expirationDate: row.expirationDate ?? row.date,
+            action: state.openerAction,
+            pricePerContract: Number(state.price),
+            contracts: Number(state.qty),
+            fees: Number(state.fees) || 0,
+            sourceBroker: row.sourceTx?.sourceBroker ?? "Robinhood",
+            accountName: row.sourceTx?.accountName ?? "",
+          });
     onSubmit(tx);
   }
+
+  const isStock = row.kind === "stock";
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 space-y-3 rounded-lg border border-hairline bg-surface-inset p-3">
       <div className="font-sans text-[11.5px] font-medium text-foreground">Add opening trade</div>
 
       {/* Read-only inherited fields */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <ReadOnlyField label="Symbol" value={row.symbol} />
-        <ReadOnlyField label="Type" value={row.optionType ? row.optionType.charAt(0).toUpperCase() + row.optionType.slice(1) : "—"} />
-        <ReadOnlyField label="Strike" value={row.strikePrice ? `$${row.strikePrice.toFixed(2)}` : "—"} />
-        <ReadOnlyField label="Expiration" value={row.expirationDate ?? "—"} />
-      </div>
+      {isStock ? (
+        <div className="grid grid-cols-2 gap-2">
+          <ReadOnlyField label="Symbol" value={row.symbol} />
+          <ReadOnlyField label="Opening action" value="Buy" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <ReadOnlyField label="Symbol" value={row.symbol} />
+          <ReadOnlyField label="Type" value={row.optionType ? row.optionType.charAt(0).toUpperCase() + row.optionType.slice(1) : "—"} />
+          <ReadOnlyField label="Strike" value={row.strikePrice ? `$${row.strikePrice.toFixed(2)}` : "—"} />
+          <ReadOnlyField label="Expiration" value={row.expirationDate ?? "—"} />
+        </div>
+      )}
 
-      {/* Opener action (editable) */}
-      <div className="grid gap-1">
-        <label className="font-sans text-[11px] text-muted-foreground">
-          Opening action
-        </label>
-        <select
-          value={state.openerAction}
-          onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as FormState["openerAction"] }))}
-          className="h-9 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        >
-          <option value="SELL_TO_OPEN">{openerActionLabel("SELL_TO_OPEN")}</option>
-          <option value="BUY_TO_OPEN">{openerActionLabel("BUY_TO_OPEN")}</option>
-        </select>
-      </div>
+      {/* Opener action (editable, option only) */}
+      {!isStock && (
+        <div className="grid gap-1">
+          <label className="font-sans text-[11px] text-muted-foreground">
+            Opening action
+          </label>
+          <select
+            value={state.openerAction}
+            onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as FormState["openerAction"] }))}
+            className="h-9 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            <option value="SELL_TO_OPEN">{openerActionLabel("SELL_TO_OPEN")}</option>
+            <option value="BUY_TO_OPEN">{openerActionLabel("BUY_TO_OPEN")}</option>
+          </select>
+        </div>
+      )}
 
       {/* User inputs */}
       <div className="grid gap-2 sm:grid-cols-2">
@@ -190,23 +249,23 @@ function AddOpenForm({
           max={row.date}
         />
         <FormField
-          label="Premium per contract ($)"
+          label={isStock ? "Price per share ($)" : "Premium per contract ($)"}
           type="number"
-          value={state.premium}
-          onChange={(v) => setState((s) => ({ ...s, premium: v }))}
-          error={errors.premium}
+          value={state.price}
+          onChange={(v) => setState((s) => ({ ...s, price: v }))}
+          error={errors.price}
           min="0"
           step="0.01"
-          placeholder="e.g. 1.50"
+          placeholder={isStock ? "e.g. 10.00" : "e.g. 1.50"}
         />
         <FormField
-          label="Contracts"
+          label={isStock ? "Shares" : "Contracts"}
           type="number"
-          value={state.contracts}
-          onChange={(v) => setState((s) => ({ ...s, contracts: v }))}
-          error={errors.contracts}
-          min="1"
-          step="1"
+          value={state.qty}
+          onChange={(v) => setState((s) => ({ ...s, qty: v }))}
+          error={errors.qty}
+          min={isStock ? "0" : "1"}
+          step={isStock ? "0.00001" : "1"}
         />
         <FormField
           label="Fees ($, optional)"
@@ -295,13 +354,16 @@ function OrphanRowCard({
   const [expanded, setExpanded] = useState(false);
   const [resolved, setResolved] = useState(false);
 
-  // Only rows with the full matcher key (type + strike + expiration) can build a
+  // Option rows need the full matcher key (type + strike + expiration) to build a
   // valid opener — otherwise we'd synthesize a junk leg (strike 0) that never matches.
+  // Stock rows only need a positive quantity (and a symbol, always present).
   const fixable =
-    row.optionType != null &&
-    row.strikePrice != null &&
-    row.strikePrice > 0 &&
-    !!row.expirationDate;
+    row.kind === "stock"
+      ? row.qty > 0
+      : row.optionType != null &&
+        row.strikePrice != null &&
+        row.strikePrice > 0 &&
+        !!row.expirationDate;
 
   function handleSubmit(tx: TradeTransaction) {
     onAddTransaction(tx);
@@ -352,7 +414,7 @@ function OrphanRowCard({
             </button>
           ) : (
             <span className="font-sans text-[11px] text-muted-foreground">
-              Missing option details
+              {row.kind === "stock" ? "Missing trade details" : "Missing option details"}
             </span>
           )}
         </div>
@@ -473,7 +535,7 @@ export function ReviewFixPanel({
                 Review &amp; fix data issues
               </h2>
               <p className="mt-1 font-sans text-[11.5px] text-muted-foreground">
-                Add a missing opening leg to resolve orphan option closes.
+                Add a missing opening trade to resolve orphan option and stock closes.
               </p>
             </div>
             <button
@@ -491,7 +553,7 @@ export function ReviewFixPanel({
           <div className="mt-4 space-y-3">
             {orphans.length === 0 ? (
               <div className="rounded-lg border border-pos/30 bg-pos/5 p-4 font-sans text-[12.5px] text-pos">
-                No unresolved closes — all option trades are matched.
+                No unresolved closes — all option and stock trades are matched.
               </div>
             ) : (
               <>

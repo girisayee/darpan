@@ -80,8 +80,7 @@ Important behaviors:
 
 - Transaction sorting processes same-day opens before closes.
 - Stock lots use FIFO/LIFO/AVERAGE based on settings.
-- Manual per-symbol basis overrides can fill missing stock basis.
-- Exact-match zero-basis manual lots support fractional dividend-share sales.
+- A stock sell with no covering buy lot is left unresolved (`costBasis === null`) and surfaced in Review & fix, where the user adds the opening buy.
 - Option lifecycles are keyed by underlying, option type, strike, and expiration.
 - Put assignment creates a stock tax lot; stock P&L is realized later when shares are sold.
 

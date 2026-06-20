@@ -12,20 +12,6 @@ export const defaultSettings: AppSettings = {
   annualRealizedPnlGoal: 40000,
   maxBuyingPower: 125000,
   costBasisMethod: "FIFO",
-  manualCostBasisPerShare: {
-    IREN: 49.25,
-    AGQ: 74.3,
-    SLV: 36.85,
-    PYPL: 79,
-    PAYPAL: 79
-  },
-  manualZeroBasisLots: [
-    {
-      symbol: "PYPL",
-      quantity: 0.11481,
-      note: "Dividend share with zero cost basis."
-    }
-  ],
   coveredCallDenominator: "UNDERLYING_COST_BASIS",
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL",
   monthlyRoiDenominator: "AVERAGE_DEPLOYED_CAPITAL",
