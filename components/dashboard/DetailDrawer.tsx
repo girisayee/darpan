@@ -4,7 +4,8 @@ import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { RealizedPnLEvent, TradeTransaction } from "@/types/trading";
+import type { RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
+import { assignmentShareDetail } from "@/lib/utils/option-helpers";
 
 // ---------- helpers ----------
 
@@ -55,10 +56,14 @@ export function DetailDrawer({
   event,
   onClose,
   transactions,
+  events = [],
+  taxLots = [],
 }: {
   event: RealizedPnLEvent | null;
   onClose: () => void;
   transactions: TradeTransaction[];
+  events?: RealizedPnLEvent[];
+  taxLots?: TaxLot[];
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -162,6 +167,9 @@ export function DetailDrawer({
           tx.tradeDate < earliest ? tx.tradeDate : earliest
         , linked[0].tradeDate)
       : null;
+
+  // Share-leg detail for assignment events (called-away CC shares / put-acquired shares)
+  const shareDetail = assignmentShareDetail(event, events, taxLots);
 
   return (
     /* Backdrop scrim */
@@ -296,6 +304,81 @@ export function DetailDrawer({
               </span>
             </div>
           </div>
+
+          {/* ── Shares section (assignment share leg) ── */}
+          {shareDetail && shareDetail.kind === "called-away" && (
+            <div className="mt-4">
+              <div className="font-sans text-[11px] text-muted-foreground">
+                Called-away shares
+              </div>
+              <div className="mt-1.5">
+                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+                  <span className="text-dim">Shares sold at strike</span>
+                  <span className="font-sans tabular-nums font-medium text-foreground">
+                    {formatNumber(shareDetail.shares)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+                  <span className="text-dim">Share cost basis</span>
+                  <span className="font-sans tabular-nums font-medium text-neg">
+                    {shareDetail.costBasis != null
+                      ? `−${formatCurrency(Math.abs(shareDetail.costBasis), { maximumFractionDigits: 2 })}`
+                      : "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+                  <span className="text-dim">Strike proceeds</span>
+                  <span className="font-sans tabular-nums font-medium text-pos">
+                    {`+${formatCurrency(shareDetail.proceeds, { maximumFractionDigits: 2 })}`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+                  <span className="text-foreground font-medium">Assignment P&amp;L (shares)</span>
+                  <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.pnl))}>
+                    {signedCurrency(shareDetail.pnl)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2.5 font-sans text-[13px]">
+                  <span className="text-dim">Share ROI</span>
+                  <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.roiPercent))}>
+                    {shareDetail.roiPercent !== null
+                      ? `${shareDetail.roiPercent >= 0 ? "+" : ""}${formatPercent(shareDetail.roiPercent)}`
+                      : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          {shareDetail && shareDetail.kind === "acquired" && (
+            <div className="mt-4">
+              <div className="font-sans text-[11px] text-muted-foreground">
+                Shares acquired
+              </div>
+              <div className="mt-1.5">
+                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+                  <span className="text-dim">Shares purchased at strike</span>
+                  <span className="font-sans tabular-nums font-medium text-foreground">
+                    {formatNumber(shareDetail.shares)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+                  <span className="text-dim">Cost basis / share</span>
+                  <span className="font-sans tabular-nums font-medium text-foreground">
+                    {formatCurrency(shareDetail.costBasisPerShare, { maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+                  <span className="text-foreground font-medium">Total cost basis</span>
+                  <span className="font-sans tabular-nums font-medium text-foreground">
+                    {formatCurrency(shareDetail.costBasisTotal, { maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="py-2 font-sans text-[11px] text-muted-foreground">
+                  Strike purchase cost net of premium received.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── 3×2 meta grid ── */}
           <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">

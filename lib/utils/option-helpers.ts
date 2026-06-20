@@ -6,6 +6,7 @@
 import type {
   OptionLifecycle,
   RealizedPnLEvent,
+  TaxLot,
   TradeAction,
   TradeTransaction,
 } from "@/types/trading";
@@ -207,4 +208,76 @@ export function buildManualOpenTransaction(
     tags: ["manual"],
     status: "normalized",
   };
+}
+
+// ── assignmentShareDetail: share-side detail for the DetailDrawer ─────────────
+
+/**
+ * Share-leg detail for an assignment event, for display in the DetailDrawer.
+ *  - "called-away": covered-call assignment sold the shares at strike — shows the
+ *    allocated cost basis, strike proceeds, the realized share P&L, and share ROI.
+ *  - "acquired": cash-secured-put assignment bought shares at strike — shows the
+ *    resulting lot's effective cost basis (strike purchase − net premium).
+ */
+export type AssignmentShareDetail =
+  | {
+      kind: "called-away";
+      shares: number;
+      costBasis: number | null;
+      proceeds: number;
+      pnl: number;
+      roiPercent: number | null;
+    }
+  | {
+      kind: "acquired";
+      shares: number;
+      costBasisTotal: number;
+      costBasisPerShare: number;
+    }
+  | null;
+
+export function assignmentShareDetail(
+  event: RealizedPnLEvent,
+  events: RealizedPnLEvent[],
+  taxLots: TaxLot[]
+): AssignmentShareDetail {
+  // Covered call: the underlying shares were called away (sold at strike).
+  // The premium event id is `pnl-<lc>-assignment`; the share event is `...-stock`.
+  const stockEvent =
+    event.strategy === "COVERED_CALL_ASSIGNMENT_STOCK"
+      ? event
+      : event.strategy === "COVERED_CALL_ASSIGNMENT"
+        ? events.find((e) => e.id === `${event.id}-stock`)
+        : undefined;
+  if (stockEvent) {
+    const basis = stockEvent.costBasis;
+    return {
+      kind: "called-away",
+      shares: stockEvent.quantity,
+      costBasis: basis,
+      proceeds: stockEvent.grossProceeds,
+      pnl: stockEvent.realizedPnl,
+      roiPercent: basis != null && basis > 0 ? (stockEvent.realizedPnl / basis) * 100 : null,
+    };
+  }
+
+  // Cash-secured put: shares were acquired at strike — a new lot carries the basis.
+  if (event.strategy === "PUT_ASSIGNMENT") {
+    const ids = new Set(event.linkedTransactionIds);
+    const lot = taxLots.find(
+      (l) =>
+        l.source === "CASH_SECURED_PUT_ASSIGNMENT" &&
+        l.linkedTransactionIds.some((id) => ids.has(id))
+    );
+    if (lot) {
+      return {
+        kind: "acquired",
+        shares: lot.originalQuantity,
+        costBasisTotal: lot.costBasisTotal,
+        costBasisPerShare: lot.costBasisPerShare,
+      };
+    }
+  }
+
+  return null;
 }

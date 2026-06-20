@@ -199,6 +199,8 @@ export function DashboardApp() {
         event={selectedEvent}
         onClose={() => setSelectedEvent(null)}
         transactions={result.transactions}
+        events={result.realizedEvents}
+        taxLots={result.taxLots}
       />
 
       <ReviewFixPanel

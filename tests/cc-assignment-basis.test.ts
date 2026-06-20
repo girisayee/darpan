@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { calculateDashboard } from "@/lib/calculations/engine";
-import { buildManualOpenTransaction } from "@/lib/utils/option-helpers";
+import { assignmentShareDetail, buildManualOpenTransaction } from "@/lib/utils/option-helpers";
 import { buildOrphanRows } from "@/components/dashboard/ReviewFixPanel";
 import { defaultSettings } from "@/lib/storage/local-store";
-import type { TradeTransaction } from "@/types/trading";
+import type { RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
 
 // Build a multi-contract option transaction (the optionTx test helper hardcodes
 // quantity:1; a covered call over 200 shares needs 2 contracts).
@@ -148,5 +148,67 @@ describe("integration: covered-call assignment missing share cost basis", () => 
     expect(ccRow!.qty).toBe(SHARES); // shares called away
     expect(ccRow!.date).toBe("2026-02-27"); // assignment date
     expect(ccRow!.reason).toMatch(/covered-call assignment/i);
+  });
+
+  it("drawer: assignmentShareDetail surfaces called-away share basis, P&L, and ROI", () => {
+    const lotA = buildManualOpenTransaction({
+      kind: "stock", baseId: "lotA", openDate: "2026-01-10", symbol: "IREN",
+      underlyingSymbol: "IREN", action: "BUY", pricePerShare: 49.5, shares: 100,
+      fees: 0, sourceBroker: "Robinhood", accountName: "Test",
+    });
+    const lotB = buildManualOpenTransaction({
+      kind: "stock", baseId: "lotB", openDate: "2026-01-15", symbol: "IREN",
+      underlyingSymbol: "IREN", action: "BUY", pricePerShare: 49, shares: 100,
+      fees: 0, sourceBroker: "Robinhood", accountName: "Test",
+    });
+    const after = calculateDashboard([...buildBaseTxs(), lotA, lotB], defaultSettings);
+
+    // Open the drawer on the option-premium event (what lifecycleToEvent returns).
+    const premiumEvent = after.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT");
+    expect(premiumEvent).toBeDefined();
+
+    const detail = assignmentShareDetail(premiumEvent!, after.realizedEvents, after.taxLots);
+    expect(detail).not.toBeNull();
+    expect(detail!.kind).toBe("called-away");
+    if (detail!.kind === "called-away") {
+      expect(detail!.shares).toBe(SHARES); // 200
+      expect(detail!.costBasis).toBe(9850);
+      expect(detail!.proceeds).toBe(PROCEEDS); // 9600
+      expect(detail!.pnl).toBe(PROCEEDS - 9850); // −250
+      expect(detail!.roiPercent).toBeCloseTo(((PROCEEDS - 9850) / 9850) * 100, 6);
+    }
+  });
+});
+
+describe("assignmentShareDetail: put assignment + non-assignment", () => {
+  it("put assignment → acquired shares with effective cost basis from the lot", () => {
+    const putEvent = {
+      id: "pnl-csp1-put-assignment",
+      strategy: "PUT_ASSIGNMENT",
+      linkedTransactionIds: ["p1", "p2"],
+    } as unknown as RealizedPnLEvent;
+    const lot = {
+      id: "lot-csp1-assignment",
+      symbol: "ABC",
+      source: "CASH_SECURED_PUT_ASSIGNMENT",
+      originalQuantity: 100,
+      costBasisTotal: 4500,
+      costBasisPerShare: 45,
+      linkedTransactionIds: ["p1"],
+    } as unknown as TaxLot;
+
+    const detail = assignmentShareDetail(putEvent, [], [lot]);
+    expect(detail).not.toBeNull();
+    expect(detail!.kind).toBe("acquired");
+    if (detail!.kind === "acquired") {
+      expect(detail!.shares).toBe(100);
+      expect(detail!.costBasisTotal).toBe(4500);
+      expect(detail!.costBasisPerShare).toBe(45);
+    }
+  });
+
+  it("non-assignment event → null", () => {
+    const swing = { id: "pnl-x", strategy: "SWING_TRADE", linkedTransactionIds: [] } as unknown as RealizedPnLEvent;
+    expect(assignmentShareDetail(swing, [], [])).toBeNull();
   });
 });
