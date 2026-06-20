@@ -154,13 +154,6 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       align: "right",
     },
     {
-      key: "capitalDays",
-      header: "Capital Days",
-      value: (row) => row.capitalDays,
-      render: (row) => formatCurrency(row.capitalDays),
-      align: "right",
-    },
-    {
       key: "realizedRoiPercent",
       header: "Monthly ROI %",
       value: (row) => row.realizedRoiPercent ?? -999,

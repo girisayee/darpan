@@ -37,6 +37,7 @@ import {
 } from "recharts";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
+import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
@@ -335,29 +336,6 @@ function MonthlyComposedChart({
   );
 }
 
-// ── Benchmark placeholder ─────────────────────────────────────────────────────
-//
-// DATA GAP: SPY / QQQ benchmark returns are a deferred subsystem.
-
-function BenchmarkPlaceholder() {
-  return (
-    <div
-      className="flex flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-hairline bg-surface px-6 py-8 text-center"
-      aria-label="Benchmark coming soon"
-    >
-      <span className="font-sans text-[13px] font-medium text-muted-foreground">
-        Benchmark vs SPY / QQQ
-      </span>
-      <span className="inline-flex items-center rounded-full bg-surface-inset px-3 py-1 font-sans text-[11px] font-medium text-muted-foreground">
-        coming soon
-      </span>
-      <p className="max-w-[280px] font-sans text-[12px] text-dim">
-        Benchmark comparison requires a market-data feed that is not yet connected. It will appear here once available.
-      </p>
-    </div>
-  );
-}
-
 // ── PerformanceTab ─────────────────────────────────────────────────────────────
 
 export function PerformanceTab({
@@ -388,22 +366,6 @@ export function PerformanceTab({
     a.tradeQuality.profitFactor === null
       ? "—"
       : formatNumber(a.tradeQuality.profitFactor, 2);
-
-  // ── Risk strip: Concentration + Assignment rate ───────────────────────────
-
-  // assignmentRate is fraction → ×100 before formatPercent
-  const assignmentRateDisplay =
-    a.premium.assignmentRate === null
-      ? "—"
-      : formatPercent(a.premium.assignmentRate * 100, 0);
-
-  const concentrationLevel = a.allocation.bySymbol.level; // "low" | "moderate" | "high"
-  const concentrationTone: "positive" | "negative" | "neutral" =
-    concentrationLevel === "low"
-      ? "positive"
-      : concentrationLevel === "high"
-        ? "negative"
-        : "neutral";
 
   return (
     <div className="space-y-5 py-2">
@@ -441,7 +403,10 @@ export function PerformanceTab({
         />
       </MetricGroup>
 
-      {/* ── 2. Equity curve ── */}
+      {/* ── 2. Benchmark comparison (moved up above equity curve) ── */}
+      <BenchmarkComparison result={result} />
+
+      {/* ── 3. Equity curve ── */}
       <section className="space-y-2">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
           Equity curve
@@ -450,26 +415,6 @@ export function PerformanceTab({
           <EquityCurveChart result={result} annualGoal={annualGoal} />
         </div>
       </section>
-
-      {/* ── 3. Risk strip: Concentration + Assignment rate ── */}
-      <MetricGroup label="Risk" cols={2}>
-        <KpiCard
-          label="Concentration"
-          value={concentrationLevel.charAt(0).toUpperCase() + concentrationLevel.slice(1)}
-          helper={`HHI ${formatNumber(a.allocation.bySymbol.hhi, 3)}`}
-          tooltip="Symbol concentration level based on Herfindahl–Hirschman Index. Low < 0.15, moderate 0.15–0.25, high > 0.25."
-          tone={concentrationTone}
-          variant="compact"
-        />
-        <KpiCard
-          label="Assignment rate"
-          value={assignmentRateDisplay}
-          helper="Assigned / terminal cycles"
-          tooltip="Fraction of terminal option cycles (expired + closed + assigned) that ended in assignment. Fraction ×100 before display."
-          tone="neutral"
-          variant="compact"
-        />
-      </MetricGroup>
 
       {/* ── 4. Monthly realized P&L + ROI ComposedChart ── */}
       <section className="space-y-2">
@@ -480,11 +425,10 @@ export function PerformanceTab({
           <MonthlyComposedChart result={result} annualGoal={annualGoal} />
         </div>
         <MonthlyRoiTable rows={result.monthlyReturns} />
+        <p className="font-sans text-[12px] text-muted-foreground">
+          Monthly ROI = realized P&amp;L ÷ average capital deployed all month (how hard your whole book worked). Closed Trade ROI = realized P&amp;L ÷ capital in just the trades that closed (return on the positions you realized).
+        </p>
       </section>
-
-      {/* ── 5. Benchmark placeholder ── */}
-      {/* DATA GAP: SPY/QQQ benchmark returns require a market-data feed (deferred) */}
-      <BenchmarkPlaceholder />
     </div>
   );
 }
