@@ -26,6 +26,7 @@ import { parseRobinhoodInput, type ImportPreview } from "@/lib/import/robinhood"
 import { sampleTransactions } from "@/lib/sample-data/sample-transactions";
 import { goalPace } from "@/lib/selectors/goal-pace";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
+import { riskMetrics } from "@/lib/selectors/risk";
 import { filterResult } from "@/lib/selectors/filter-result";
 import {
   createBackup,
@@ -476,6 +477,7 @@ function OverviewTab({
 function CapitalTab({ result, onSelectEvent }: { result: CalculationResult; onSelectEvent: (event: RealizedPnLEvent) => void }) {
   const latest = result.monthlyReturns.at(-1);
   const a = wheelAnalytics(result);
+  const risk = riskMetrics(result);
   return (
     <div className="space-y-3">
       {/* 8-up KpiCard readout */}
@@ -537,6 +539,31 @@ function CapitalTab({ result, onSelectEvent }: { result: CalculationResult; onSe
           tone="neutral"
         />
       </div>
+
+      {/* Risk metrics group */}
+      <MetricGroup label="Risk" cols={3}>
+        <KpiCard
+          label="Max Drawdown"
+          value={risk.maxDrawdownPct === null ? "—" : formatPercent(-(risk.maxDrawdownPct * 100), 1)}
+          helper="Peak-to-trough equity decline"
+          tooltip="Largest peak-to-trough decline in cumulative realized equity."
+          tone={risk.maxDrawdownPct ? "negative" : "neutral"}
+        />
+        <KpiCard
+          label="Sortino"
+          value={risk.sortino === null ? "—" : formatNumber(risk.sortino, 2)}
+          helper="Downside-adj. return ratio"
+          tooltip="Downside-deviation-adjusted return (monthly ROI, MAR 0)."
+          tone="neutral"
+        />
+        <KpiCard
+          label="Calmar"
+          value={risk.calmar === null ? "—" : formatNumber(risk.calmar, 2)}
+          helper="Ann. return / max drawdown"
+          tooltip="Annualized return divided by max drawdown."
+          tone="neutral"
+        />
+      </MetricGroup>
 
       {/* Monthly ROI bar chart */}
       <section className="rounded-lg border border-hairline bg-surface p-4">
