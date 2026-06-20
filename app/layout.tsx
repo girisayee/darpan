@@ -5,7 +5,7 @@ import "./globals.css";
 const sans = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "PositionIQ",
+  title: "RealizedEdge",
   description: "Realized P&L, option income, and capital efficiency across options and stock trades."
 };
 

@@ -171,7 +171,7 @@ export function DashboardApp() {
       </section>
 
       <footer className="pb-6 text-center text-xs text-muted-foreground">
-        PositionIQ is for personal tracking and analysis only. Verify results against official brokerage and tax documents.
+        RealizedEdge is for personal tracking and analysis only. Verify results against official brokerage and tax documents.
       </footer>
 
       <DetailDrawer event={selectedEvent} onClose={() => setSelectedEvent(null)} transactions={result.transactions} />
@@ -248,6 +248,7 @@ function OverviewTab({
           helper="Calendar-year realized"
           tooltip="Current calendar-year realized P&L across all closed events."
           tone={tone(result.aggregates.currentYearRealizedPnl)}
+          variant="hero"
         />
         <KpiCard
           label="Annualized ROC"
@@ -255,6 +256,7 @@ function OverviewTab({
           helper="Capital-weighted"
           tooltip="Capital-weighted mean of per-event annualized ROI."
           tone={tone(a.capitalEfficiency.annualizedRoc ?? 0)}
+          variant="hero"
         />
         <KpiCard
           label="Premium collected"
@@ -262,6 +264,7 @@ function OverviewTab({
           helper={a.premium.captureRate === null ? "—" : `${formatPercent(a.premium.captureRate * 100, 0)} capture`}
           tooltip="Total premium received from opening option sales."
           tone="neutral"
+          variant="hero"
         />
         <KpiCard
           label="Win rate"
@@ -269,6 +272,7 @@ function OverviewTab({
           helper={`PF ${a.tradeQuality.profitFactor === null ? "—" : formatNumber(a.tradeQuality.profitFactor, 1)} · exp ${a.tradeQuality.expectancy === null ? "—" : formatCurrency(a.tradeQuality.expectancy)}`}
           tooltip="Win rate: fraction of realized events that closed profitable."
           tone="neutral"
+          variant="hero"
         />
       </MetricGroup>
 
@@ -280,6 +284,7 @@ function OverviewTab({
           helper="Closed option premium P&L"
           tooltip="Net realized option premium from all closed cycles."
           tone={tone(result.aggregates.totalOptionsPremium)}
+          variant="compact"
         />
         <KpiCard
           label="Stock P&L"
@@ -287,6 +292,7 @@ function OverviewTab({
           helper="Realized stock sales"
           tooltip="Realized P&L from stock sales (swings and assignments)."
           tone={tone(result.aggregates.totalStockTradingPnl)}
+          variant="compact"
         />
         <KpiCard
           label="Income / day"
@@ -294,6 +300,7 @@ function OverviewTab({
           helper="Option premium per capital-day"
           tooltip="Total option premium P&L divided by total capital-days."
           tone="neutral"
+          variant="compact"
         />
       </MetricGroup>
 
@@ -305,6 +312,7 @@ function OverviewTab({
           helper="YTD P&L / YTD avg deployed capital"
           tooltip="YTD realized P&L divided by average deployed capital."
           tone={tone(result.aggregates.ytdRoi ?? 0)}
+          variant="compact"
         />
         <KpiCard
           label="Avg monthly ROI"
@@ -312,6 +320,7 @@ function OverviewTab({
           helper="Average of months with known capital"
           tooltip="Only months with known capital are included."
           tone={tone(result.aggregates.averageMonthlyRoi ?? 0)}
+          variant="compact"
         />
         <KpiCard
           label="Capital turnover"
@@ -319,6 +328,7 @@ function OverviewTab({
           helper="Total closed capital / mean deployed"
           tooltip="How many times the average deployed capital was cycled through closed trades."
           tone="neutral"
+          variant="compact"
         />
       </MetricGroup>
 
@@ -330,6 +340,7 @@ function OverviewTab({
           helper="Gross profit / gross loss"
           tooltip="Ratio of gross profit to gross loss. >1 means net profitable."
           tone="neutral"
+          variant="compact"
         />
         <KpiCard
           label="Expectancy"
@@ -337,6 +348,7 @@ function OverviewTab({
           helper="Mean P&L per trade"
           tooltip="Average realized P&L per closed event."
           tone={tone(a.tradeQuality.expectancy ?? 0)}
+          variant="compact"
         />
         <KpiCard
           label="Payoff ratio"
@@ -344,6 +356,7 @@ function OverviewTab({
           helper="Avg win / avg loss"
           tooltip="Average winning trade divided by average losing trade magnitude."
           tone="neutral"
+          variant="compact"
         />
         <KpiCard
           label="Assignment rate"
@@ -351,6 +364,7 @@ function OverviewTab({
           helper="Assigned / terminal options"
           tooltip="Fraction of terminal option contracts that resulted in assignment."
           tone="neutral"
+          variant="compact"
         />
       </MetricGroup>
 
@@ -362,6 +376,7 @@ function OverviewTab({
           helper={a.allocation.bySymbol.topShare > 0 ? `${formatPercent(a.allocation.bySymbol.topShare * 100, 0)} of capital` : "No data"}
           tooltip="Symbol with the largest cumulative realized P&L."
           tone="neutral"
+          variant="compact"
         />
         <KpiCard
           label="Concentration"
@@ -369,6 +384,7 @@ function OverviewTab({
           helper={`HHI ${formatNumber(a.allocation.bySymbol.hhi, 2)}`}
           tooltip="Herfindahl-Hirschman Index measures portfolio concentration by symbol capital."
           tone="neutral"
+          variant="compact"
         />
         <KpiCard
           label="Premium capture"
@@ -376,6 +392,7 @@ function OverviewTab({
           helper="Net option P&L / premium received"
           tooltip="How much of the collected premium was retained as net P&L."
           tone="neutral"
+          variant="compact"
         />
       </MetricGroup>
 
@@ -398,6 +415,7 @@ function OverviewTab({
                 helper="Calendar-year realized P&L"
                 tooltip="Current calendar-year realized P&L."
                 tone={tone(result.aggregates.currentYearRealizedPnl)}
+                variant="compact"
               />
               <KpiCard
                 label="All-time Net P&L"
@@ -405,6 +423,7 @@ function OverviewTab({
                 helper="All-time realized P&L"
                 tooltip="All-time total realized P&L across all closed events."
                 tone={tone(result.aggregates.totalRealizedPnl)}
+                variant="compact"
               />
               <KpiCard
                 label="Avg deployed"
@@ -412,6 +431,7 @@ function OverviewTab({
                 helper="Avg monthly capital-days denominator"
                 tooltip="Average deployed capital uses daily capital exposure."
                 tone="neutral"
+                variant="compact"
               />
               <KpiCard
                 label="Peak deployed"
@@ -419,6 +439,7 @@ function OverviewTab({
                 helper="Highest daily deployed capital"
                 tooltip="Highest deployed capital observed in a month."
                 tone="neutral"
+                variant="compact"
               />
               <KpiCard
                 label="Avg win"
@@ -426,6 +447,7 @@ function OverviewTab({
                 helper="Average profitable event"
                 tooltip="Mean P&L of all winning realized events."
                 tone={tone(a.tradeQuality.averageWin ?? 0)}
+                variant="compact"
               />
               <KpiCard
                 label="Avg loss"
@@ -433,20 +455,23 @@ function OverviewTab({
                 helper="Average losing event"
                 tooltip="Mean P&L of all losing realized events."
                 tone={tone(a.tradeQuality.averageLoss ?? 0)}
+                variant="compact"
               />
               <KpiCard
                 label="Best strategy"
-                value={label(bestStrategy?.strategy)}
+                value={bestStrategy ? label(bestStrategy.strategy) : "—"}
                 helper="Highest strategy P&L"
                 tooltip="Strategy group with the largest cumulative realized P&L."
                 tone="neutral"
+                variant="compact"
               />
               <KpiCard
                 label="Worst strategy"
-                value={label(worstStrategy?.strategy)}
+                value={worstStrategy ? label(worstStrategy.strategy) : "—"}
                 helper="Lowest strategy P&L"
                 tooltip="Strategy group with the smallest cumulative realized P&L."
                 tone="neutral"
+                variant="compact"
               />
               <KpiCard
                 label="Closed trades"
@@ -454,6 +479,7 @@ function OverviewTab({
                 helper="Total realized P&L events"
                 tooltip="Count of all realized P&L events in the current view."
                 tone="neutral"
+                variant="compact"
               />
             </MetricGroup>
           </div>
