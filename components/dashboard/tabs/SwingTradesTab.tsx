@@ -11,10 +11,11 @@
  * above the ClosedTradesTable filtered to SWING_TRADE rows.
  */
 
+import { Column, DataTable } from "@/components/tables/DataTable";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
-import { ClosedTradesTable } from "./shared";
+import { signedMoney, signedPercent } from "./shared";
 
 // ── Swing metrics strip ───────────────────────────────────────────────────────
 
@@ -71,6 +72,114 @@ function SwingMetricsStrip({ rows }: { rows: RealizedPnLEvent[] }) {
   );
 }
 
+// ── SwingTradesTable ──────────────────────────────────────────────────────────
+
+function SwingTradesTable({
+  rows,
+  onSelectEvent,
+}: {
+  rows: RealizedPnLEvent[];
+  onSelectEvent: (e: RealizedPnLEvent) => void;
+}) {
+  const filtered = rows.filter((r) => r.strategy !== "DATA_ISSUE");
+
+  const columns: Column<RealizedPnLEvent>[] = [
+    {
+      key: "date",
+      header: "Date",
+      value: (row) => row.date ?? "",
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">
+          {row.date ?? <span className="opacity-50">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: "symbol",
+      header: "Symbol",
+      value: (row) => row.symbol,
+      render: (row) => (
+        <span className="font-medium text-foreground">{row.symbol}</span>
+      ),
+    },
+    {
+      key: "quantity",
+      header: "Qty",
+      value: (row) => row.quantity,
+      render: (row) => (
+        <span className="tabular-nums text-foreground">{row.quantity}</span>
+      ),
+      align: "right",
+    },
+    {
+      key: "purchasePrice",
+      header: "Purchase price",
+      value: (row) => {
+        const basis = (row.costBasis ?? 0) > 0 ? row.costBasis! : 1;
+        return row.quantity > 0 ? basis / row.quantity : 0;
+      },
+      render: (row) => {
+        const basis = (row.costBasis ?? 0) > 0 ? row.costBasis! : 1;
+        const price = row.quantity > 0 ? basis / row.quantity : 0;
+        return <span className="tabular-nums text-foreground">{formatCurrency(price)}</span>;
+      },
+      align: "right",
+    },
+    {
+      key: "salePrice",
+      header: "Sale price",
+      value: (row) => (row.quantity > 0 ? row.grossProceeds / row.quantity : 0),
+      render: (row) => {
+        const price = row.quantity > 0 ? row.grossProceeds / row.quantity : 0;
+        return <span className="tabular-nums text-foreground">{formatCurrency(price)}</span>;
+      },
+      align: "right",
+    },
+    {
+      key: "realizedPnl",
+      header: "Realized P&L",
+      value: (row) => row.realizedPnl,
+      render: (row) => signedMoney(row.realizedPnl),
+      align: "right",
+    },
+    {
+      key: "holdingDays",
+      header: "Days held",
+      value: (row) => row.holdingDays ?? -Infinity,
+      render: (row) =>
+        row.holdingDays != null ? (
+          <span className="tabular-nums text-foreground">{row.holdingDays}</span>
+        ) : (
+          <span className="opacity-50">—</span>
+        ),
+      align: "right",
+    },
+    {
+      key: "roiPercent",
+      header: "ROI %",
+      value: (row) => {
+        const basis = (row.costBasis ?? 0) > 0 ? row.costBasis! : 1;
+        return (row.realizedPnl / basis) * 100;
+      },
+      render: (row) => {
+        const basis = (row.costBasis ?? 0) > 0 ? row.costBasis! : 1;
+        return signedPercent((row.realizedPnl / basis) * 100);
+      },
+      align: "right",
+    },
+  ];
+
+  return (
+    <DataTable
+      rows={filtered}
+      columns={columns}
+      onRowClick={onSelectEvent}
+      empty="No swing trades yet."
+      defaultSort={{ key: "date", direction: "desc" }}
+    />
+  );
+}
+
 // ── SwingTradesTab ────────────────────────────────────────────────────────────
 
 export function SwingTradesTab({
@@ -115,10 +224,9 @@ export function SwingTradesTab({
           </span>
         </div>
       </div>
-      <ClosedTradesTable
+      <SwingTradesTable
         rows={swingRows}
         onSelectEvent={onSelectEvent}
-        empty="No swing trades yet."
       />
     </div>
   );

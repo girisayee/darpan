@@ -15,6 +15,28 @@ export type CapitalMatchedResult = {
 };
 
 /**
+ * Resolve the benchmark window start as a strict YYYY-MM-01 ISO date from the
+ * earliest numeric year/month present.
+ *
+ * IMPORTANT: callers MUST pass numeric year/month (e.g. result.monthlyReturns),
+ * NOT a formatted month label. A prior bug derived this from
+ * aggregates.monthlyRealizedPnl[].month — a human label like "Jan 25" — and
+ * appended "-01", producing "Jan 25-01", which the /api/benchmark route rejects
+ * (it validates /^\d{4}-\d{2}-\d{2}$/), so the comparison always returned empty.
+ *
+ * Returns null when there are no months.
+ */
+export function benchmarkStartISO(
+  months: { year: number; month: number }[]
+): string | null {
+  if (months.length === 0) return null;
+  const earliest = [...months].sort(
+    (a, b) => a.year - b.year || a.month - b.month
+  )[0];
+  return `${earliest.year}-${String(earliest.month).padStart(2, "0")}-01`;
+}
+
+/**
  * Given an array of daily closes and an average deployed capital amount,
  * compute what a buy-and-hold of that capital in the benchmark would have returned
  * over the same window.

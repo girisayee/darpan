@@ -140,9 +140,21 @@ export function OverviewTab({
         </p>
       </div>
 
-      {/* ── Hero KPI row — exactly three tiles ── */}
+      {/* ── Hero KPI row ── */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
-        {/* 1. Return on capital */}
+        {/* 1. Net P&L · YTD — moved here from the Performance tab */}
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <KpiCard
+            label="Net P&L · YTD"
+            value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
+            helper="Calendar-year realized"
+            tooltip="Current calendar-year realized P&L across all closed events."
+            tone={tone(result.aggregates.currentYearRealizedPnl)}
+            variant="hero"
+          />
+        </div>
+
+        {/* 2. Return on capital */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <KpiCard
             label="Return on capital"
@@ -154,7 +166,7 @@ export function OverviewTab({
           />
         </div>
 
-        {/* 2. Avg deployed capital */}
+        {/* 3. Avg deployed capital */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <KpiCard
             label="Avg deployed capital"
@@ -166,7 +178,7 @@ export function OverviewTab({
           />
         </div>
 
-        {/* 3. Win · PF — winRate is a fraction → ×100 before formatPercent */}
+        {/* 4. Win · PF — winRate is a fraction → ×100 before formatPercent */}
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <KpiCard
             label="Win · PF"

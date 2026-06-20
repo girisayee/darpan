@@ -17,8 +17,8 @@ PositionIQ is built around realized trading analytics rather than live portfolio
 
 - `Overview`: goal cards, performance snapshot, KPI matrix, and insights. Sections are rearrangeable and hideable.
 - `Capital & ROI`: monthly ROI, capital efficiency KPIs, charts, monthly ROI table, and capital efficiency ledger.
-- `Covered Calls`: option-cycle stats, current open covered-call capital, open covered calls, all covered-call cycles, and covered-call results.
-- `Cash-Secured Puts`: option-cycle stats, current open CSP collateral, open CSPs, all CSP cycles, and CSP results.
+- `Covered Calls`: option-cycle stats, current open covered-call capital, open covered calls, and covered-call results.
+- `Cash-Secured Puts`: option-cycle stats, current open CSP collateral, open CSPs, and CSP results.
 - `Swing Trades`: realized stock-trade ledger.
 - `Tax Lots`: open/closed/partially closed tax lots.
 - `Trades`: normalized transaction list.

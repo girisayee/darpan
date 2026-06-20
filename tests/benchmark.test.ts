@@ -1,8 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { capitalMatchedReturn } from "@/lib/benchmark/compare";
+import { benchmarkStartISO, capitalMatchedReturn } from "@/lib/benchmark/compare";
 
 const mkCloses = (pairs: [string, number][]) =>
   pairs.map(([date, close]) => ({ date, close }));
+
+describe("benchmarkStartISO", () => {
+  it("returns the earliest month as a valid YYYY-MM-01 ISO date", () => {
+    const iso = benchmarkStartISO([
+      { year: 2025, month: 1 },
+      { year: 2025, month: 2 },
+      { year: 2026, month: 3 },
+    ]);
+    expect(iso).toBe("2025-01-01");
+  });
+
+  it("zero-pads single-digit months", () => {
+    expect(benchmarkStartISO([{ year: 2025, month: 3 }])).toBe("2025-03-01");
+    expect(benchmarkStartISO([{ year: 2025, month: 12 }])).toBe("2025-12-01");
+  });
+
+  it("picks the earliest even when input is out of order or crosses years", () => {
+    const iso = benchmarkStartISO([
+      { year: 2026, month: 2 },
+      { year: 2024, month: 11 },
+      { year: 2025, month: 6 },
+    ]);
+    expect(iso).toBe("2024-11-01");
+  });
+
+  it("returns null for an empty array", () => {
+    expect(benchmarkStartISO([])).toBeNull();
+  });
+
+  it("never produces a non-ISO string from a formatted label (regression)", () => {
+    // The bug: callers passed a human label like "Jan 25" + "-01" → "Jan 25-01".
+    // benchmarkStartISO takes numeric year/month, so output always matches the
+    // strict YYYY-MM-DD shape the /api/benchmark route validates.
+    const iso = benchmarkStartISO([{ year: 2025, month: 1 }]);
+    expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
 
 describe("capitalMatchedReturn", () => {
   it("returns correct returnPct and dollarPnl for a gain", () => {

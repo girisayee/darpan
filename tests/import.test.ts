@@ -94,6 +94,17 @@ describe("Robinhood import", () => {
     expect(preview.rows[3]).toMatchObject({ action: "ASSIGNMENT", instrumentType: "stock", status: "ignored" });
   });
 
+  it("ignores multi-contract assignment stock legs described as 'Options Assigned' (plural)", () => {
+    const csv = [
+      '"Activity Date","Process Date","Settle Date","Instrument","Description","Trans Code","Quantity","Price","Amount"',
+      '"2/27/2026","2/27/2026","3/2/2026","IREN","IREN 2/27/2026 Call $35.00","OASGN","2","",""',
+      '"2/27/2026","2/27/2026","3/2/2026","IREN","IREN Limited CUSIP: Q4982L109 2 IREN Options Assigned","Sell","200","$35.00","$6,999.96"'
+    ].join("\n");
+    const preview = parseRobinhoodInput(csv);
+    expect(preview.rows[0]).toMatchObject({ action: "ASSIGNMENT", instrumentType: "option", optionType: "call", strikePrice: 35, status: "normalized" });
+    expect(preview.rows[1]).toMatchObject({ action: "ASSIGNMENT", instrumentType: "stock", status: "ignored" });
+  });
+
   it("normalizes non-trade cash rows without requiring symbols", () => {
     const csv = [
       '"Activity Date","Process Date","Settle Date","Instrument","Description","Trans Code","Quantity","Price","Amount"',

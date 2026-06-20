@@ -9,6 +9,9 @@ interface AppShellProps {
   tabs: readonly string[];
   activeTab: string;
   onSelectTab: (tab: string) => void;
+  years: string[];
+  year: string;
+  onYear: (year: string) => void;
   accounts: string[];
   account: string;
   onAccount: (account: string) => void;
@@ -50,6 +53,9 @@ export function AppShell({
   tabs,
   activeTab,
   onSelectTab,
+  years,
+  year,
+  onYear,
   accounts,
   account,
   onAccount,
@@ -135,8 +141,25 @@ export function AppShell({
         </nav>
       </div>
 
-      {/* RIGHT: account switcher + actions */}
+      {/* RIGHT: year selector + account switcher + actions */}
       <div className="flex items-center gap-1 shrink-0">
+        {/* Year selector */}
+        <select
+          value={year}
+          onChange={(e) => onYear(e.target.value)}
+          aria-label="Filter by year"
+          className={cn(
+            "rounded-[8px] border border-hairline bg-surface",
+            "px-2.5 py-[5px] text-[12px] text-muted-foreground",
+            "hover:text-foreground transition-colors cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          )}
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
         {/* Account switcher pill */}
         <button
           type="button"

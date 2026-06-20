@@ -81,7 +81,7 @@ function normalizeRow(
   const symbol = get("symbol") || inferSymbol(rawDescription);
   const rawAction = get("action");
   const initialAction = normalizeAction(rawAction, rawDescription);
-  const isAssignmentStockLeg = /^(buy|sell)$/i.test(rawAction) && /option assigned/i.test(rawDescription);
+  const isAssignmentStockLeg = /^(buy|sell)$/i.test(rawAction) && /options? assigned/i.test(rawDescription);
   const action = isAssignmentStockLeg ? "ASSIGNMENT" : initialAction;
   const optionType = normalizeOptionType(get("optionType"), rawDescription);
   const strikePrice = parseMoney(get("strikePrice")) || inferStrike(rawDescription);
@@ -184,7 +184,7 @@ function normalizeInstrument(value: string, optionType: OptionType, description:
   const text = `${value} ${description}`.toLowerCase();
   if (optionType || /\b(call|put|\d+[cp])\b/.test(text)) return "option";
   if (["DIVIDEND", "FEE", "TRANSFER"].includes(action)) return "cash";
-  if (["BUY", "SELL"].includes(action) || (action === "ASSIGNMENT" && /option assigned/i.test(description))) return "stock";
+  if (["BUY", "SELL"].includes(action) || (action === "ASSIGNMENT" && /options? assigned/i.test(description))) return "stock";
   if (text.includes("stock") || text.includes("share") || text.includes("buy") || text.includes("sell")) return "stock";
   if (text.includes("cash")) return "cash";
   return "other";

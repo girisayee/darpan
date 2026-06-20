@@ -60,6 +60,7 @@ export function DashboardApp() {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const { theme, toggle } = useTheme();
   const [account, setAccount] = useState("ALL");
+  const [year, setYear] = useState("2026");
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
   const [reviewFixOpen, setReviewFixOpen] = useState(false);
 
@@ -77,16 +78,21 @@ export function DashboardApp() {
     [allTransactions, settings]
   );
 
-  // FilterBar removed per spec kill-list. Pass ALL constants; keep account from chrome switcher.
   const result = useMemo(
-    () => filterResult(baseResult, { symbol: "ALL", strategy: "ALL", year: "ALL", month: "ALL", account }, settings),
-    [baseResult, account, settings]
+    () => filterResult(baseResult, { symbol: "ALL", strategy: "ALL", year, month: "ALL", account }, settings),
+    [baseResult, year, account, settings]
   );
 
   const accounts = useMemo(
     () => ["ALL", ...new Set(allTransactions.map((t) => t.accountName).filter(Boolean).sort())],
     [allTransactions]
   );
+
+  const years = useMemo(() => {
+    const fromData = new Set(allTransactions.map((t) => t.tradeDate.slice(0, 4)).filter(Boolean));
+    fromData.add("2026");
+    return [...fromData].sort((a, b) => b.localeCompare(a));
+  }, [allTransactions]);
 
   function updateSettings(next: AppSettings) {
     void saveStore({ settings: { ...next, showSampleData: false } });
@@ -100,9 +106,8 @@ export function DashboardApp() {
     setReviewFixOpen(true);
   }
 
-  function addTransaction(tx: TradeTransaction) {
-    const next = [...storedTransactions, tx];
-    void saveStore({ transactions: next });
+  function addTransactions(txs: TradeTransaction[]) {
+    void saveStore({ transactions: [...storedTransactions, ...txs] });
   }
 
   const primaryTabs = tabs as readonly string[];
@@ -114,6 +119,9 @@ export function DashboardApp() {
         tabs={primaryTabs}
         activeTab={activeTab === "Import" || activeTab === "Settings" ? "Overview" : activeTab}
         onSelectTab={(t) => setActiveTab(t as Tab)}
+        years={years}
+        year={year}
+        onYear={setYear}
         accounts={accounts}
         account={account}
         onAccount={setAccount}
@@ -197,7 +205,7 @@ export function DashboardApp() {
         open={reviewFixOpen}
         onClose={() => setReviewFixOpen(false)}
         result={result}
-        onAddTransaction={addTransaction}
+        onAddTransactions={addTransactions}
       />
     </main>
   );

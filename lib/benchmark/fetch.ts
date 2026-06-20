@@ -67,6 +67,62 @@ function parseYahooJson(json: unknown): ClosePoint[] {
 }
 
 /**
+ * Realistic browser headers. Stooq and Yahoo both increasingly reject requests
+ * that don't look like a browser (Stooq serves an anti-bot JS challenge; Yahoo
+ * returns 401/429). These improve the odds of a real response on a live network.
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+/** fetch with an abort timeout. Returns null on any error/timeout (never throws). */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  ms: number
+): Promise<Response | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal, cache: "no-store" });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Best-effort Yahoo session cookie (cached for the server process lifetime).
+ * Yahoo's data hosts often 401/429 without an A1/A3 cookie. Failure is fine —
+ * we proceed without one and let the chart call try anyway.
+ */
+let yahooCookie: string | null = null;
+async function getYahooCookie(): Promise<string | null> {
+  if (yahooCookie) return yahooCookie;
+  const resp = await fetchWithTimeout(
+    "https://fc.yahoo.com/",
+    { headers: BROWSER_HEADERS },
+    4000
+  );
+  if (!resp) return null;
+  // Node/undici exposes getSetCookie(); fall back to the combined header.
+  const raw =
+    typeof resp.headers.getSetCookie === "function"
+      ? resp.headers.getSetCookie()
+      : resp.headers.get("set-cookie")
+        ? [resp.headers.get("set-cookie") as string]
+        : [];
+  const pairs = raw.map((c) => c.split(";")[0]).filter(Boolean);
+  if (pairs.length === 0) return null;
+  yahooCookie = pairs.join("; ");
+  return yahooCookie;
+}
+
+/**
  * Fetch daily closes for `symbol` between `fromISO` and `toISO` (YYYY-MM-DD).
  * Tries Stooq first, falls back to Yahoo Finance, returns [] on all errors.
  */
@@ -80,43 +136,34 @@ export async function fetchDailyCloses(
   const stooqUrl = `https://stooq.com/q/d/l/?s=${symbol.toLowerCase()}.us&d1=${d1}&d2=${d2}&i=d`;
 
   // Primary: Stooq CSV
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
-    const resp = await fetch(stooqUrl, {
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
-    clearTimeout(timer);
-    if (resp.ok) {
-      const text = await resp.text();
-      const data = parseStooqCsv(text);
-      if (data.length > 0) return data;
-    }
-  } catch {
-    // fall through to Yahoo
+  const stooqResp = await fetchWithTimeout(
+    stooqUrl,
+    { headers: BROWSER_HEADERS },
+    4000
+  );
+  if (stooqResp?.ok) {
+    const data = parseStooqCsv(await stooqResp.text());
+    if (data.length > 0) return data;
   }
 
-  // Fallback: Yahoo Finance chart API
-  try {
-    const from = Math.floor(new Date(fromISO + "T00:00:00Z").getTime() / 1000);
-    const to = Math.floor(new Date(toISO + "T23:59:59Z").getTime() / 1000);
-    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${from}&period2=${to}&interval=1d`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
-    const resp = await fetch(yahooUrl, {
-      signal: ctrl.signal,
-      cache: "no-store",
-      headers: { "User-Agent": "Mozilla/5.0" },
-    });
-    clearTimeout(timer);
-    if (resp.ok) {
-      const json: unknown = await resp.json();
-      const data = parseYahooJson(json);
+  // Fallback: Yahoo Finance chart API (try both hosts; attach a session cookie).
+  const from = Math.floor(new Date(fromISO + "T00:00:00Z").getTime() / 1000);
+  const to = Math.floor(new Date(toISO + "T23:59:59Z").getTime() / 1000);
+  const cookie = await getYahooCookie();
+  const yahooHeaders: Record<string, string> = cookie
+    ? { ...BROWSER_HEADERS, Cookie: cookie }
+    : BROWSER_HEADERS;
+
+  for (const host of ["query1", "query2"]) {
+    const yahooUrl = `https://${host}.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${from}&period2=${to}&interval=1d`;
+    const resp = await fetchWithTimeout(yahooUrl, { headers: yahooHeaders }, 4000);
+    if (!resp?.ok) continue;
+    try {
+      const data = parseYahooJson(await resp.json());
       if (data.length > 0) return data;
+    } catch {
+      // try next host
     }
-  } catch {
-    // fall through
   }
 
   return [];

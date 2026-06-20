@@ -1,19 +1,16 @@
 "use client";
 
 /**
- * PerformanceTab — Phase 2.
+ * PerformanceTab — index comparison + visuals only.
  *
  * Sections:
- *   1. Top KPI strip (3 compact KpiCards: Net P&L · Return on capital · Profit factor)
+ *   1. Benchmark vs SPY/QQQ (capital-matched index comparison)
  *   2. Equity curve — recharts line in an h-[200px] ResponsiveContainer
- *   3. Risk strip (Concentration + Assignment rate only)
- *   4. Monthly P&L + ROI ComposedChart (bars left $ axis, line right % axis, ReferenceLine at monthly goal)
- *   5. Monthly ledger table
- *   6. "Benchmark vs SPY/QQQ — coming soon" placeholder card
+ *   3. Monthly P&L + ROI ComposedChart (bars left $ axis, line right % axis,
+ *      ReferenceLine at monthly goal) + Monthly ledger table
  *
- * DATA GAPS noted inline where a live data source is deferred:
- *   - Benchmark (SPY/QQQ) returns: deferred subsystem → placeholder card
- *   - Income calendar: deferred subsystem → not rendered
+ * Numeric KPI cards (Net P&L · YTD, Return on capital, Profit factor) live on
+ * the Overview tab — this tab is deliberately charts + benchmark only.
  *
  * Token classes only; fraction selectors ×100 before formatPercent;
  * already-% values (ytdRoi, averageMonthlyRoi) passed straight.
@@ -35,13 +32,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { KpiCard } from "@/components/dashboard/KpiCard";
-import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
-import { wheelAnalytics } from "@/lib/selectors/analytics";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
-import { MonthlyRoiTable, tone } from "./shared";
+import { MonthlyRoiTable } from "./shared";
 
 // ── recharts palette via CSS variables ───────────────────────────────────────
 const C_POS      = "rgb(var(--pos))";
@@ -349,64 +343,16 @@ export function PerformanceTab({
 }) {
   void onSelectEvent; // DetailDrawer wiring — available for future drill-down
 
-  const a = wheelAnalytics(result);
-
-  // ── Top KPI strip ────────────────────────────────────────────────────────
-  // Net P&L YTD, Return on capital, Profit factor
-
-  // Return on capital = totalRealizedPnl / averageDeployedCapital × 100
-  const roc =
-    result.aggregates.averageDeployedCapital > 0
-      ? (result.aggregates.totalRealizedPnl / result.aggregates.averageDeployedCapital) * 100
-      : null;
-  const rocDisplay = roc === null ? "—" : formatPercent(roc, 1);
-
-  // Profit factor
-  const pfDisplay =
-    a.tradeQuality.profitFactor === null
-      ? "—"
-      : formatNumber(a.tradeQuality.profitFactor, 2);
+  // This tab is intentionally index-comparison + visuals only. The numeric KPI
+  // strip (Net P&L · YTD, Return on capital, Profit factor) now lives on the
+  // Overview tab to avoid duplicating headline metrics across tabs.
 
   return (
     <div className="space-y-5 py-2">
-      {/* ── 1. Top KPI strip ── */}
-      <MetricGroup cols={3}>
-        <KpiCard
-          label="Net P&L · YTD"
-          value={formatCurrency(result.aggregates.currentYearRealizedPnl)}
-          helper="Calendar-year realized"
-          tooltip="Current calendar-year realized P&L across all closed events."
-          tone={tone(result.aggregates.currentYearRealizedPnl)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Return on capital"
-          value={rocDisplay}
-          helper="realized P&L ÷ avg deployed"
-          tooltip="Total realized P&L divided by average deployed capital."
-          tone={tone(roc ?? 0)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Profit factor"
-          value={pfDisplay}
-          helper="Gross profit / gross loss"
-          tooltip="Total gross profit divided by total gross loss magnitude. Values above 1.0 are positive."
-          tone={
-            a.tradeQuality.profitFactor !== null && a.tradeQuality.profitFactor >= 1
-              ? "positive"
-              : a.tradeQuality.profitFactor !== null
-                ? "negative"
-                : "neutral"
-          }
-          variant="compact"
-        />
-      </MetricGroup>
-
-      {/* ── 2. Benchmark comparison (moved up above equity curve) ── */}
+      {/* ── 1. Benchmark vs SPY/QQQ ── */}
       <BenchmarkComparison result={result} />
 
-      {/* ── 3. Equity curve ── */}
+      {/* ── 2. Equity curve ── */}
       <section className="space-y-2">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
           Equity curve
@@ -416,7 +362,7 @@ export function PerformanceTab({
         </div>
       </section>
 
-      {/* ── 4. Monthly realized P&L + ROI ComposedChart ── */}
+      {/* ── 3. Monthly realized P&L + ROI ComposedChart ── */}
       <section className="space-y-2">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
           Monthly realized P&amp;L &amp; ROI

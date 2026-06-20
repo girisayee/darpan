@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { capitalMatchedReturn } from "@/lib/benchmark/compare";
+import { benchmarkStartISO, capitalMatchedReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
 import type { CalculationResult } from "@/types/trading";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
@@ -105,10 +105,10 @@ function deleteCache(key: string | null): void {
 }
 
 export function BenchmarkComparison({ result }: { result: CalculationResult }) {
-  const months = result.aggregates.monthlyRealizedPnl;
-
-  // Derive window: first month → today
-  const fromISO: string | null = months.length > 0 ? months[0].month + "-01" : null;
+  // Derive window: earliest month → today. Build the start date from numeric
+  // year/month (result.monthlyReturns), NOT the formatted aggregates label —
+  // see benchmarkStartISO for the prior "Jan 25-01" bug this avoids.
+  const fromISO: string | null = benchmarkStartISO(result.monthlyReturns);
   const toISO = new Date().toISOString().slice(0, 10);
   const cacheKey = fromISO ? `benchmark|${fromISO}|${toISO}` : null;
 

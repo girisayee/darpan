@@ -430,7 +430,14 @@ function handleCoveredCallAssignment(
   const proceeds = lifecycle.strikePrice * lifecycle.sharesControlled;
   const allocation = allocateLots(lots, lifecycle.underlyingSymbol, lifecycle.sharesControlled, settings, transaction.tradeDate);
   lifecycle.linkedStockLotIds = allocation.linkedLotIds;
-  const allLinkedIds = [...lifecycle.linkedTransactionIds, ...allocation.linkedTransactionIds];
+  // Fold the consumed stock-lot transactions into the lifecycle's linked ids so the
+  // "manual" badge (ClosedCyclesTable manualTxIds check) and the drawer bridge pick up
+  // manually-added share buys that supplied the cost basis.
+  lifecycle.linkedTransactionIds = unique([
+    ...lifecycle.linkedTransactionIds,
+    ...allocation.linkedTransactionIds,
+  ]);
+  const allLinkedIds = lifecycle.linkedTransactionIds;
   const holdingDays = allocation.openDate ? dateDiffDays(allocation.openDate, transaction.tradeDate) : null;
   const warnings = [...lifecycle.warnings, ...allocation.warnings];
   if (!allocation.costBasisKnown) warnings.push("Missing cost basis");

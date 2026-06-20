@@ -602,8 +602,34 @@ export function OptionsTab({
     (l) => l.status !== "open" && l.status !== "unresolved"
   );
 
+  // Covered-call assignments missing the underlying share cost basis: the called-away
+  // P&L is inflated until the opening share purchase(s) are entered via Review & fix.
+  const ccMissingBasisCount = result.realizedEvents.filter(
+    (e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK" && e.costBasis === null
+  ).length;
+
   return (
     <div className="space-y-6 py-2">
+      {/* ── Missing-basis covered-call assignment banner ────────────────────── */}
+      {ccMissingBasisCount > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-hairline border-l-4 border-l-warn bg-warn/5 p-3">
+          <p className="font-sans text-[12.5px] text-foreground">
+            {ccMissingBasisCount} covered-call assignment
+            {ccMissingBasisCount !== 1 ? "s" : ""} need share cost basis to compute
+            assignment returns
+          </p>
+          {onReviewFix && (
+            <button
+              type="button"
+              onClick={onReviewFix}
+              className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              Fix →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Compact KPI header — always visible, whole-book ─────────────────── */}
       <OptionsKpiHeader result={result} />
 
