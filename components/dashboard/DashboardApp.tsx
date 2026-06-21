@@ -9,10 +9,10 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
 import { ReviewFixPanel } from "@/components/dashboard/ReviewFixPanel";
 import { KpiCard } from "@/components/dashboard/KpiCard";
-import { OverviewTab } from "@/components/dashboard/tabs/OverviewTab";
-import { OptionsTab } from "@/components/dashboard/tabs/OptionsTab";
+import { HomeTab } from "@/components/dashboard/tabs/HomeTab";
 import { PerformanceTab } from "@/components/dashboard/tabs/PerformanceTab";
-import { SwingTradesTab } from "@/components/dashboard/tabs/SwingTradesTab";
+import { TickersTab } from "@/components/dashboard/tabs/TickersTab";
+import { PositionsTab } from "@/components/dashboard/tabs/PositionsTab";
 import { AppShell } from "@/components/shell/AppShell";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { calculateDashboard } from "@/lib/calculations/engine";
@@ -40,10 +40,10 @@ import { label, signedMoney } from "@/components/dashboard/tabs/shared";
 import { ManualEntryCard } from "@/components/dashboard/ReviewFixPanel";
 
 const tabs = [
-  "Overview",
-  "Options",
-  "Swing trades",
+  "Home",
   "Performance",
+  "Tickers",
+  "Positions",
 ] as const;
 
 type PrimaryTab = (typeof tabs)[number];
@@ -53,13 +53,19 @@ export function DashboardApp() {
   const store = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerSnapshot);
   const settings = store.settings;
   const storedTransactions = store.transactions;
-  const [activeTab, setActiveTab] = useState<Tab>("Overview");
+  const [activeTab, setActiveTab] = useState<Tab>("Home");
   const { theme, toggle } = useTheme();
   const [account, setAccount] = useState("ALL");
   const [year, setYear] = useState("2026");
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
   const [selectedLifecycle, setSelectedLifecycle] = useState<OptionLifecycle | null>(null);
   const [reviewFixOpen, setReviewFixOpen] = useState(false);
+  const [positionsInitialStrategy, setPositionsInitialStrategy] = useState<import("@/lib/selectors/strategy-analytics").StrategyKey | undefined>(undefined);
+
+  function openStrategyInPositions(key: import("@/lib/selectors/strategy-analytics").StrategyKey) {
+    setPositionsInitialStrategy(key);
+    setActiveTab("Positions");
+  }
 
   useEffect(() => {
     void loadStore();
@@ -123,7 +129,7 @@ export function DashboardApp() {
       {/* Unified chrome: logo + nav pills + account switcher + actions */}
       <AppShell
         tabs={primaryTabs}
-        activeTab={activeTab === "Import" || activeTab === "Settings" ? "Overview" : activeTab}
+        activeTab={activeTab === "Import" || activeTab === "Settings" ? "Home" : activeTab}
         onSelectTab={(t) => setActiveTab(t as Tab)}
         years={years}
         year={year}
@@ -156,28 +162,25 @@ export function DashboardApp() {
         tabIndex={0}
         aria-label={activeTab}
       >
-        {activeTab === "Overview" && (
-          <OverviewTab
+        {activeTab === "Home" && (
+          <HomeTab
             result={result}
             settings={settings}
-          />
-        )}
-        {activeTab === "Options" && (
-          <OptionsTab
-            result={result}
-            onSelectLifecycle={setSelectedLifecycle}
-            onReviewFix={() => setReviewFixOpen(true)}
-          />
-        )}
-        {activeTab === "Swing trades" && (
-          <SwingTradesTab
-            result={result}
-            onSelectEvent={setSelectedEvent}
-            onReviewFix={() => setReviewFixOpen(true)}
+            onOpenStrategy={openStrategyInPositions}
           />
         )}
         {activeTab === "Performance" && (
-          <PerformanceTab result={result} annualGoal={settings.annualRealizedPnlGoal} onSelectEvent={setSelectedEvent} />
+          <PerformanceTab result={result} settings={settings} />
+        )}
+        {activeTab === "Tickers" && (
+          <TickersTab result={result} />
+        )}
+        {activeTab === "Positions" && (
+          <PositionsTab
+            result={result}
+            initialStrategy={positionsInitialStrategy}
+            onReviewFix={() => setReviewFixOpen(true)}
+          />
         )}
         {activeTab === "Import" && (
           <ImportTab
