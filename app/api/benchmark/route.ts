@@ -3,7 +3,7 @@
  *
  * GET /api/benchmark?from=YYYY-MM-DD&to=YYYY-MM-DD
  *
- * Returns: { spy: ClosePoint[], qqq: ClosePoint[] }
+ * Returns: { spy: ClosePoint[], qqq: ClosePoint[], vti: ClosePoint[] }
  * Fail-soft: never 500; missing/failed symbols return empty arrays.
  */
 
@@ -21,17 +21,18 @@ export async function GET(req: Request): Promise<Response> {
     // Validate date format roughly — fail-soft to empty arrays if bad
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRe.test(from) || !dateRe.test(to)) {
-      return Response.json({ spy: [], qqq: [] });
+      return Response.json({ spy: [], qqq: [], vti: [] });
     }
 
-    const [spy, qqq]: [ClosePoint[], ClosePoint[]] = await Promise.all([
+    const [spy, qqq, vti]: [ClosePoint[], ClosePoint[], ClosePoint[]] = await Promise.all([
       fetchDailyCloses("SPY", from, to).catch((): ClosePoint[] => []),
       fetchDailyCloses("QQQ", from, to).catch((): ClosePoint[] => []),
+      fetchDailyCloses("VTI", from, to).catch((): ClosePoint[] => []),
     ]);
 
-    return Response.json({ spy, qqq });
+    return Response.json({ spy, qqq, vti });
   } catch {
     // Never 500 — always return the empty shape
-    return Response.json({ spy: [], qqq: [] });
+    return Response.json({ spy: [], qqq: [], vti: [] });
   }
 }

@@ -17,7 +17,7 @@ import type { CalculationResult } from "@/types/trading";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
-type BenchmarkData = { spy: ClosePoint[]; qqq: ClosePoint[] };
+type BenchmarkData = { spy: ClosePoint[]; qqq: ClosePoint[]; vti: ClosePoint[] };
 type FetchStatus = "loading" | "success" | "error";
 
 type TileProps = {
@@ -110,7 +110,8 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   // see benchmarkStartISO for the prior "Jan 25-01" bug this avoids.
   const fromISO: string | null = benchmarkStartISO(result.monthlyReturns);
   const toISO = new Date().toISOString().slice(0, 10);
-  const cacheKey = fromISO ? `benchmark|${fromISO}|${toISO}` : null;
+  // "v2" invalidates older SPY/QQQ-only cache entries that lack vti.
+  const cacheKey = fromISO ? `benchmark|v2|${fromISO}|${toISO}` : null;
 
   // Lazy state init: seed from sessionStorage on first render to avoid a
   // loading flash when the data is already cached. This runs only once.
@@ -185,15 +186,21 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       ? capitalMatchedReturn(data.qqq, avgDeployed)
       : null;
 
+  const vtiResult =
+    data && data.vti && data.vti.length >= 2
+      ? capitalMatchedReturn(data.vti, avgDeployed)
+      : null;
+
   const spyUnavailable = status === "success" && (!data || data.spy.length < 2);
   const qqqUnavailable = status === "success" && (!data || data.qqq.length < 2);
+  const vtiUnavailable = status === "success" && (!data || !data.vti || data.vti.length < 2);
 
   return (
     <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Vs. buy &amp; hold (SPY / QQQ)
+          Vs. buy &amp; hold (SPY / VTI / QQQ)
         </h2>
         <span className="font-sans text-[11px] text-muted-foreground">
           {fromISO} → {toISO}
@@ -228,7 +235,8 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
 
       {/* Loading skeleton */}
       {status === "loading" && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <SkeletonTile />
           <SkeletonTile />
           <SkeletonTile />
           <SkeletonTile />
@@ -237,7 +245,7 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
 
       {/* Success state */}
       {status === "success" && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Tile
             label="Your return"
             returnPct={yourReturnPct}
@@ -248,6 +256,12 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
             returnPct={spyResult?.returnPct ?? null}
             dollarPnl={spyResult?.dollarPnl ?? null}
             unavailable={spyUnavailable}
+          />
+          <Tile
+            label="VTI (matched)"
+            returnPct={vtiResult?.returnPct ?? null}
+            dollarPnl={vtiResult?.dollarPnl ?? null}
+            unavailable={vtiUnavailable}
           />
           <Tile
             label="QQQ (matched)"
