@@ -7,6 +7,7 @@
 
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { StatusChip } from "@/components/common/StatusChip";
+import { TickerLogo } from "@/components/common/TickerLogo";
 import { cn } from "@/lib/utils/cn";
 import { compactMonth, formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
@@ -249,7 +250,10 @@ export function ClosedTradesTable({
       header: "Symbol",
       value: (row) => row.symbol,
       render: (row) => (
-        <span className="font-medium text-foreground">{row.symbol}</span>
+        <span className="inline-flex items-center gap-2">
+          <TickerLogo symbol={row.symbol} size={18} />
+          <span className="font-medium text-foreground">{row.symbol}</span>
+        </span>
       ),
     },
     {
@@ -434,6 +438,7 @@ export function ClosedCyclesTable({
         return (
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
+              <TickerLogo symbol={row.underlyingSymbol} size={18} />
               <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
               {isManual && (
                 <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-sans text-[9px] font-medium leading-none text-accent">

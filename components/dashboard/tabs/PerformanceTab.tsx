@@ -33,6 +33,7 @@ import {
   YAxis,
 } from "recharts";
 import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
+import { TickerLogo } from "@/components/common/TickerLogo";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { Column, DataTable } from "@/components/tables/DataTable";
@@ -361,6 +362,7 @@ function LeaderColumn({ title, rows }: { title: string; rows: SymbolRow[] }) {
           {rows.map((r, i) => (
             <li key={r.symbol} className="flex items-center gap-2 py-1.5">
               <span className="w-4 shrink-0 text-right font-sans text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+              <TickerLogo symbol={r.symbol} size={16} />
               <span className="min-w-0 flex-1 truncate font-sans text-[12.5px] font-medium text-foreground">{r.symbol}</span>
               <span className="shrink-0 font-sans text-[11px] tabular-nums">
                 {r.roiPercent == null ? <span className="text-dim">—</span> : signedPercent(r.roiPercent)}
@@ -393,7 +395,12 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
       key: "symbol",
       header: "Symbol",
       value: (r) => r.symbol,
-      render: (r) => <span className="font-medium text-foreground">{r.symbol}</span>,
+      render: (r) => (
+        <span className="inline-flex items-center gap-2">
+          <TickerLogo symbol={r.symbol} size={18} />
+          <span className="font-medium text-foreground">{r.symbol}</span>
+        </span>
+      ),
     },
     {
       key: "pnl",

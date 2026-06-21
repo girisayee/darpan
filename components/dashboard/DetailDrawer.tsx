@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
+import { TickerLogo } from "@/components/common/TickerLogo";
 
 // ---------- helpers ----------
 
@@ -330,6 +331,7 @@ function EventDetailBody({
       <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
         <div>
           <div className="flex items-center gap-2">
+            <TickerLogo symbol={event.symbol} size={24} />
             <span className="font-sans text-[16px] font-medium text-foreground">
               {event.symbol}
             </span>
@@ -631,6 +633,7 @@ function OptionCycleBody({
       <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
+            <TickerLogo symbol={lc.underlyingSymbol} size={24} />
             <span className="font-sans text-[16px] font-medium text-foreground">
               {lc.underlyingSymbol}
             </span>

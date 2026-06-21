@@ -17,6 +17,7 @@ import { formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/fo
 import { wheelAnalytics } from "@/lib/selectors/analytics";
 import type { CalculationResult, OptionLifecycle, TradeTransaction } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { TickerLogo } from "@/components/common/TickerLogo";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import {
   ClosedCyclesTable,
@@ -163,12 +164,15 @@ function OpenPositionsTable({
         const sharesNote =
           row.optionType === "call" ? ` · ${row.sharesControlled} shs` : "";
         return (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium text-foreground">{row.underlyingSymbol}</span>
-            <span className="text-[11px] text-muted-foreground">
-              {tag} ${row.strikePrice.toFixed(2)}
-              {sharesNote}
-            </span>
+          <div className="flex items-center gap-2">
+            <TickerLogo symbol={row.underlyingSymbol} size={18} />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium text-foreground">{row.underlyingSymbol}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {tag} ${row.strikePrice.toFixed(2)}
+                {sharesNote}
+              </span>
+            </div>
           </div>
         );
       },
