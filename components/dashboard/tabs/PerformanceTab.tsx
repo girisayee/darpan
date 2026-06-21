@@ -401,6 +401,7 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
       value: (r) => r.pnl,
       render: (r) => signedMoney(r.pnl),
       align: "right",
+      tooltip: "Total realized P&L across this symbol's closed events.",
     },
     {
       key: "roi",
@@ -409,6 +410,7 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
       value: (r) => r.roiPercent ?? -Infinity,
       render: (r) => (r.roiPercent == null ? <span className="opacity-50">—</span> : signedPercent(r.roiPercent)),
       align: "right",
+      tooltip: "Realized P&L ÷ capital deployed for this symbol.",
     },
     {
       key: "trades",
@@ -416,6 +418,7 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
       value: (r) => r.trades,
       render: (r) => <span className="tabular-nums text-foreground">{r.trades}</span>,
       align: "right",
+      tooltip: "Number of closed (realized) events for this symbol.",
     },
     {
       key: "winRate",
@@ -423,6 +426,7 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
       value: (r) => r.winRate ?? -Infinity,
       render: (r) => (r.winRate == null ? <span className="opacity-50">—</span> : formatPercent(r.winRate, 0)),
       align: "right",
+      tooltip: "Share of this symbol's closed events that were profitable.",
     },
     {
       key: "capital",
@@ -430,6 +434,7 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
       value: (r) => r.capital,
       render: (r) => <span className="tabular-nums text-foreground">{formatCurrency(r.capital)}</span>,
       align: "right",
+      tooltip: "Total capital deployed across this symbol's events.",
     },
   ];
   return (

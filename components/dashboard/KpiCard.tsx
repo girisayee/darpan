@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
-import { useId } from "react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { InfoTooltip } from "@/components/common/InfoTooltip";
 
 type Tone = "positive" | "negative" | "neutral";
 type Variant = "hero" | "standard" | "compact" | "exposure";
@@ -22,8 +22,6 @@ export function KpiCard({
   tone?: Tone;
   variant?: Variant;
 }) {
-  const tooltipId = useId();
-
   const valueClass = cn(
     "tabular-nums leading-snug flex items-center gap-0.5",
     variant === "hero"    && "text-[30px] font-semibold tracking-[-0.01em]",
@@ -38,24 +36,7 @@ export function KpiCard({
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
         {label}
-        <span className="group/tooltip relative inline-flex">
-          <button
-            type="button"
-            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground outline-none opacity-60 transition hover:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40"
-            aria-label={`About ${label}: ${tooltip}`}
-            aria-describedby={tooltipId}
-            title={tooltip}
-          >
-            <Info className="h-3 w-3" aria-hidden="true" />
-          </button>
-          <span
-            id={tooltipId}
-            role="tooltip"
-            className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-64 -translate-x-1/2 rounded-md border border-hairline bg-foreground px-3 py-2 text-xs font-medium normal-case leading-5 text-background opacity-0 transition group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100"
-          >
-            {tooltip}
-          </span>
-        </span>
+        <InfoTooltip text={tooltip} label={label} />
       </div>
       <div className={valueClass}>
         {tone === "positive" && (

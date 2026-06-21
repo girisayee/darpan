@@ -360,6 +360,7 @@ function TradesPreview({ rows }: { rows: TradeTransaction[] }) {
       value: (row) => row.netAmount,
       render: (row) => signedMoney(row.netAmount),
       align: "right",
+      tooltip: "Gross amount − fees.",
     },
     { key: "status", header: "Status", value: (row) => row.status },
     { key: "rawDescription", header: "Raw", value: (row) => row.rawDescription },

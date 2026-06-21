@@ -139,6 +139,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.realizedPnl,
       render: (row) => signedMoney(row.realizedPnl),
       align: "right",
+      tooltip: "Net realized P&L from all events that closed during this month.",
     },
     {
       key: "averageDeployedCapital",
@@ -146,6 +147,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.averageDeployedCapital,
       render: (row) => formatCurrency(row.averageDeployedCapital),
       align: "right",
+      tooltip: "Average capital deployed across the month (time-weighted by days).",
     },
     {
       key: "peakDeployedCapital",
@@ -153,6 +155,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.peakDeployedCapital,
       render: (row) => formatCurrency(row.peakDeployedCapital),
       align: "right",
+      tooltip: "Highest capital deployed on any single day that month.",
     },
     {
       key: "realizedRoiPercent",
@@ -160,6 +163,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.realizedRoiPercent ?? -999,
       render: (row) => signedPercent(row.realizedRoiPercent),
       align: "right",
+      tooltip: "Realized P&L ÷ average capital deployed all month.",
     },
     {
       key: "closedTradeRoiPercent",
@@ -167,6 +171,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.closedTradeRoiPercent ?? -999,
       render: (row) => signedPercent(row.closedTradeRoiPercent),
       align: "right",
+      tooltip: "Realized P&L ÷ capital in just the trades that closed that month.",
     },
     {
       key: "coveredCallRoiPercent",
@@ -174,6 +179,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.coveredCallRoiPercent ?? -999,
       render: (row) => signedPercent(row.coveredCallRoiPercent),
       align: "right",
+      tooltip: "Realized P&L ÷ deployed capital, for covered calls that closed that month.",
     },
     {
       key: "cashSecuredPutRoiPercent",
@@ -181,6 +187,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.cashSecuredPutRoiPercent ?? -999,
       render: (row) => signedPercent(row.cashSecuredPutRoiPercent),
       align: "right",
+      tooltip: "Realized P&L ÷ deployed capital, for cash-secured puts that closed that month.",
     },
     {
       key: "swingTradeRoiPercent",
@@ -188,6 +195,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       value: (row) => row.swingTradeRoiPercent ?? -999,
       render: (row) => signedPercent(row.swingTradeRoiPercent),
       align: "right",
+      tooltip: "Realized P&L ÷ deployed capital, for swing trades that closed that month.",
     },
   ];
   return (
@@ -287,6 +295,7 @@ export function ClosedTradesTable({
       value: (row) => row.optionPremium,
       render: (row) => signedMoney(row.optionPremium),
       align: "right",
+      tooltip: "Net option premium received to open (credit), or paid for a long option.",
     },
     {
       key: "realizedPnl",
@@ -294,11 +303,13 @@ export function ClosedTradesTable({
       value: (row) => row.realizedPnl,
       render: (row) => signedMoney(row.realizedPnl),
       align: "right",
+      tooltip: "Sale proceeds − cost basis − fees.",
     },
     {
       key: "holdingDays",
       header: "Days held",
       value: (row) => row.holdingDays ?? -Infinity,
+      tooltip: "Calendar days from open to close/expiration.",
       render: (row) =>
         row.holdingDays != null ? (
           <span className="tabular-nums text-foreground">{row.holdingDays}</span>
@@ -313,6 +324,7 @@ export function ClosedTradesTable({
       value: (row) => row.roiPercent ?? -Infinity,
       render: (row) => signedPercent(row.roiPercent),
       align: "right",
+      tooltip: "Realized P&L ÷ cost basis.",
     },
   ];
 
@@ -409,6 +421,7 @@ export function ClosedCyclesTable({
       header: "Type",
       value: (row) => optionTypeLabel(row),
       render: (row) => <OptionTypeTag row={row} />,
+      tooltip: "Position type — covered call, cash-secured put, or long call/put.",
     },
     // 3. Symbol (+ manual badge when lifecycle includes a manual tx)
     {
@@ -452,6 +465,7 @@ export function ClosedCyclesTable({
     {
       key: "daysHeld",
       header: "Days held",
+      tooltip: "Calendar days from open to close/expiration.",
       value: (row) => {
         if (!row.openDate) return -Infinity;
         const end = row.closeDate ?? row.expirationDate;
@@ -475,11 +489,13 @@ export function ClosedCyclesTable({
       render: (row) => (
         <StatusChip kind={row.status as "closed" | "expired" | "assigned"} />
       ),
+      tooltip: "How it ended: expired, closed (bought/sold back), or assigned.",
     },
     // 7. Premium (the option premium received/paid to open)
     {
       key: "premiumReceived",
       header: "Premium",
+      tooltip: "Net option premium received to open (credit), or paid for a long option.",
       value: (row) => row.premiumReceived,
       render: (row) => {
         if (row.direction === "long") {
@@ -501,6 +517,7 @@ export function ClosedCyclesTable({
     {
       key: "assignmentStockPnl",
       header: "Shares P/L",
+      tooltip: "Gain/loss on shares called away in a covered-call assignment (strike proceeds − share cost basis); — if not assigned.",
       value: (row) => row.assignmentStockPnl ?? -Infinity,
       render: (row) => {
         if (row.assignmentStockPnl == null) {
@@ -514,6 +531,7 @@ export function ClosedCyclesTable({
     {
       key: "realizedPnl",
       header: "Realized P/L",
+      tooltip: "Net of option premium + any assignment share P&L.",
       value: (row) => row.netOptionPnl + (row.assignmentStockPnl ?? 0),
       render: (row) => {
         const net = row.netOptionPnl + (row.assignmentStockPnl ?? 0);
@@ -527,6 +545,7 @@ export function ClosedCyclesTable({
     {
       key: "capitalDeployed",
       header: "Capital",
+      tooltip: "Capital deployed — CSP collateral, covered-call underlying basis, or long-option debit.",
       value: (row) => row.capitalDeployed ?? -Infinity,
       render: (row) => {
         const cap = row.capitalDeployed ?? 0;
@@ -541,6 +560,7 @@ export function ClosedCyclesTable({
     {
       key: "roi",
       header: "ROI",
+      tooltip: "Realized P/L ÷ capital deployed.",
       value: (row) => {
         const cap = row.capitalDeployed ?? 0;
         const net = row.netOptionPnl + (row.assignmentStockPnl ?? 0);

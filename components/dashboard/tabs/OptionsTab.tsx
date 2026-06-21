@@ -204,6 +204,7 @@ function OpenPositionsTable({
     {
       key: "daysHeld",
       header: "Days held",
+      tooltip: "Calendar days since the position was opened.",
       value: (row) => daysHeld(row.openDate) ?? -Infinity,
       render: (row) => {
         const d = daysHeld(row.openDate);
@@ -221,6 +222,7 @@ function OpenPositionsTable({
       value: (row) => daysToExpiry(row.expirationDate),
       render: (row) => <DteCell dte={daysToExpiry(row.expirationDate)} />,
       align: "right",
+      tooltip: "Calendar days to expiration from today.",
     },
     {
       key: "premium",
@@ -230,6 +232,7 @@ function OpenPositionsTable({
         <span className="tabular-nums text-pos">{formatCurrency(row.premiumReceived)}</span>
       ),
       align: "right",
+      tooltip: "Premium received when the position was opened.",
     },
     {
       key: "capital",
@@ -239,6 +242,7 @@ function OpenPositionsTable({
         <span className="tabular-nums text-foreground">{formatCurrency(displayCapital(row))}</span>
       ),
       align: "right",
+      tooltip: "Collateral / underlying basis tied up while the option is open.",
     },
     {
       key: "action",
@@ -246,6 +250,7 @@ function OpenPositionsTable({
       value: (row) => triageBucket(row),
       render: (row) => <ActionChip bucket={triageBucket(row)} />,
       align: "right",
+      tooltip: "Triage bucket from days-to-expiration (≤7 = roll/close soon).",
     },
   ];
 
@@ -397,6 +402,7 @@ function UnresolvedClosesSection({
       value: () => -Infinity,
       render: () => <span className="opacity-50">—</span>,
       align: "right",
+      tooltip: "Can't be computed until the matching opening trade is imported.",
     },
     {
       key: "roi",
@@ -404,6 +410,7 @@ function UnresolvedClosesSection({
       value: () => -Infinity,
       render: () => <span className="opacity-50">—</span>,
       align: "right",
+      tooltip: "Can't be computed until the matching opening trade is imported.",
     },
     {
       key: "note",

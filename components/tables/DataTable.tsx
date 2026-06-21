@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { InfoTooltip } from "@/components/common/InfoTooltip";
 
 export type Column<T> = {
   key: string;
@@ -10,6 +11,8 @@ export type Column<T> = {
   value: (row: T) => string | number | null | undefined;
   render?: (row: T) => React.ReactNode;
   align?: "left" | "right";
+  /** Optional hover explanation of how this column is calculated. */
+  tooltip?: string;
 };
 
 export function DataTable<T>({
@@ -114,23 +117,30 @@ export function DataTable<T>({
                           column.align === "right" && "text-right"
                         )}
                       >
-                        <button
-                          type="button"
+                        <div
                           className={cn(
-                            "inline-flex items-center gap-1 text-[11.5px] font-normal normal-case tracking-normal text-muted-foreground",
+                            "inline-flex items-center gap-1",
                             column.align === "right" && "flex-row-reverse"
                           )}
-                          onClick={() => {
-                            setPage(0);
-                            setSort((current) => ({
-                              key: column.key,
-                              direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc"
-                            }));
-                          }}
                         >
-                          {column.header}
-                          <Icon className="h-3 w-3 shrink-0" />
-                        </button>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-[11.5px] font-normal normal-case tracking-normal text-muted-foreground"
+                            onClick={() => {
+                              setPage(0);
+                              setSort((current) => ({
+                                key: column.key,
+                                direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc"
+                              }));
+                            }}
+                          >
+                            {column.header}
+                            <Icon className="h-3 w-3 shrink-0" />
+                          </button>
+                          {column.tooltip && (
+                            <InfoTooltip text={column.tooltip} label={column.header} side="bottom" />
+                          )}
+                        </div>
                       </th>
                     );
                   })}
