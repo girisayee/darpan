@@ -324,6 +324,7 @@ function createLifecycle(transaction: TradeTransaction, warnings: string[], lots
     fees: transaction.fees,
     netOptionPnl: premium - transaction.fees,
     capitalDeployed: stockBasis ?? collateral,
+    costBasisOverride: transaction.costBasisOverride,
     status: "open",
     linkedTransactionIds: [transaction.id, ...backingTxIds],
     linkedStockLotIds: backingLots.map((lot) => lot.id),
@@ -541,7 +542,10 @@ function handlePutAssignment(
   settings: AppSettings
 ) {
   const grossAssignedCost = lifecycle.strikePrice * lifecycle.sharesControlled;
-  const effectiveBasis = grossAssignedCost - lifecycle.netOptionPnl + lifecycle.fees;
+  const derivedBasis = grossAssignedCost - lifecycle.netOptionPnl + lifecycle.fees;
+  // A manual cost-basis override (e.g. the broker-adjusted basis) wins over the
+  // wheel-derived strike − premium basis.
+  const effectiveBasis = lifecycle.costBasisOverride ?? derivedBasis;
   const lot: MutableLot = {
     id: `lot-${lifecycle.id}-assignment`,
     symbol: lifecycle.underlyingSymbol,
@@ -554,7 +558,9 @@ function handlePutAssignment(
     costBasisPerShare: effectiveBasis / lifecycle.sharesControlled,
     linkedTransactionIds: lifecycle.linkedTransactionIds,
     status: "open",
-    notes: `Put assignment basis = strike purchase cost ${money(grossAssignedCost)} - premium ${money(lifecycle.netOptionPnl)}.`
+    notes: lifecycle.costBasisOverride != null
+      ? `Put assignment basis manually set to ${money(effectiveBasis)} (broker-adjusted).`
+      : `Put assignment basis = strike purchase cost ${money(grossAssignedCost)} - premium ${money(lifecycle.netOptionPnl)}.`
   };
   lots.push(lot);
   lifecycle.linkedStockLotIds = [lot.id];

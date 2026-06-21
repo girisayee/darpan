@@ -53,6 +53,12 @@ export type TradeTransaction = {
   notes?: string;
   tags: string[];
   status: TransactionStatus;
+  /**
+   * Optional manual override of the TOTAL cost basis of the shares this opener leads to
+   * (e.g. a broker-adjusted basis for shares acquired via a cash-secured-put assignment).
+   * When set, the engine uses it instead of the wheel-derived basis (strike − premium).
+   */
+  costBasisOverride?: number;
 };
 
 export type RealizedPnLEvent = {
@@ -117,6 +123,8 @@ export type OptionLifecycle = {
    * null / undefined for all other outcomes.
    */
   assignmentStockPnl?: number | null;
+  /** Carried from the opening transaction's costBasisOverride (broker-adjusted basis). */
+  costBasisOverride?: number;
   status: "open" | "expired" | "closed" | "assigned" | "unresolved";
   linkedTransactionIds: string[];
   linkedStockLotIds: string[];

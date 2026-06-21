@@ -378,6 +378,25 @@ describe("calculation engine", () => {
     expect(fcc!.capitalDeployed).toBe(11000); // 100 shares × $110, preserved across the filter
   });
 
+  it("put-assignment cost basis honors a manual override (broker-adjusted basis)", () => {
+    // CSP sold + assigned (broker strike $230) but the user's adjusted basis is $198.50/sh.
+    // The override sets the lot basis; the put premium income is unaffected. The shares are
+    // then called away by a $185 covered call → P&L uses the $19,850 override.
+    const stoPut = { ...optionTx("p", "2025-12-01", "SELL_TO_OPEN", "SNOW", "put", 230, "2026-06-18", 1050), costBasisOverride: 19850 };
+    const assignPut = optionTx("pa", "2026-01-05", "ASSIGNMENT", "SNOW", "put", 230, "2026-06-18", 0);
+    const stoCall = optionTx("c", "2026-02-01", "SELL_TO_OPEN", "SNOW", "call", 185, "2026-06-18", 889);
+    const assignCall = optionTx("ca", "2026-06-18", "ASSIGNMENT", "SNOW", "call", 185, "2026-06-18", 0);
+    const r = calculateDashboard([stoPut, assignPut, stoCall, assignCall], defaultSettings);
+
+    const lot = r.taxLots.find((t) => t.symbol === "SNOW");
+    expect(lot!.costBasisPerShare).toBe(198.5); // override, not strike−premium ($219.50)
+    const put = r.realizedEvents.find((e) => e.strategy === "PUT_ASSIGNMENT");
+    expect(put!.realizedPnl).toBe(1050); // premium income unchanged
+    const stock = r.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
+    expect(stock!.costBasis).toBe(19850);
+    expect(stock!.realizedPnl).toBe(-1350); // 18,500 strike proceeds − 19,850 basis
+  });
+
   it("assigned covered-call lifecycle has assignmentStockPnl and unchanged option P&L", () => {
     // Stock: 100 shares @ $10 = $1000 cost basis. CC strike = $12. Premium = $100.
     // Assignment: proceeds = 12 × 100 = $1200; stockPnl = $1200 − $1000 = $200.
