@@ -37,8 +37,8 @@ export function BuyingPowerGauge({
 
   const ariaLabel =
     util !== null
-      ? `Buying power ${intPct}% used, ${formatCurrency(deployed)} of ${formatCurrency(maxBP!)} deployed`
-      : "Buying power: no max configured";
+      ? `Capital deployed ${formatCurrency(deployed)}, ${intPct}% of ${formatCurrency(maxBP!)} max`
+      : "Capital deployed: no max configured";
 
   return (
     <div className="flex items-center gap-3 rounded-[12px] border border-hairline bg-surface p-3">
@@ -95,15 +95,15 @@ export function BuyingPowerGauge({
       {/* Text */}
       <div className="min-w-0">
         <div className="font-sans text-[12px] font-medium text-foreground">
-          Buying power
+          Capital deployed
         </div>
         <div className="mt-0.5 font-sans text-[11px] tabular-nums text-muted-foreground">
           {valid
-            ? `${formatCurrency(deployed)} / ${formatCurrency(maxBP!)} used`
+            ? `${formatCurrency(deployed)} / ${formatCurrency(maxBP!)}`
             : "—"}
         </div>
         <div className="mt-0.5 font-sans text-[10.5px] text-muted-foreground opacity-70">
-          healthy 40–80%
+          of configured max
         </div>
       </div>
     </div>

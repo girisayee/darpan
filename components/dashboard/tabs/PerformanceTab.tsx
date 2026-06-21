@@ -195,8 +195,6 @@ export function PerformanceTab({
     }))
   );
 
-  const totalCapitalDays = result.monthlyReturns.reduce((s, m) => s + m.capitalDays, 0);
-
   const avgDeployed = result.aggregates.averageDeployedCapital;
   const peakDeployed = result.aggregates.peakDeployedCapital;
   const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
@@ -267,10 +265,10 @@ export function PerformanceTab({
           variant="compact"
         />
         <KpiCard
-          label="Buying power used"
+          label="Capital utilization"
           value={bpUsed != null ? formatPercent(bpUsed, 0) : "—"}
-          helper="Avg deployed ÷ max BP"
-          tooltip="Average deployed capital as a share of your max buying power setting."
+          helper="Avg deployed ÷ configured max"
+          tooltip="Average deployed capital as a share of your configured max buying power."
           tone="neutral"
           variant="compact"
         />
@@ -288,14 +286,6 @@ export function PerformanceTab({
           helper="Option premium per capital-day"
           tooltip="Option premium P&L divided by total capital-days deployed."
           tone={tone(ce.incomePerDay ?? 0)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Capital-days"
-          value={totalCapitalDays.toLocaleString()}
-          helper="Σ monthly capital-days"
-          tooltip="Sum of capital-days across all months — a measure of total capital work done."
-          tone="neutral"
           variant="compact"
         />
         <KpiCard

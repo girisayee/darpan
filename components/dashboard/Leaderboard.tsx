@@ -11,7 +11,7 @@ function Row({ r }: { r: LeaderboardRow }) {
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-medium text-foreground">{r.symbol}</div>
         <div className="text-[10px] text-muted-foreground">
-          {r.winRate != null ? `${Math.round(r.winRate * 100)}% win` : "—"} · {r.trades} trades
+          {r.winRate != null ? `${Math.round(r.winRate)}% win` : "—"} · {r.trades} trades
         </div>
       </div>
       <div className="text-right">
