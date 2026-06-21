@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
 
@@ -344,7 +344,7 @@ function EventDetailBody({
             )}
           </div>
           <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
-            Closed {event.date}
+            Closed {formatDisplayDate(event.date)}
             {event.quantity ? ` · ${formatNumber(event.quantity)} shares` : ""}
           </div>
         </div>
@@ -508,7 +508,7 @@ function EventDetailBody({
 
       {/* ── 3×2 meta grid ── */}
       <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
-        <MetaCell label="Opened" value={openDate ?? "N/A"} />
+        <MetaCell label="Opened" value={openDate ? formatDisplayDate(openDate) : "N/A"} />
         <MetaCell
           label="Holding"
           value={holdingDays !== null ? `${formatNumber(holdingDays)} days` : "N/A"}
@@ -623,7 +623,7 @@ function OptionCycleBody({
       (tx.importBatchId === "manual" || tx.tags.includes("manual"))
   );
 
-  const contractsNote = `${lc.contracts} contract${lc.contracts !== 1 ? "s" : ""} · ${formatNumber(lc.sharesControlled)} sh · strike ${formatCurrency(lc.strikePrice, { maximumFractionDigits: 2 })} · exp ${lc.expirationDate}`;
+  const contractsNote = `${lc.contracts} contract${lc.contracts !== 1 ? "s" : ""} · ${formatNumber(lc.sharesControlled)} sh · strike ${formatCurrency(lc.strikePrice, { maximumFractionDigits: 2 })} · exp ${formatDisplayDate(lc.expirationDate)}`;
 
   return (
     <>
@@ -733,7 +733,7 @@ function OptionCycleBody({
           label="Held"
           value={
             heldDays != null
-              ? `${lc.openDate} → ${endDate} · ${formatNumber(heldDays)} days`
+              ? `${formatDisplayDate(lc.openDate)} → ${formatDisplayDate(endDate)} · ${formatNumber(heldDays)} days`
               : "—"
           }
         />
@@ -844,7 +844,7 @@ function OptionCycleBody({
 
       {/* ── Meta grid ── */}
       <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
-        <MetaCell label="Opened" value={lc.openDate || "—"} />
+        <MetaCell label="Opened" value={lc.openDate ? formatDisplayDate(lc.openDate) : "—"} />
         <MetaCell
           label="Held"
           value={heldDays != null ? `${formatNumber(heldDays)} days` : "—"}

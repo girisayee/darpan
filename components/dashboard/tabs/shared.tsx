@@ -8,7 +8,7 @@
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { StatusChip } from "@/components/common/StatusChip";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils/format";
+import { compactMonth, formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
   CalculationResult,
   MonthlyCapitalReturn,
@@ -131,6 +131,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       key: "month",
       header: "Month",
       value: (row) => `${row.year}-${String(row.month).padStart(2, "0")}`,
+      render: (row) => compactMonth(row.year, row.month),
     },
     {
       key: "realizedPnl",
@@ -231,7 +232,7 @@ export function ClosedTradesTable({
       value: (row) => row.date ?? "",
       render: (row) => (
         <span className="tabular-nums text-muted-foreground">
-          {row.date ?? <span className="opacity-50">—</span>}
+          {row.date ? formatDisplayDate(row.date) : <span className="opacity-50">—</span>}
         </span>
       ),
     },
@@ -397,7 +398,7 @@ export function ClosedCyclesTable({
         const date = row.closeDate ?? row.expirationDate;
         return (
           <span className="tabular-nums text-muted-foreground">
-            {date ?? <span className="opacity-50">—</span>}
+            {date ? formatDisplayDate(date) : <span className="opacity-50">—</span>}
           </span>
         );
       },

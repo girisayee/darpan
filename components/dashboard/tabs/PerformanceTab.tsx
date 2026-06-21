@@ -34,7 +34,7 @@ import {
 } from "recharts";
 import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
 import { Column, DataTable } from "@/components/tables/DataTable";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
 import { MonthlyRoiTable, signedMoney, signedPercent } from "./shared";
 
@@ -134,6 +134,7 @@ function EquityCurveChart({
             <XAxis
               dataKey="month"
               tick={TICK_STYLE}
+              tickFormatter={(v: string) => formatDisplayDate(v)}
               axisLine={{ stroke: C_HAIRLINE }}
               tickLine={false}
             />
@@ -153,6 +154,7 @@ function EquityCurveChart({
                 formatCurrency(typeof value === "number" ? value : Number(value)),
                 name === "goalPace" ? "Goal pace" : "Cumulative P&L",
               ]}
+              labelFormatter={(label: unknown) => formatDisplayDate(String(label))}
               contentStyle={TOOLTIP_CONTENT_STYLE}
               itemStyle={TOOLTIP_ITEM_STYLE}
               labelStyle={TOOLTIP_LABEL_STYLE}
@@ -251,6 +253,7 @@ function MonthlyComposedChart({
             <XAxis
               dataKey="label"
               tick={TICK_STYLE}
+              tickFormatter={(v: string) => formatDisplayDate(v)}
               axisLine={{ stroke: C_HAIRLINE }}
               tickLine={false}
             />
@@ -284,6 +287,7 @@ function MonthlyComposedChart({
                 if (name === "roi") return [formatPercent(n, 1), "ROI"];
                 return [formatCurrency(n), "Realized P&L"];
               }}
+              labelFormatter={(label: unknown) => formatDisplayDate(String(label))}
               contentStyle={TOOLTIP_CONTENT_STYLE}
               itemStyle={TOOLTIP_ITEM_STYLE}
               labelStyle={TOOLTIP_LABEL_STYLE}

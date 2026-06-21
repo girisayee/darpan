@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
 import { wheelAnalytics } from "@/lib/selectors/analytics";
 import type { CalculationResult, OptionLifecycle, TradeTransaction } from "@/types/trading";
 import { KpiCard } from "@/components/dashboard/KpiCard";
@@ -197,7 +197,7 @@ function OpenPositionsTable({
       value: (row) => row.openDate ?? "",
       render: (row) => (
         <span className="tabular-nums text-muted-foreground">
-          {row.openDate ?? <span className="opacity-50">—</span>}
+          {row.openDate ? formatDisplayDate(row.openDate) : <span className="opacity-50">—</span>}
         </span>
       ),
     },
@@ -341,7 +341,7 @@ function UnresolvedClosesSection({
       header: "Date",
       value: (row) => row.date,
       render: (row) => (
-        <span className="tabular-nums text-muted-foreground">{row.date}</span>
+        <span className="tabular-nums text-muted-foreground">{formatDisplayDate(row.date)}</span>
       ),
     },
     {
@@ -368,7 +368,7 @@ function UnresolvedClosesSection({
         const parts: string[] = [];
         if (row.optionType) parts.push(row.optionType.charAt(0).toUpperCase() + row.optionType.slice(1));
         if (row.strikePrice) parts.push(`$${row.strikePrice.toFixed(2)}`);
-        if (row.expirationDate) parts.push(row.expirationDate);
+        if (row.expirationDate) parts.push(formatDisplayDate(row.expirationDate));
         return (
           <span className="text-[12px] text-muted-foreground">
             {parts.length > 0 ? parts.join(" · ") : <span className="opacity-50">—</span>}

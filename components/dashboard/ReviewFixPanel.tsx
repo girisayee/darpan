@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { formatDisplayDate } from "@/lib/utils/format";
 import { inferOpenerAction, buildManualOpenTransaction } from "@/lib/utils/option-helpers";
 import type { CalculationResult, OptionLifecycle, TradeAction, TradeTransaction } from "@/types/trading";
 
@@ -199,7 +200,7 @@ function validateOptionForm(state: OptionOpenerState, closeDate: string): Option
   if (!state.openDate) {
     errs.openDate = "Open date is required.";
   } else if (state.openDate > closeDate) {
-    errs.openDate = `Open date must be on or before close date (${closeDate}).`;
+    errs.openDate = `Open date must be on or before close date (${formatDisplayDate(closeDate)}).`;
   }
   const priceNum = Number(state.price);
   if (state.price === "" || isNaN(priceNum) || priceNum < 0) {
@@ -275,7 +276,7 @@ function AddOptionOpenForm({
         <ReadOnlyField label="Symbol" value={row.symbol} />
         <ReadOnlyField label="Type" value={row.optionType ? row.optionType.charAt(0).toUpperCase() + row.optionType.slice(1) : "—"} />
         <ReadOnlyField label="Strike" value={row.strikePrice ? `$${row.strikePrice.toFixed(2)}` : "—"} />
-        <ReadOnlyField label="Expiration" value={row.expirationDate ?? "—"} />
+        <ReadOnlyField label="Expiration" value={row.expirationDate ? formatDisplayDate(row.expirationDate) : "—"} />
       </div>
 
       {/* Opener action (editable) */}
@@ -382,7 +383,7 @@ function validateLots(lots: LotInput[], closeDate: string): LotErrors[] {
     if (!lot.openDate) {
       errs.openDate = "Open date is required.";
     } else if (lot.openDate > closeDate) {
-      errs.openDate = `Must be on or before ${closeDate}.`;
+      errs.openDate = `Must be on or before ${formatDisplayDate(closeDate)}.`;
     }
     const sharesNum = Number(lot.shares);
     if (lot.shares === "" || isNaN(sharesNum) || sharesNum <= 0) {
@@ -676,7 +677,7 @@ function EditOptionForm({
         <ReadOnlyField label="Symbol" value={tx.symbol} />
         <ReadOnlyField label="Type" value={tx.optionType ? tx.optionType.charAt(0).toUpperCase() + tx.optionType.slice(1) : "—"} />
         <ReadOnlyField label="Strike" value={tx.strikePrice ? `$${tx.strikePrice.toFixed(2)}` : "—"} />
-        <ReadOnlyField label="Expiration" value={tx.expirationDate ?? "—"} />
+        <ReadOnlyField label="Expiration" value={tx.expirationDate ? formatDisplayDate(tx.expirationDate) : "—"} />
       </div>
       <div className="grid gap-1">
         <label className="font-sans text-[11px] text-muted-foreground">Opening action</label>
@@ -800,7 +801,7 @@ export function ManualEntryCard({
   const details: string[] = [];
   if (isOption && tx.optionType) details.push(tx.optionType.charAt(0).toUpperCase() + tx.optionType.slice(1));
   if (isOption && tx.strikePrice) details.push(`$${tx.strikePrice.toFixed(2)}`);
-  if (isOption && tx.expirationDate) details.push(tx.expirationDate);
+  if (isOption && tx.expirationDate) details.push(formatDisplayDate(tx.expirationDate));
 
   return (
     <div className="rounded-lg border border-hairline bg-surface p-3">
@@ -815,7 +816,7 @@ export function ManualEntryCard({
             <div className="font-sans text-[11px] text-muted-foreground">{details.join(" · ")}</div>
           )}
           <div className="font-sans text-[11px] tabular-nums text-muted-foreground">
-            {tx.tradeDate} · ${tx.price.toFixed(2)}{isOption ? "/contract" : "/share"}
+            {formatDisplayDate(tx.tradeDate)} · ${tx.price.toFixed(2)}{isOption ? "/contract" : "/share"}
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -881,7 +882,7 @@ function OrphanRowCard({
   const typeParts: string[] = [];
   if (row.optionType) typeParts.push(row.optionType.charAt(0).toUpperCase() + row.optionType.slice(1));
   if (row.strikePrice) typeParts.push(`$${row.strikePrice.toFixed(2)}`);
-  if (row.expirationDate) typeParts.push(row.expirationDate);
+  if (row.expirationDate) typeParts.push(formatDisplayDate(row.expirationDate));
 
   return (
     <div className={cn(
@@ -902,7 +903,7 @@ function OrphanRowCard({
               {typeParts.join(" · ")}
             </div>
           )}
-          <div className="font-sans text-[11px] tabular-nums text-muted-foreground">{row.date}</div>
+          <div className="font-sans text-[11px] tabular-nums text-muted-foreground">{formatDisplayDate(row.date)}</div>
           <div className="font-sans text-[11px] text-warn">{row.reason}</div>
         </div>
 

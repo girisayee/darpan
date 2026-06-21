@@ -29,7 +29,7 @@ import {
 } from "@/lib/storage/server-store-client";
 import { useTheme } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatNumber } from "@/lib/utils/format";
+import { formatCurrency, formatDisplayDate, formatNumber } from "@/lib/utils/format";
 import type {
   AppSettings,
   OptionLifecycle,
@@ -335,7 +335,12 @@ function ImportTab({
 
 function TradesPreview({ rows }: { rows: TradeTransaction[] }) {
   const columns: Column<TradeTransaction>[] = [
-    { key: "tradeDate", header: "Date", value: (row) => row.tradeDate },
+    {
+      key: "tradeDate",
+      header: "Date",
+      value: (row) => row.tradeDate,
+      render: (row) => formatDisplayDate(row.tradeDate),
+    },
     { key: "symbol", header: "Symbol", value: (row) => row.symbol },
     {
       key: "action",

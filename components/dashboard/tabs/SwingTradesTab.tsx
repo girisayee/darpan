@@ -13,7 +13,7 @@
 
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
 import { signedMoney, signedPercent } from "./shared";
 
@@ -90,7 +90,7 @@ function SwingTradesTable({
       value: (row) => row.date ?? "",
       render: (row) => (
         <span className="tabular-nums text-muted-foreground">
-          {row.date ?? <span className="opacity-50">—</span>}
+          {row.date ? formatDisplayDate(row.date) : <span className="opacity-50">—</span>}
         </span>
       ),
     },
