@@ -150,7 +150,7 @@ export function DashboardApp() {
       )}
 
       <section
-        className="min-h-[60vh] py-4"
+        className="min-h-[60vh] py-4 pb-16 md:pb-0"
         role="tabpanel"
         id="dashboard-tabpanel"
         tabIndex={0}
