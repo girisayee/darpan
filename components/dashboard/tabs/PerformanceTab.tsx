@@ -33,9 +33,10 @@ import {
   YAxis,
 } from "recharts";
 import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
+import { Column, DataTable } from "@/components/tables/DataTable";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
-import { MonthlyRoiTable } from "./shared";
+import { MonthlyRoiTable, signedMoney, signedPercent } from "./shared";
 
 // ── recharts palette via CSS variables ───────────────────────────────────────
 const C_POS      = "rgb(var(--pos))";
@@ -332,6 +333,68 @@ function MonthlyComposedChart({
 
 // ── PerformanceTab ─────────────────────────────────────────────────────────────
 
+// ── Returns by symbol ──────────────────────────────────────────────────────────
+
+type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number];
+
+function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
+  const columns: Column<SymbolRow>[] = [
+    {
+      key: "symbol",
+      header: "Symbol",
+      value: (r) => r.symbol,
+      render: (r) => <span className="font-medium text-foreground">{r.symbol}</span>,
+    },
+    {
+      key: "pnl",
+      header: "Realized P&L",
+      value: (r) => r.pnl,
+      render: (r) => signedMoney(r.pnl),
+      align: "right",
+    },
+    {
+      key: "roi",
+      header: "ROI",
+      // roiPercent is already a % value — pass straight; null sorts last / renders "—"
+      value: (r) => r.roiPercent ?? -Infinity,
+      render: (r) => (r.roiPercent == null ? <span className="opacity-50">—</span> : signedPercent(r.roiPercent)),
+      align: "right",
+    },
+    {
+      key: "trades",
+      header: "Trades",
+      value: (r) => r.trades,
+      render: (r) => <span className="tabular-nums text-foreground">{r.trades}</span>,
+      align: "right",
+    },
+    {
+      key: "winRate",
+      header: "Win rate",
+      value: (r) => r.winRate ?? -Infinity,
+      render: (r) => (r.winRate == null ? <span className="opacity-50">—</span> : formatPercent(r.winRate, 0)),
+      align: "right",
+    },
+    {
+      key: "capital",
+      header: "Capital",
+      value: (r) => r.capital,
+      render: (r) => <span className="tabular-nums text-foreground">{formatCurrency(r.capital)}</span>,
+      align: "right",
+    },
+  ];
+  return (
+    <DataTable
+      rows={rows}
+      columns={columns}
+      empty="No symbol returns yet."
+      defaultSort={{ key: "pnl", direction: "desc" }}
+      searchable
+      searchPlaceholder="Filter symbols…"
+      pageSize={15}
+    />
+  );
+}
+
 export function PerformanceTab({
   result,
   annualGoal,
@@ -374,6 +437,14 @@ export function PerformanceTab({
         <p className="font-sans text-[12px] text-muted-foreground">
           Monthly ROI = realized P&amp;L ÷ average capital deployed all month (how hard your whole book worked). Closed Trade ROI = realized P&amp;L ÷ capital in just the trades that closed (return on the positions you realized).
         </p>
+      </section>
+
+      {/* ── 4. Returns by symbol ── */}
+      <section className="space-y-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">
+          Returns by symbol
+        </h2>
+        <SymbolReturnsTable rows={result.aggregates.symbolBreakdown} />
       </section>
     </div>
   );

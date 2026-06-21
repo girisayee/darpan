@@ -359,7 +359,7 @@ function TradesPreview({ rows }: { rows: TradeTransaction[] }) {
     { key: "status", header: "Status", value: (row) => row.status },
     { key: "rawDescription", header: "Raw", value: (row) => row.rawDescription },
   ];
-  return <DataTable rows={rows} columns={columns} empty="No parsed rows." />;
+  return <DataTable rows={rows} columns={columns} empty="No parsed rows." searchable pageSize={25} />;
 }
 
 function ImportIssues({ issues }: { issues: ImportPreview["issues"] }) {

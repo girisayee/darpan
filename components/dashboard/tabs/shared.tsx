@@ -322,6 +322,8 @@ export function ClosedTradesTable({
       onRowClick={onSelectEvent}
       empty={empty}
       defaultSort={{ key: "date", direction: "desc" }}
+      searchable
+      pageSize={25}
     />
   );
 }
@@ -341,6 +343,25 @@ export function optionTypeLabel(row: OptionLifecycle): string {
   if (row.strategy === "CASH_SECURED_PUT") return "Sold Put";
   // Fallback: infer from optionType
   return row.optionType === "call" ? "Covered Call" : "Sold Put";
+}
+
+/** Tone class for an option type label — shared by open and closed option tables. */
+export function optionTypeToneClass(row: Pick<OptionLifecycle, "direction" | "optionType">): string {
+  if (row.direction === "long") return "text-muted-foreground"; // bought call/put
+  if (row.optionType === "call") return "text-accent"; // covered call
+  return "text-pos"; // sold put
+}
+
+/**
+ * Shared option-type tag: identical label + coloring + style across the open-positions
+ * and closed-cycles tables (covered call = accent, sold put = pos, long = muted).
+ */
+export function OptionTypeTag({ row }: { row: OptionLifecycle }) {
+  return (
+    <span className={cn("font-sans text-[12px] font-medium", optionTypeToneClass(row))}>
+      {optionTypeLabel(row)}
+    </span>
+  );
 }
 
 // ── ClosedCyclesTable ─────────────────────────────────────────────────────────
@@ -386,11 +407,7 @@ export function ClosedCyclesTable({
       key: "type",
       header: "Type",
       value: (row) => optionTypeLabel(row),
-      render: (row) => (
-        <span className="text-[12px] font-medium text-foreground">
-          {optionTypeLabel(row)}
-        </span>
-      ),
+      render: (row) => <OptionTypeTag row={row} />,
     },
     // 3. Symbol (+ manual badge when lifecycle includes a manual tx)
     {
@@ -545,6 +562,8 @@ export function ClosedCyclesTable({
       empty={empty}
       onRowClick={onRowClick}
       defaultSort={{ key: "closeDate", direction: "desc" }}
+      searchable
+      pageSize={25}
     />
   );
 }

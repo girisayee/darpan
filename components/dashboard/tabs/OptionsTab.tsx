@@ -20,8 +20,10 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { DataTable, Column } from "@/components/tables/DataTable";
 import {
   ClosedCyclesTable,
+  OptionTypeTag,
   SegmentedControl,
   currentDeployedCapital,
+  optionTypeLabel,
   tone,
 } from "@/components/dashboard/tabs/shared";
 
@@ -53,21 +55,6 @@ function displayCapital(lc: OptionLifecycle): number {
   return lc.strikePrice * lc.sharesControlled;
 }
 
-/** Stage label derived from direction + optionType — matches ClosedCyclesTable. */
-function stageLabel(lc: OptionLifecycle): string {
-  if (lc.direction === "long") {
-    return lc.optionType === "call" ? "Bought Call" : "Bought Put";
-  }
-  if (lc.optionType === "call") return "Covered Call";
-  return "Sold Put";
-}
-
-/** Stage tone class. */
-function stageToneClass(lc: OptionLifecycle): string {
-  if (lc.direction === "long") return "text-muted-foreground";
-  if (lc.optionType === "call") return "text-accent";
-  return "text-pos";
-}
 
 // ── Triage chip (filter pill) ─────────────────────────────────────────────────
 
@@ -189,12 +176,8 @@ function OpenPositionsTable({
     {
       key: "stage",
       header: "Stage",
-      value: (row) => stageLabel(row),
-      render: (row) => (
-        <span className={cn("text-[12px] font-medium", stageToneClass(row))}>
-          {stageLabel(row)}
-        </span>
-      ),
+      value: (row) => optionTypeLabel(row),
+      render: (row) => <OptionTypeTag row={row} />,
     },
     {
       key: "qty",
