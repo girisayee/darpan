@@ -20,6 +20,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import {
   Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
@@ -92,13 +93,16 @@ function EquityCurveChart({
   );
 
   const data = useMemo(() => {
-    return result.aggregates.monthlyRealizedPnl.map((m, i) => ({
-      month: m.month,
-      cumulative: m.cumulative,
+    // Build from monthlyReturns (already trimmed to the selected year by filterResult) so
+    // the curve shows ONLY the selected year — not prior-year months that bleed in via
+    // cross-year opening legs. Cumulative is a running within-scope sum (n ≤ 12).
+    return result.monthlyReturns.map((m, i) => ({
+      month: `${m.year}-${String(m.month).padStart(2, "0")}`,
+      cumulative: result.monthlyReturns.slice(0, i + 1).reduce((sum, x) => sum + x.realizedPnl, 0),
       // Goal pace: annualGoal × (i+1) / 12 — prorated monthly target
-      goalPace: annualGoal > 0 ? annualGoal * (i + 1) / 12 : undefined,
+      goalPace: annualGoal > 0 ? (annualGoal * (i + 1)) / 12 : undefined,
     }));
-  }, [result.aggregates.monthlyRealizedPnl, annualGoal]);
+  }, [result.monthlyReturns, annualGoal]);
 
   if (!mounted) {
     return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
@@ -337,6 +341,51 @@ function MonthlyComposedChart({
 
 type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number];
 
+/** Horizontal bar leaderboard: symbols ranked by realized P&L, colored by sign. */
+function SymbolLeaderboardChart({ rows }: { rows: SymbolRow[] }) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
+  const data = useMemo(
+    () => [...rows].sort((a, b) => b.pnl - a.pnl).slice(0, 15).map((r) => ({ symbol: r.symbol, pnl: r.pnl })),
+    [rows]
+  );
+  if (data.length === 0) return null;
+  if (!mounted) return <div className="h-[220px] animate-pulse rounded-md bg-surface-inset" />;
+  const height = Math.max(140, data.length * 28 + 24);
+  return (
+    <div style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+          <CartesianGrid horizontal={false} strokeDasharray="0" stroke={C_HAIRLINE} />
+          <XAxis
+            type="number"
+            tick={TICK_STYLE}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => (v >= 1000 || v <= -1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`)}
+          />
+          <YAxis type="category" dataKey="symbol" tick={TICK_STYLE} axisLine={false} tickLine={false} width={52} />
+          <Tooltip
+            formatter={(value: unknown) => [formatCurrency(typeof value === "number" ? value : Number(value)), "Realized P&L"]}
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
+            cursor={{ fill: C_HAIRLINE, opacity: 0.3 }}
+          />
+          <Bar dataKey="pnl" radius={[0, 3, 3, 0]}>
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? C_POS : C_NEG} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
   const columns: Column<SymbolRow>[] = [
     {
@@ -444,6 +493,9 @@ export function PerformanceTab({
         <h2 className="font-sans text-[13px] font-medium text-foreground">
           Returns by symbol
         </h2>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <SymbolLeaderboardChart rows={result.aggregates.symbolBreakdown} />
+        </div>
         <SymbolReturnsTable rows={result.aggregates.symbolBreakdown} />
       </section>
     </div>
