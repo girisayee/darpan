@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateDashboard, calculateMonthlyReturns } from "@/lib/calculations/engine";
+import { filterResult } from "@/lib/selectors/filter-result";
 import { defaultSettings } from "@/lib/storage/local-store";
 import type { CapitalUsage, RealizedPnLEvent } from "@/types/trading";
 import { optionTx, stockTx } from "./helpers";
@@ -351,6 +352,30 @@ describe("calculation engine", () => {
     const result = calculateDashboard([bto, exp]);
     const lc = result.optionLifecycles.find((l) => l.underlyingSymbol === "CAN");
     expect(lc!.netOptionPnl).toBeCloseTo(-380.42, 2);
+  });
+
+  it("covered call links its prior-year underlying shares and survives a year filter", () => {
+    // Shares bought 2025, covered call written + expired 2026. The CC must record the
+    // backing share lot so the year filter (which re-runs the engine on a date-filtered
+    // tx set) keeps the 2025 purchase and doesn't resurrect the "no underlying lot" warning.
+    const txs = [
+      stockTx("nflx-buy", "2025-11-14", "BUY", "NFLX", 100, 110),
+      optionTx("nflx-cc", "2026-01-05", "SELL_TO_OPEN", "NFLX", "call", 104, "2026-01-30", 100),
+      optionTx("nflx-exp", "2026-01-30", "EXPIRATION", "NFLX", "call", 104, "2026-01-30", 0),
+    ];
+    const base = calculateDashboard(txs, defaultSettings);
+    const cc = base.optionLifecycles.find((l) => l.strategy === "COVERED_CALL");
+    expect(cc!.linkedTransactionIds).toContain("nflx-buy");
+    expect(cc!.warnings).not.toContain("Option trade could not be linked to underlying stock lot");
+
+    const filtered = filterResult(
+      base,
+      { symbol: "ALL", strategy: "ALL", year: "2026", month: "ALL", account: "ALL" },
+      defaultSettings
+    );
+    const fcc = filtered.optionLifecycles.find((l) => l.strategy === "COVERED_CALL");
+    expect(fcc!.warnings).not.toContain("Option trade could not be linked to underlying stock lot");
+    expect(fcc!.capitalDeployed).toBe(11000); // 100 shares × $110, preserved across the filter
   });
 
   it("assigned covered-call lifecycle has assignmentStockPnl and unchanged option P&L", () => {

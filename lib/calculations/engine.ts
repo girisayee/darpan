@@ -298,6 +298,16 @@ function createLifecycle(transaction: TradeTransaction, warnings: string[], lots
         : strikeCollateral(transaction, sharesControlled)
       : undefined;
   if (optionType === "call" && !stockBasis) warnings.push("Option trade could not be linked to underlying stock lot");
+  // A covered call is backed by the underlying shares. Record those open lots' opening
+  // transactions on the lifecycle so a year filter (which re-runs the engine on a
+  // date-filtered transaction set) preserves a prior-year share purchase that supplies the
+  // basis — otherwise the cross-year link is lost and the "no underlying lot" warning returns.
+  const underlying = transaction.underlyingSymbol || transaction.symbol;
+  const backingLots =
+    optionType === "call" && stockBasis
+      ? lots.filter((lot) => lot.symbol === underlying && lot.remainingQuantity > 0)
+      : [];
+  const backingTxIds = unique(backingLots.flatMap((lot) => lot.linkedTransactionIds));
   return {
     id: `opt-${transaction.id}`,
     underlyingSymbol: transaction.underlyingSymbol || transaction.symbol,
@@ -315,8 +325,8 @@ function createLifecycle(transaction: TradeTransaction, warnings: string[], lots
     netOptionPnl: premium - transaction.fees,
     capitalDeployed: stockBasis ?? collateral,
     status: "open",
-    linkedTransactionIds: [transaction.id],
-    linkedStockLotIds: [],
+    linkedTransactionIds: [transaction.id, ...backingTxIds],
+    linkedStockLotIds: backingLots.map((lot) => lot.id),
     explanation: `Opened ${optionType === "call" ? "covered call" : "cash-secured put"} on ${transaction.symbol} for ${money(premium)} premium.`,
     warnings
   };
