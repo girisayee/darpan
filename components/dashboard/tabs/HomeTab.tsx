@@ -2,15 +2,15 @@
 
 import { useState, useSyncExternalStore, useMemo } from "react";
 import {
-  Line,
-  LineChart,
+  BarChart,
+  Bar,
+  Cell,
   CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingDown, TrendingUp } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { BuyingPowerGauge } from "@/components/dashboard/BuyingPowerGauge";
 import { CalendarHeatmap } from "@/components/dashboard/CalendarHeatmap";
@@ -19,19 +19,17 @@ import { StrategyStrip } from "@/components/dashboard/StrategyStrip";
 import { SegmentedControl } from "@/components/dashboard/tabs/shared";
 import { dailyPnl } from "@/lib/selectors/daily-pnl";
 import { tradeQuality } from "@/lib/selectors/trade-quality";
-import { goalPace } from "@/lib/selectors/goal-pace";
 import { currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
-import type { AppSettings, CalculationResult } from "@/types/trading";
+import type { AppSettings, CalculationResult, RealizedPnLEvent } from "@/types/trading";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
 import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
-import { cn } from "@/lib/utils/cn";
 
 const C_POS      = "rgb(var(--pos))";
+const C_NEG      = "rgb(var(--neg))";
 const C_MUTED    = "rgb(var(--text-muted))";
 const C_HAIRLINE = "rgb(var(--hairline))";
 const C_SURFACE  = "rgb(var(--surface))";
-const C_GOAL_PACE = "rgb(var(--text-muted))";
 
 const TICK_STYLE = {
   fontFamily: "var(--font-sans)",
@@ -62,23 +60,21 @@ const TOOLTIP_LABEL_STYLE: React.CSSProperties = {
 
 type CalMode = "YTD" | "Month";
 
-function MiniEquityCurve({ result, annualGoal }: { result: CalculationResult; annualGoal: number }) {
+function MonthlyPnlBar({ result }: { result: CalculationResult }) {
   const mounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
     () => false
   );
 
-  const data = useMemo(() => {
-    return result.monthlyReturns.map((m, i) => ({
-      month: `${m.year}-${String(m.month).padStart(2, "0")}`,
-      cumulative: result.monthlyReturns.slice(0, i + 1).reduce((sum, x) => sum + x.realizedPnl, 0),
-      goalPace: annualGoal > 0 ? (annualGoal * (i + 1)) / 12 : undefined,
-    }));
-  }, [result.monthlyReturns, annualGoal]);
-
-  const finalCumulative = data.length > 0 ? data[data.length - 1].cumulative : 0;
-  const C_EQUITY = finalCumulative >= 0 ? C_POS : "rgb(var(--neg))";
+  const data = useMemo(
+    () =>
+      result.monthlyReturns.map((m) => ({
+        month: `${m.year}-${String(m.month).padStart(2, "0")}`,
+        pnl: m.realizedPnl,
+      })),
+    [result.monthlyReturns]
+  );
 
   if (!mounted) {
     return <div className="h-[160px] animate-pulse rounded-md bg-surface-inset" />;
@@ -87,7 +83,7 @@ function MiniEquityCurve({ result, annualGoal }: { result: CalculationResult; an
   return (
     <div className="h-[160px]">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" stroke={C_HAIRLINE} opacity={1} />
           <XAxis
             dataKey="month"
@@ -106,36 +102,24 @@ function MiniEquityCurve({ result, annualGoal }: { result: CalculationResult; an
             width={48}
           />
           <Tooltip
-            formatter={(value: unknown, name: string | number | undefined) => [
+            formatter={(value: unknown) => [
               formatCurrency(typeof value === "number" ? value : Number(value)),
-              name === "goalPace" ? "Goal pace" : "Cumulative P&L",
+              "Monthly P&L",
             ]}
             contentStyle={TOOLTIP_CONTENT_STYLE}
             itemStyle={TOOLTIP_ITEM_STYLE}
             labelStyle={TOOLTIP_LABEL_STYLE}
-            cursor={{ stroke: C_HAIRLINE, strokeWidth: 1 }}
+            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.3 }}
           />
-          <Line
-            type="monotone"
-            dataKey="cumulative"
-            stroke={C_EQUITY}
-            strokeWidth={2}
-            dot={false}
-            activeDot={{ r: 4, stroke: C_EQUITY, fill: C_SURFACE }}
-          />
-          {annualGoal > 0 && (
-            <Line
-              type="monotone"
-              dataKey="goalPace"
-              stroke={C_GOAL_PACE}
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
-              dot={false}
-              activeDot={false}
-              opacity={0.6}
-            />
-          )}
-        </LineChart>
+          <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.pnl >= 0 ? C_POS : C_NEG}
+              />
+            ))}
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
@@ -146,23 +130,19 @@ export function HomeTab({
   settings,
   year,
   onOpenStrategy,
+  onSelectEvent,
 }: {
   result: CalculationResult;
   settings: AppSettings;
   year?: string;
   onOpenStrategy: (k: StrategyKey) => void;
+  onSelectEvent: (e: RealizedPnLEvent) => void;
 }) {
   const [calMode, setCalMode] = useState<CalMode>("YTD");
   const [selectedDay, setSelectedDay] = useState<DailyPnl | null>(null);
 
   const nonIssueEvents = result.realizedEvents.filter((e) => e.strategy !== "DATA_ISSUE");
   const quality = tradeQuality(nonIssueEvents);
-
-  const annualGoal = settings.annualRealizedPnlGoal;
-  const monthlyRealized = result.monthlyReturns.map((m) => m.realizedPnl);
-  const monthIndex = result.monthlyReturns.length > 0 ? result.monthlyReturns.length - 1 : 0;
-  const pace = goalPace({ annualGoal, monthlyRealized, monthIndex });
-  const isAhead = pace.aheadBy >= 0;
 
   const maxBP = settings.maxBuyingPower ?? 125000;
   const currentDeployed = currentDeployedCapital(result);
@@ -234,54 +214,21 @@ export function HomeTab({
         />
         {days.length > 0 && (
           <div className="mt-3 border-t border-hairline-soft pt-3">
-            <DayDetail day={selectedDay} />
+            <DayDetail day={selectedDay} onSelect={onSelectEvent} />
           </div>
         )}
       </div>
 
-      {/* ── Bottom row: equity curve + buying power + goal pace ── */}
+      {/* ── Bottom row: monthly P&L bar chart + buying power ── */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
-        {/* Equity curve */}
+        {/* Monthly P&L bar chart */}
         <div className="rounded-[14px] border border-hairline bg-surface p-4">
-          <div className="mb-2 text-[12px] font-medium text-foreground">Equity curve</div>
-          <MiniEquityCurve result={result} annualGoal={annualGoal} />
+          <div className="mb-2 text-[12px] font-medium text-foreground">Monthly P&amp;L</div>
+          <MonthlyPnlBar result={result} />
         </div>
 
-        {/* Right column: buying power + goal pace */}
-        <div className="flex flex-col gap-3">
-          <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
-
-          {annualGoal > 0 && (
-            <div className="rounded-[12px] border border-hairline bg-surface p-3">
-              <div className="text-[11px] text-muted-foreground">Annual goal · pace</div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-[20px] font-semibold tabular-nums leading-none text-foreground">
-                  {formatCurrency(pace.actual)}
-                </span>
-                <span className="text-[12px] tabular-nums text-dim">
-                  / {formatCurrency(annualGoal)}
-                </span>
-              </div>
-              <span
-                className={cn(
-                  "mt-1.5 inline-flex items-center gap-1 rounded-[6px] px-2 py-[3px] text-[10px] font-semibold",
-                  isAhead ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg"
-                )}
-              >
-                {isAhead ? (
-                  <TrendingUp className="h-3 w-3" aria-hidden="true" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" aria-hidden="true" />
-                )}
-                {formatCurrency(Math.abs(pace.aheadBy))}{" "}
-                {isAhead ? "ahead" : "behind"}
-              </span>
-              <p className="mt-1.5 text-[10.5px] text-muted-foreground">
-                Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Buying power gauge */}
+        <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
       </div>
     </div>
   );

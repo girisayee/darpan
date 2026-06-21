@@ -1,5 +1,5 @@
 import type { Column } from "@/components/tables/DataTable";
-import type { CalculationResult } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { signedMoney } from "@/components/dashboard/tabs/shared";
@@ -18,6 +18,9 @@ export interface PositionRow {
   cost?: number;
   qty?: string;
   costBasis?: string;
+  strategyLabel?: string;
+  lifecycle?: OptionLifecycle;
+  event?: RealizedPnLEvent;
 }
 
 const DAY_MS = 1000 * 60 * 60 * 24;
@@ -86,6 +89,39 @@ const text = (key: keyof PositionRow, header: string): Column<PositionRow> => ({
   value: (r) => (r[key] as string | undefined) ?? "",
 });
 
+export const allColumns: Column<PositionRow>[] = [
+  position(),
+  {
+    key: "strategyLabel",
+    header: "Strategy",
+    value: (r) => r.strategyLabel ?? "",
+    render: (r) => (
+      <span className="text-[11px] text-muted-foreground">{r.strategyLabel ?? "—"}</span>
+    ),
+  },
+  stage(),
+  when(),
+  pnl(),
+];
+
+export function toAllPositionRows(
+  result: CalculationResult,
+  state: "all" | "active" | "closed"
+): PositionRow[] {
+  const labels: Record<StrategyKey, string> = {
+    csp: "Cash-secured puts",
+    cc: "Covered calls",
+    long: "Long options",
+    swing: "Swing",
+  };
+  return (["csp", "cc", "long", "swing"] as StrategyKey[]).flatMap((k) =>
+    toPositionRows(result, k, state).map((row) => ({
+      ...row,
+      strategyLabel: labels[k],
+    }))
+  );
+}
+
 export function columnsFor(key: StrategyKey): Column<PositionRow>[] {
   if (key === "csp" || key === "cc")
     return [
@@ -135,6 +171,7 @@ export function toPositionRows(
             pnl: lc.netOptionPnl,
             premium: lc.premiumReceived,
             capital: lc.capitalDeployed ?? undefined,
+            lifecycle: lc,
           };
         }
 
@@ -157,6 +194,7 @@ export function toPositionRows(
           pnl: lc.netOptionPnl + (lc.assignmentStockPnl ?? 0),
           premium: lc.premiumReceived,
           capital: lc.capitalDeployed ?? undefined,
+          lifecycle: lc,
         };
       });
   }
@@ -187,6 +225,7 @@ export function toPositionRows(
             when: `${daysToExpiry} DTE`,
             pnl: lc.netOptionPnl,
             cost: lc.premiumReceived,
+            lifecycle: lc,
           };
         }
 
@@ -207,6 +246,7 @@ export function toPositionRows(
           when: `${daysHeld}d`,
           pnl: lc.netOptionPnl + (lc.assignmentStockPnl ?? 0),
           cost: lc.premiumReceived,
+          lifecycle: lc,
         };
       });
   }
@@ -250,6 +290,7 @@ export function toPositionRows(
                 e.costBasis != null
                   ? `$${(e.costBasis / e.quantity).toFixed(2)}`
                   : "—",
+              event: e,
             })
           );
 

@@ -168,6 +168,7 @@ export function DashboardApp() {
             settings={settings}
             year={year}
             onOpenStrategy={openStrategyInPositions}
+            onSelectEvent={setSelectedEvent}
           />
         )}
         {activeTab === "Performance" && (
@@ -181,6 +182,8 @@ export function DashboardApp() {
             result={result}
             initialStrategy={positionsInitialStrategy}
             onReviewFix={() => setReviewFixOpen(true)}
+            onSelectEvent={setSelectedEvent}
+            onSelectLifecycle={setSelectedLifecycle}
           />
         )}
         {activeTab === "Import" && (

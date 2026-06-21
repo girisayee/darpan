@@ -5,9 +5,9 @@ import { StrategyStrip } from "@/components/dashboard/StrategyStrip";
 import { StrategyMetrics } from "@/components/dashboard/StrategyMetrics";
 import { DataTable } from "@/components/tables/DataTable";
 import { SegmentedControl } from "@/components/dashboard/tabs/shared";
-import { columnsFor, toPositionRows } from "@/components/dashboard/positions/columns";
+import { allColumns, columnsFor, toAllPositionRows, toPositionRows } from "@/components/dashboard/positions/columns";
 import { strategyAnalytics, type StrategyKey } from "@/lib/selectors/strategy-analytics";
-import type { CalculationResult } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 
 type SegmentValue = "all" | StrategyKey;
 type StateFilter = "All" | "Active" | "Closed";
@@ -23,14 +23,19 @@ export function PositionsTab({
   result,
   initialStrategy,
   onReviewFix,
+  onSelectEvent,
+  onSelectLifecycle,
 }: {
   result: CalculationResult;
   initialStrategy?: StrategyKey;
   onReviewFix?: () => void;
+  onSelectEvent: (e: RealizedPnLEvent) => void;
+  onSelectLifecycle: (l: OptionLifecycle) => void;
 }) {
   const [appliedInitial, setAppliedInitial] = useState<StrategyKey | undefined>(initialStrategy);
   const [segment, setSegment] = useState<SegmentValue>(initialStrategy ?? "all");
   const [stateFilter, setStateFilter] = useState<StateFilter>("Active");
+  const [allStateFilter, setAllStateFilter] = useState<StateFilter>("Active");
 
   // Detect prop changes using only state (avoids effect/ref lint rules).
   // When the parent passes a new initialStrategy, update segment to match.
@@ -45,6 +50,8 @@ export function PositionsTab({
   }
 
   if (segment === "all") {
+    const allStateKey = allStateFilter.toLowerCase() as "all" | "active" | "closed";
+    const allRows = toAllPositionRows(result, allStateKey);
     return (
       <div className="space-y-5 py-2">
         <StrategyStrip result={result} onOpen={handleOpenStrategy} />
@@ -60,6 +67,25 @@ export function PositionsTab({
             </button>
           </div>
         )}
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] font-medium text-foreground">All positions</span>
+          <SegmentedControl<StateFilter>
+            value={allStateFilter}
+            options={["All", "Active", "Closed"]}
+            onChange={setAllStateFilter}
+          />
+        </div>
+        <DataTable
+          rows={allRows}
+          columns={allColumns}
+          empty={`No ${allStateFilter.toLowerCase()} positions.`}
+          searchable
+          pageSize={8}
+          onRowClick={(row) => {
+            if (row.lifecycle) onSelectLifecycle(row.lifecycle);
+            else if (row.event) onSelectEvent(row.event);
+          }}
+        />
       </div>
     );
   }
@@ -111,6 +137,10 @@ export function PositionsTab({
         empty={`No ${stateFilter.toLowerCase()} ${STRATEGY_LABELS[segment].toLowerCase()} positions.`}
         searchable
         pageSize={5}
+        onRowClick={(row) => {
+          if (row.lifecycle) onSelectLifecycle(row.lifecycle);
+          else if (row.event) onSelectEvent(row.event);
+        }}
       />
     </div>
   );
