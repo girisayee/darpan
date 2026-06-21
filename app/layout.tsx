@@ -6,8 +6,8 @@ import "./globals.css";
 const sans = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "RealizedEdge",
-  description: "Realized P&L, option income, and capital efficiency across options and stock trades."
+  title: "Darpan",
+  description: "The mirror for your trades."
 };
 
 // Set the .dark class before paint (from stored/system preference) so there is no
