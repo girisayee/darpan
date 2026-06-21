@@ -83,6 +83,9 @@ function EquityCurveChart({
     }));
   }, [result.monthlyReturns, annualGoal]);
 
+  const finalCumulative = data.length > 0 ? data[data.length - 1].cumulative : 0;
+  const C_EQUITY = finalCumulative >= 0 ? C_POS : "rgb(var(--neg))";
+
   if (!mounted) {
     return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
   }
@@ -91,7 +94,7 @@ function EquityCurveChart({
     <div className="space-y-2">
       <div className="flex items-center gap-4 px-1">
         <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
-          <span className="inline-block h-0.5 w-5 rounded-full bg-pos" />
+          <span className="inline-block h-0.5 w-5 rounded-full" style={{ background: C_EQUITY }} />
           Cumulative P&amp;L
         </span>
         {annualGoal > 0 && (
@@ -144,10 +147,10 @@ function EquityCurveChart({
             <Line
               type="monotone"
               dataKey="cumulative"
-              stroke={C_POS}
+              stroke={C_EQUITY}
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 4, stroke: C_POS, fill: C_SURFACE }}
+              activeDot={{ r: 4, stroke: C_EQUITY, fill: C_SURFACE }}
             />
             {annualGoal > 0 && (
               <Line

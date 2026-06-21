@@ -8,16 +8,16 @@ export function intensity(pnl: number, maxAbs: number): number {
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function CalendarHeatmap({ days, mode, onSelectDay }: {
-  days: DailyPnl[]; mode: "year" | "month"; onSelectDay: (d: DailyPnl) => void;
+export function CalendarHeatmap({ days, mode, year: yearProp, onSelectDay }: {
+  days: DailyPnl[]; mode: "year" | "month"; year?: string; onSelectDay: (d: DailyPnl) => void;
 }) {
   const byKey = new Map(days.map((d) => [d.date, d]));
   const maxAbs = days.reduce((m, d) => Math.max(m, Math.abs(d.pnl)), 0);
   const color = (pnl: number) =>
     `rgb(var(--${pnl >= 0 ? "pos" : "neg"}) / ${intensity(pnl, maxAbs).toFixed(2)})`;
 
-  // Determine the year from data (fallback: latest day) and months present.
-  const year = days.length ? days[days.length - 1].date.slice(0, 4) : `${new Date().getFullYear()}`;
+  // Use the explicitly-passed year when available; fall back to inferring from data.
+  const year = yearProp ?? (days.length ? days[days.length - 1].date.slice(0, 4) : `${new Date().getFullYear()}`);
   const monthsToRender = mode === "year"
     ? Array.from(new Set(days.map((d) => Number(d.date.slice(5, 7))))).sort((a, b) => a - b)
     : [days.length ? Number(days[days.length - 1].date.slice(5, 7)) : 1];

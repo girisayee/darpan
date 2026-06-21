@@ -1,10 +1,18 @@
 "use client";
 import type { CalculationResult } from "@/types/trading";
-import { strategyAnalytics, type StrategyKey } from "@/lib/selectors/strategy-analytics";
+import { strategyAnalytics, STRATEGY_EVENT_ENUMS, type StrategyKey } from "@/lib/selectors/strategy-analytics";
 import { signedMoney } from "@/components/dashboard/tabs/shared";
 import { formatPercent } from "@/lib/utils/format";
 
 const LABELS: Record<StrategyKey, string> = { csp: "Cash-secured puts", cc: "Covered calls", long: "Long options", swing: "Swing" };
+
+function strategyRoi(result: CalculationResult, key: StrategyKey): number | null {
+  const enums = STRATEGY_EVENT_ENUMS[key];
+  const rows = result.aggregates.strategyBreakdown.filter((b) => enums.includes(b.strategy));
+  const capital = rows.reduce((s, b) => s + b.capital, 0);
+  const pnl = rows.reduce((s, b) => s + b.pnl, 0);
+  return capital > 0 ? (pnl / capital) * 100 : null;
+}
 
 export function StrategyStrip({ result, onOpen }: { result: CalculationResult; onOpen: (k: StrategyKey) => void }) {
   const keys: StrategyKey[] = ["csp", "cc", "long", "swing"];
@@ -12,7 +20,7 @@ export function StrategyStrip({ result, onOpen }: { result: CalculationResult; o
     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
       {keys.map((k) => {
         const a = strategyAnalytics(result, k);
-        const roi = result.aggregates.strategyBreakdown.find((b) => b.pnl === a.pnl)?.roiPercent ?? null;
+        const roi = strategyRoi(result, k);
         return (
           <button key={k} type="button" onClick={() => onOpen(k)}
             className="rounded-[10px] border border-hairline bg-surface p-3 text-left hover:border-accent">

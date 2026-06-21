@@ -166,6 +166,7 @@ export function DashboardApp() {
           <HomeTab
             result={result}
             settings={settings}
+            year={year}
             onOpenStrategy={openStrategyInPositions}
           />
         )}

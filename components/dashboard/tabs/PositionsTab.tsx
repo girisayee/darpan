@@ -28,8 +28,16 @@ export function PositionsTab({
   initialStrategy?: StrategyKey;
   onReviewFix?: () => void;
 }) {
+  const [appliedInitial, setAppliedInitial] = useState<StrategyKey | undefined>(initialStrategy);
   const [segment, setSegment] = useState<SegmentValue>(initialStrategy ?? "all");
   const [stateFilter, setStateFilter] = useState<StateFilter>("Active");
+
+  // Detect prop changes using only state (avoids effect/ref lint rules).
+  // When the parent passes a new initialStrategy, update segment to match.
+  if (initialStrategy !== appliedInitial) {
+    setAppliedInitial(initialStrategy);
+    if (initialStrategy) setSegment(initialStrategy);
+  }
 
   function handleOpenStrategy(k: StrategyKey) {
     setSegment(k);

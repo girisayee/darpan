@@ -77,6 +77,9 @@ function MiniEquityCurve({ result, annualGoal }: { result: CalculationResult; an
     }));
   }, [result.monthlyReturns, annualGoal]);
 
+  const finalCumulative = data.length > 0 ? data[data.length - 1].cumulative : 0;
+  const C_EQUITY = finalCumulative >= 0 ? C_POS : "rgb(var(--neg))";
+
   if (!mounted) {
     return <div className="h-[160px] animate-pulse rounded-md bg-surface-inset" />;
   }
@@ -115,10 +118,10 @@ function MiniEquityCurve({ result, annualGoal }: { result: CalculationResult; an
           <Line
             type="monotone"
             dataKey="cumulative"
-            stroke={C_POS}
+            stroke={C_EQUITY}
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4, stroke: C_POS, fill: C_SURFACE }}
+            activeDot={{ r: 4, stroke: C_EQUITY, fill: C_SURFACE }}
           />
           {annualGoal > 0 && (
             <Line
@@ -141,10 +144,12 @@ function MiniEquityCurve({ result, annualGoal }: { result: CalculationResult; an
 export function HomeTab({
   result,
   settings,
+  year,
   onOpenStrategy,
 }: {
   result: CalculationResult;
   settings: AppSettings;
+  year?: string;
   onOpenStrategy: (k: StrategyKey) => void;
 }) {
   const [calMode, setCalMode] = useState<CalMode>("YTD");
@@ -165,7 +170,9 @@ export function HomeTab({
   const days = useMemo(() => dailyPnl(result.realizedEvents), [result.realizedEvents]);
   const calModeToHeatmap = calMode === "YTD" ? "year" : "month";
 
-  const ytdPnl = result.aggregates.currentYearRealizedPnl;
+  // Use sum of filtered monthly returns so the card tracks the selected year,
+  // not the system year (which would show $0 for historical year selections).
+  const ytdPnl = result.monthlyReturns.reduce((s, m) => s + m.realizedPnl, 0);
   const ytdRoi = result.aggregates.ytdRoi;
 
   return (
@@ -222,6 +229,7 @@ export function HomeTab({
         <CalendarHeatmap
           days={days}
           mode={calModeToHeatmap}
+          year={year}
           onSelectDay={setSelectedDay}
         />
         {days.length > 0 && (
