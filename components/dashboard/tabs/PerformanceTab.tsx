@@ -1,53 +1,37 @@
 "use client";
 
 /**
- * PerformanceTab — index comparison + visuals only.
+ * PerformanceTab — benchmark comparison + capital-deployed metrics + equity curve
+ * + monthly breakdown.
  *
- * Sections:
- *   1. Benchmark vs SPY/QQQ (capital-matched index comparison)
- *   2. Equity curve — recharts line in an h-[200px] ResponsiveContainer
- *   3. Monthly P&L + ROI ComposedChart (bars left $ axis, line right % axis,
- *      ReferenceLine at monthly goal) + Monthly ledger table
- *
- * Numeric KPI cards (Net P&L · YTD, Return on capital, Profit factor) live on
- * the Overview tab — this tab is deliberately charts + benchmark only.
- *
- * Token classes only; fraction selectors ×100 before formatPercent;
- * already-% values (ytdRoi, averageMonthlyRoi) passed straight.
- * Nulls render "—".
+ * Excluded per spec: max drawdown, Sortino, Calmar, payoff ratio.
  */
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import {
-  Bar,
   CartesianGrid,
-  Cell,
-  ComposedChart,
-  Legend,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
-import { TickerLogo } from "@/components/common/TickerLogo";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
-import { Column, DataTable } from "@/components/tables/DataTable";
-import { compactMonth, formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
-import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
-import { MonthlyRoiTable, SegmentedControl, signedMoney, signedPercent, tone } from "./shared";
+import { capitalEfficiency } from "@/lib/selectors/capital-efficiency";
+import { allocation } from "@/lib/selectors/allocation";
+import { goalPace } from "@/lib/selectors/goal-pace";
+import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import type { AppSettings, CalculationResult } from "@/types/trading";
+import { MonthlyRoiTable, tone } from "./shared";
 
-// ── recharts palette via CSS variables ───────────────────────────────────────
 const C_POS      = "rgb(var(--pos))";
-const C_NEG      = "rgb(var(--neg))";
 const C_MUTED    = "rgb(var(--text-muted))";
 const C_HAIRLINE = "rgb(var(--hairline))";
 const C_SURFACE  = "rgb(var(--surface))";
-const C_ACCENT   = "rgb(var(--accent))";
+const C_GOAL_PACE = "rgb(var(--text-muted))";
 
 const TICK_STYLE = {
   fontFamily: "var(--font-sans)",
@@ -76,10 +60,6 @@ const TOOLTIP_LABEL_STYLE: React.CSSProperties = {
   marginBottom: 4,
 };
 
-// ── Equity-curve chart ────────────────────────────────────────────────────────
-
-const C_GOAL_PACE = "rgb(var(--text-muted))";
-
 function EquityCurveChart({
   result,
   annualGoal,
@@ -87,7 +67,6 @@ function EquityCurveChart({
   result: CalculationResult;
   annualGoal: number;
 }) {
-  // useSyncExternalStore avoids SSR/client hydration mismatch for recharts.
   const mounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -95,13 +74,11 @@ function EquityCurveChart({
   );
 
   const data = useMemo(() => {
-    // Build from monthlyReturns (already trimmed to the selected year by filterResult) so
-    // the curve shows ONLY the selected year — not prior-year months that bleed in via
-    // cross-year opening legs. Cumulative is a running within-scope sum (n ≤ 12).
     return result.monthlyReturns.map((m, i) => ({
       month: `${m.year}-${String(m.month).padStart(2, "0")}`,
-      cumulative: result.monthlyReturns.slice(0, i + 1).reduce((sum, x) => sum + x.realizedPnl, 0),
-      // Goal pace: annualGoal × (i+1) / 12 — prorated monthly target
+      cumulative: result.monthlyReturns
+        .slice(0, i + 1)
+        .reduce((sum, x) => sum + x.realizedPnl, 0),
       goalPace: annualGoal > 0 ? (annualGoal * (i + 1)) / 12 : undefined,
     }));
   }, [result.monthlyReturns, annualGoal]);
@@ -112,7 +89,6 @@ function EquityCurveChart({
 
   return (
     <div className="space-y-2">
-      {/* Legend */}
       <div className="flex items-center gap-4 px-1">
         <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
           <span className="inline-block h-0.5 w-5 rounded-full bg-pos" />
@@ -120,7 +96,10 @@ function EquityCurveChart({
         </span>
         {annualGoal > 0 && (
           <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
-            <span className="inline-block h-0.5 w-5 rounded-full bg-muted-foreground opacity-50" style={{ borderTop: "2px dashed" }} />
+            <span
+              className="inline-block h-0.5 w-5 rounded-full bg-muted-foreground opacity-50"
+              style={{ borderTop: "2px dashed" }}
+            />
             Goal pace
           </span>
         )}
@@ -137,7 +116,7 @@ function EquityCurveChart({
             <XAxis
               dataKey="month"
               tick={TICK_STYLE}
-              tickFormatter={(v: string) => formatDisplayDate(v)}
+              tickFormatter={(v: string) => v.slice(5)}
               axisLine={{ stroke: C_HAIRLINE }}
               tickLine={false}
             />
@@ -157,7 +136,6 @@ function EquityCurveChart({
                 formatCurrency(typeof value === "number" ? value : Number(value)),
                 name === "goalPace" ? "Goal pace" : "Cumulative P&L",
               ]}
-              labelFormatter={(label: unknown) => formatDisplayDate(String(label))}
               contentStyle={TOOLTIP_CONTENT_STYLE}
               itemStyle={TOOLTIP_ITEM_STYLE}
               labelStyle={TOOLTIP_LABEL_STYLE}
@@ -190,375 +168,148 @@ function EquityCurveChart({
   );
 }
 
-// ── Monthly P&L + ROI ComposedChart ──────────────────────────────────────────
-//
-// Left Y-axis ($): realized P&L bars (green ≥0, red <0, per-bar Cell)
-// Right Y-axis (%): monthly ROI line
-// ReferenceLine on $ axis at annualGoal/12, labelled "Monthly goal"
-
-function MonthlyComposedChart({
-  result,
-  annualGoal,
-}: {
-  result: CalculationResult;
-  annualGoal: number;
-}) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false
-  );
-
-  const data = useMemo(() => {
-    return result.monthlyReturns.map((m) => ({
-      label: `${m.year}-${String(m.month).padStart(2, "0")}`,
-      realizedPnl: m.realizedPnl,
-      // realizedRoiPercent is already a % value — pass straight
-      roi: m.realizedRoiPercent,
-    }));
-  }, [result.monthlyReturns]);
-
-  const monthlyGoal = annualGoal > 0 ? annualGoal / 12 : undefined;
-
-  if (!mounted) {
-    return <div className="h-[220px] animate-pulse rounded-md bg-surface-inset" />;
-  }
-
-  return (
-    <div className="space-y-2">
-      {/* Custom legend */}
-      <div className="flex items-center gap-4 px-1">
-        <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
-          <span className="inline-block h-3 w-3 rounded-sm bg-pos opacity-80" />
-          P&amp;L
-        </span>
-        <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
-          <span className="inline-block h-0.5 w-5 rounded-full" style={{ background: C_ACCENT }} />
-          ROI
-        </span>
-        {monthlyGoal !== undefined && (
-          <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
-            <span className="inline-block h-0.5 w-5 rounded-full opacity-60" style={{ borderTop: `2px dashed ${C_GOAL_PACE}` }} />
-            Monthly goal
-          </span>
-        )}
-      </div>
-
-      <div className="h-[220px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 4, right: 40, left: 4, bottom: 4 }}>
-            <CartesianGrid
-              vertical={false}
-              strokeDasharray="0"
-              stroke={C_HAIRLINE}
-              opacity={1}
-            />
-            <XAxis
-              dataKey="label"
-              tick={TICK_STYLE}
-              tickFormatter={(v: string) => formatDisplayDate(v)}
-              axisLine={{ stroke: C_HAIRLINE }}
-              tickLine={false}
-            />
-            {/* Left Y-axis: dollar P&L */}
-            <YAxis
-              yAxisId="pnl"
-              orientation="left"
-              tick={TICK_STYLE}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v: number) =>
-                v >= 1000 || v <= -1000
-                  ? `$${(v / 1000).toFixed(0)}k`
-                  : `$${v.toFixed(0)}`
-              }
-              width={52}
-            />
-            {/* Right Y-axis: ROI % */}
-            <YAxis
-              yAxisId="roi"
-              orientation="right"
-              tick={TICK_STYLE}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v: number) => `${v.toFixed(1)}%`}
-              width={44}
-            />
-            <Tooltip
-              formatter={(value: unknown, name: string | number | undefined) => {
-                const n = typeof value === "number" ? value : Number(value);
-                if (name === "roi") return [formatPercent(n, 1), "ROI"];
-                return [formatCurrency(n), "Realized P&L"];
-              }}
-              labelFormatter={(label: unknown) => formatDisplayDate(String(label))}
-              contentStyle={TOOLTIP_CONTENT_STYLE}
-              itemStyle={TOOLTIP_ITEM_STYLE}
-              labelStyle={TOOLTIP_LABEL_STYLE}
-              cursor={{ fill: C_HAIRLINE, opacity: 0.3 }}
-            />
-            {/* Suppress recharts default legend — we use our own */}
-            <Legend content={() => null} />
-            {/* Monthly goal reference line on $ axis */}
-            {monthlyGoal !== undefined && (
-              <ReferenceLine
-                yAxisId="pnl"
-                y={monthlyGoal}
-                stroke={C_GOAL_PACE}
-                strokeDasharray="4 4"
-                strokeWidth={1.5}
-                opacity={0.7}
-                label={{
-                  value: "Monthly goal",
-                  position: "insideTopRight",
-                  style: { ...TICK_STYLE, fontSize: 10 },
-                }}
-              />
-            )}
-            {/* P&L bars with per-bar color */}
-            <Bar yAxisId="pnl" dataKey="realizedPnl" radius={[3, 3, 0, 0]}>
-              {data.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.realizedPnl >= 0 ? C_POS : C_NEG}
-                />
-              ))}
-            </Bar>
-            {/* ROI line */}
-            <Line
-              yAxisId="roi"
-              type="monotone"
-              dataKey="roi"
-              stroke={C_ACCENT}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, stroke: C_ACCENT, fill: C_SURFACE }}
-              connectNulls
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-// ── PerformanceTab ─────────────────────────────────────────────────────────────
-
-// ── Returns by symbol ──────────────────────────────────────────────────────────
-
-type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number];
-
-/**
- * Ranked leaderboard — Top winners / Top losers by realized P&L. A ranked list
- * (not bars) so a single large outlier can't compress the rest of the field.
- */
-function LeaderColumn({ title, rows }: { title: string; rows: SymbolRow[] }) {
-  return (
-    <div className="rounded-[12px] border border-hairline bg-surface p-3">
-      <div className="mb-1 font-sans text-[12px] font-medium text-muted-foreground">{title}</div>
-      {rows.length === 0 ? (
-        <div className="py-2 font-sans text-[12px] text-dim">None</div>
-      ) : (
-        <ul className="divide-y divide-hairline-soft">
-          {rows.map((r, i) => (
-            <li key={r.symbol} className="flex items-center gap-2 py-1.5">
-              <span className="w-4 shrink-0 text-right font-sans text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
-              <TickerLogo symbol={r.symbol} size={16} />
-              <span className="min-w-0 flex-1 truncate font-sans text-[12.5px] font-medium text-foreground">{r.symbol}</span>
-              <span className="shrink-0 font-sans text-[11px] tabular-nums">
-                {r.roiPercent == null ? <span className="text-dim">—</span> : signedPercent(r.roiPercent)}
-              </span>
-              <span className="w-[88px] shrink-0 text-right font-sans text-[12.5px] tabular-nums">{signedMoney(r.pnl)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function SymbolLeaderboard({ rows }: { rows: SymbolRow[] }) {
-  const sorted = [...rows].sort((a, b) => b.pnl - a.pnl);
-  const winners = sorted.filter((r) => r.pnl > 0).slice(0, 5);
-  const losers = sorted.filter((r) => r.pnl < 0).reverse().slice(0, 5); // most negative first
-  if (winners.length === 0 && losers.length === 0) return null;
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <LeaderColumn title="Top winners" rows={winners} />
-      <LeaderColumn title="Top losers" rows={losers} />
-    </div>
-  );
-}
-
-function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
-  const columns: Column<SymbolRow>[] = [
-    {
-      key: "symbol",
-      header: "Symbol",
-      value: (r) => r.symbol,
-      render: (r) => (
-        <span className="inline-flex items-center gap-2">
-          <TickerLogo symbol={r.symbol} size={18} />
-          <span className="font-medium text-foreground">{r.symbol}</span>
-        </span>
-      ),
-    },
-    {
-      key: "pnl",
-      header: "Realized P&L",
-      value: (r) => r.pnl,
-      render: (r) => signedMoney(r.pnl),
-      align: "right",
-      tooltip: "Total realized P&L across this symbol's closed events.",
-    },
-    {
-      key: "roi",
-      header: "ROI",
-      // roiPercent is already a % value — pass straight; null sorts last / renders "—"
-      value: (r) => r.roiPercent ?? -Infinity,
-      render: (r) => (r.roiPercent == null ? <span className="opacity-50">—</span> : signedPercent(r.roiPercent)),
-      align: "right",
-      tooltip: "Realized P&L ÷ capital deployed for this symbol.",
-    },
-    {
-      key: "trades",
-      header: "Trades",
-      value: (r) => r.trades,
-      render: (r) => <span className="tabular-nums text-foreground">{r.trades}</span>,
-      align: "right",
-      tooltip: "Number of closed (realized) events for this symbol.",
-    },
-    {
-      key: "winRate",
-      header: "Win rate",
-      value: (r) => r.winRate ?? -Infinity,
-      render: (r) => (r.winRate == null ? <span className="opacity-50">—</span> : formatPercent(r.winRate, 0)),
-      align: "right",
-      tooltip: "Share of this symbol's closed events that were profitable.",
-    },
-    {
-      key: "capital",
-      header: "Capital",
-      value: (r) => r.capital,
-      render: (r) => <span className="tabular-nums text-foreground">{formatCurrency(r.capital)}</span>,
-      align: "right",
-      tooltip: "Total capital deployed across this symbol's events.",
-    },
-  ];
-  return (
-    <DataTable
-      rows={rows}
-      columns={columns}
-      empty="No symbol returns yet."
-      defaultSort={{ key: "pnl", direction: "desc" }}
-      searchable
-      searchPlaceholder="Filter symbols…"
-      pageSize={15}
-    />
-  );
-}
-
-// ── Section metric strips ──────────────────────────────────────────────────────
-
-function MonthlyMetrics({ result }: { result: CalculationResult }) {
-  const months = result.monthlyReturns;
-  if (months.length === 0) return null;
-  const totalPnl = months.reduce((s, m) => s + m.realizedPnl, 0);
-  const profitable = months.filter((m) => m.realizedPnl > 0).length;
-  const best = months.reduce((a, b) => (b.realizedPnl > a.realizedPnl ? b : a), months[0]);
-  const avgRoi = result.aggregates.averageMonthlyRoi; // already % or null
-  return (
-    <MetricGroup cols={4}>
-      <KpiCard label="Realized P&L" value={formatCurrency(totalPnl)} helper={`${months.length} month${months.length !== 1 ? "s" : ""}`} tooltip="Sum of realized P&L across the months in view." tone={tone(totalPnl)} variant="compact" />
-      <KpiCard label="Avg monthly ROI" value={avgRoi == null ? "—" : formatPercent(avgRoi, 1)} helper="Realized ÷ avg deployed" tooltip="Average of each month's realized ROI." tone={tone(avgRoi ?? 0)} variant="compact" />
-      <KpiCard label="Best month" value={formatCurrency(best.realizedPnl)} helper={compactMonth(best.year, best.month)} tooltip="The single most profitable month." tone={tone(best.realizedPnl)} variant="compact" />
-      <KpiCard label="Profitable months" value={`${profitable} / ${months.length}`} helper="Months in the green" tooltip="Count of months with positive realized P&L." tone="neutral" variant="compact" />
-    </MetricGroup>
-  );
-}
-
-function SymbolMetrics({ rows }: { rows: SymbolRow[] }) {
-  if (rows.length === 0) return null;
-  const winners = rows.filter((r) => r.pnl > 0).length;
-  const losers = rows.filter((r) => r.pnl < 0).length;
-  const best = [...rows].sort((a, b) => b.pnl - a.pnl)[0];
-  const worst = [...rows].sort((a, b) => a.pnl - b.pnl)[0];
-  return (
-    <MetricGroup cols={4}>
-      <KpiCard label="Symbols traded" value={String(rows.length)} helper={`${winners} up · ${losers} down`} tooltip="Distinct symbols with realized events." tone="neutral" variant="compact" />
-      <KpiCard label="Top symbol" value={best.symbol} helper={formatCurrency(best.pnl)} tooltip="Symbol with the highest realized P&L." tone={tone(best.pnl)} variant="compact" />
-      <KpiCard label="Worst symbol" value={worst.symbol} helper={formatCurrency(worst.pnl)} tooltip="Symbol with the lowest realized P&L." tone={tone(worst.pnl)} variant="compact" />
-      <KpiCard label="Win rate" value={formatPercent((winners / rows.length) * 100, 0)} helper="Profitable symbols" tooltip="Share of symbols that ended profitable." tone="neutral" variant="compact" />
-    </MetricGroup>
-  );
-}
-
-type PerfView = "Monthly" | "By symbol";
-
 export function PerformanceTab({
   result,
-  annualGoal,
-  onSelectEvent,
+  settings,
 }: {
   result: CalculationResult;
-  annualGoal: number;
-  onSelectEvent: (event: RealizedPnLEvent) => void;
+  settings: AppSettings;
 }) {
-  void onSelectEvent; // DetailDrawer wiring — available for future drill-down
-  const [view, setView] = useState<PerfView>("Monthly");
+  const annualGoal = settings.annualRealizedPnlGoal;
+  const maxBP = settings.maxBuyingPower ?? 125000;
+
+  const monthlyRealized = result.monthlyReturns.map((m) => m.realizedPnl);
+  const monthIndex = result.monthlyReturns.length > 0 ? result.monthlyReturns.length - 1 : 0;
+  const pace = goalPace({ annualGoal, monthlyRealized, monthIndex });
+
+  const ce = capitalEfficiency(result.realizedEvents, result.monthlyReturns);
+
+  const alloc = allocation(
+    result.aggregates.symbolBreakdown,
+    result.aggregates.strategyBreakdown.map((b) => ({
+      strategy: b.strategy,
+      capital: b.capital,
+    }))
+  );
+
+  const totalCapitalDays = result.monthlyReturns.reduce((s, m) => s + m.capitalDays, 0);
+
+  const avgDeployed = result.aggregates.averageDeployedCapital;
+  const peakDeployed = result.aggregates.peakDeployedCapital;
+  const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
 
   return (
     <div className="space-y-5 py-2">
-      <SegmentedControl<PerfView> value={view} options={["Monthly", "By symbol"]} onChange={setView} />
+      {/* ── Benchmark comparison ── */}
+      <BenchmarkComparison result={result} />
 
-      {view === "Monthly" && (
-        <div className="space-y-5">
-          {/* Section metrics */}
-          <MonthlyMetrics result={result} />
-
-          {/* Benchmark vs SPY/QQQ */}
-          <BenchmarkComparison result={result} />
-
-          {/* Equity curve */}
-          <section className="space-y-2">
-            <h2 className="font-sans text-[13px] font-medium text-foreground">
-              Equity curve
-            </h2>
-            <div className="rounded-[12px] border border-hairline bg-surface p-3">
-              <EquityCurveChart result={result} annualGoal={annualGoal} />
+      {/* ── Goal card ── */}
+      {annualGoal > 0 && (
+        <div className="rounded-[14px] border border-hairline bg-surface p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-[12px] text-muted-foreground">Annual goal</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-[26px] font-semibold tabular-nums leading-none text-foreground">
+                  {formatCurrency(pace.actual)}
+                </span>
+                <span className="text-[13px] tabular-nums text-dim">/ {formatCurrency(annualGoal)}</span>
+              </div>
             </div>
-          </section>
-
-          {/* Monthly realized P&L + ROI */}
-          <section className="space-y-2">
-            <h2 className="font-sans text-[13px] font-medium text-foreground">
-              Monthly realized P&amp;L &amp; ROI
-            </h2>
-            <div className="rounded-[12px] border border-hairline bg-surface p-3">
-              <MonthlyComposedChart result={result} annualGoal={annualGoal} />
-            </div>
-            <MonthlyRoiTable rows={result.monthlyReturns} />
-            <p className="font-sans text-[12px] text-muted-foreground">
-              Monthly ROI = realized P&amp;L ÷ average capital deployed all month (how hard your whole book worked). Closed Trade ROI = realized P&amp;L ÷ capital in just the trades that closed (return on the positions you realized).
-            </p>
-          </section>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
+            <div
+              className="h-full rounded-full bg-aurora transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, (pace.actual / annualGoal) * 100)).toFixed(1)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            {formatPercent(pace.pct, 0)} of goal · Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo
+          </p>
         </div>
       )}
 
-      {view === "By symbol" && (
-        <div className="space-y-5">
-          {/* Section metrics */}
-          <SymbolMetrics rows={result.aggregates.symbolBreakdown} />
-
-          {/* Leaderboard + detail table */}
-          <section className="space-y-2">
-            <h2 className="font-sans text-[13px] font-medium text-foreground">
-              Returns by symbol
-            </h2>
-            <SymbolLeaderboard rows={result.aggregates.symbolBreakdown} />
-            <SymbolReturnsTable rows={result.aggregates.symbolBreakdown} />
-          </section>
+      {/* ── Equity curve ── */}
+      <section className="space-y-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">Equity curve</h2>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <EquityCurveChart result={result} annualGoal={annualGoal} />
         </div>
-      )}
+      </section>
+
+      {/* ── Capital deployed metrics ── */}
+      <MetricGroup label="Capital deployed" cols={4}>
+        <KpiCard
+          label="Avg deployed"
+          value={formatCurrency(avgDeployed)}
+          helper="Average across active months"
+          tooltip="Average capital deployed across all months with activity."
+          tone="neutral"
+          variant="compact"
+        />
+        <KpiCard
+          label="Peak deployed"
+          value={formatCurrency(peakDeployed)}
+          helper="Highest single day"
+          tooltip="Highest capital deployed on any single day."
+          tone="neutral"
+          variant="compact"
+        />
+        <KpiCard
+          label="Return on capital"
+          value={ce.annualizedRoc != null ? formatPercent(ce.annualizedRoc, 1) : "—"}
+          helper="Capital-weighted annualized"
+          tooltip="Capital-weighted mean of per-event annualized ROI."
+          tone={tone(ce.annualizedRoc ?? 0)}
+          variant="compact"
+        />
+        <KpiCard
+          label="Buying power used"
+          value={bpUsed != null ? formatPercent(bpUsed, 0) : "—"}
+          helper="Avg deployed ÷ max BP"
+          tooltip="Average deployed capital as a share of your max buying power setting."
+          tone="neutral"
+          variant="compact"
+        />
+        <KpiCard
+          label="Capital turnover"
+          value={ce.capitalTurnover != null ? ce.capitalTurnover.toFixed(2) + "×" : "—"}
+          helper="Closed capital ÷ avg deployed"
+          tooltip="How many times your average deployed capital cycled through closed trades."
+          tone="neutral"
+          variant="compact"
+        />
+        <KpiCard
+          label="Income / day"
+          value={ce.incomePerDay != null ? formatCurrency(ce.incomePerDay) : "—"}
+          helper="Option premium per capital-day"
+          tooltip="Option premium P&L divided by total capital-days deployed."
+          tone={tone(ce.incomePerDay ?? 0)}
+          variant="compact"
+        />
+        <KpiCard
+          label="Capital-days"
+          value={totalCapitalDays.toLocaleString()}
+          helper="Σ monthly capital-days"
+          tooltip="Sum of capital-days across all months — a measure of total capital work done."
+          tone="neutral"
+          variant="compact"
+        />
+        <KpiCard
+          label="Concentration"
+          value={alloc.bySymbol.level}
+          helper={`HHI ${alloc.bySymbol.hhi.toFixed(2)}`}
+          tooltip="Herfindahl–Hirschman index across symbols. Low < 0.15, moderate 0.15–0.25, high > 0.25."
+          tone={alloc.bySymbol.level === "high" ? "negative" : alloc.bySymbol.level === "moderate" ? "neutral" : "positive"}
+          variant="compact"
+        />
+      </MetricGroup>
+
+      {/* ── Monthly breakdown table ── */}
+      <section className="space-y-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">Monthly breakdown</h2>
+        <MonthlyRoiTable rows={result.monthlyReturns} />
+      </section>
     </div>
   );
 }
