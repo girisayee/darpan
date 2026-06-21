@@ -17,7 +17,7 @@
  * Nulls render "—".
  */
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -33,10 +33,12 @@ import {
   YAxis,
 } from "recharts";
 import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
+import { KpiCard } from "@/components/dashboard/KpiCard";
+import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { Column, DataTable } from "@/components/tables/DataTable";
-import { formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
+import { compactMonth, formatCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
-import { MonthlyRoiTable, signedMoney, signedPercent } from "./shared";
+import { MonthlyRoiTable, SegmentedControl, signedMoney, signedPercent, tone } from "./shared";
 
 // ── recharts palette via CSS variables ───────────────────────────────────────
 const C_POS      = "rgb(var(--pos))";
@@ -443,6 +445,43 @@ function SymbolReturnsTable({ rows }: { rows: SymbolRow[] }) {
   );
 }
 
+// ── Section metric strips ──────────────────────────────────────────────────────
+
+function MonthlyMetrics({ result }: { result: CalculationResult }) {
+  const months = result.monthlyReturns;
+  if (months.length === 0) return null;
+  const totalPnl = months.reduce((s, m) => s + m.realizedPnl, 0);
+  const profitable = months.filter((m) => m.realizedPnl > 0).length;
+  const best = months.reduce((a, b) => (b.realizedPnl > a.realizedPnl ? b : a), months[0]);
+  const avgRoi = result.aggregates.averageMonthlyRoi; // already % or null
+  return (
+    <MetricGroup cols={4}>
+      <KpiCard label="Realized P&L" value={formatCurrency(totalPnl)} helper={`${months.length} month${months.length !== 1 ? "s" : ""}`} tooltip="Sum of realized P&L across the months in view." tone={tone(totalPnl)} variant="compact" />
+      <KpiCard label="Avg monthly ROI" value={avgRoi == null ? "—" : formatPercent(avgRoi, 1)} helper="Realized ÷ avg deployed" tooltip="Average of each month's realized ROI." tone={tone(avgRoi ?? 0)} variant="compact" />
+      <KpiCard label="Best month" value={formatCurrency(best.realizedPnl)} helper={compactMonth(best.year, best.month)} tooltip="The single most profitable month." tone={tone(best.realizedPnl)} variant="compact" />
+      <KpiCard label="Profitable months" value={`${profitable} / ${months.length}`} helper="Months in the green" tooltip="Count of months with positive realized P&L." tone="neutral" variant="compact" />
+    </MetricGroup>
+  );
+}
+
+function SymbolMetrics({ rows }: { rows: SymbolRow[] }) {
+  if (rows.length === 0) return null;
+  const winners = rows.filter((r) => r.pnl > 0).length;
+  const losers = rows.filter((r) => r.pnl < 0).length;
+  const best = [...rows].sort((a, b) => b.pnl - a.pnl)[0];
+  const worst = [...rows].sort((a, b) => a.pnl - b.pnl)[0];
+  return (
+    <MetricGroup cols={4}>
+      <KpiCard label="Symbols traded" value={String(rows.length)} helper={`${winners} up · ${losers} down`} tooltip="Distinct symbols with realized events." tone="neutral" variant="compact" />
+      <KpiCard label="Top symbol" value={best.symbol} helper={formatCurrency(best.pnl)} tooltip="Symbol with the highest realized P&L." tone={tone(best.pnl)} variant="compact" />
+      <KpiCard label="Worst symbol" value={worst.symbol} helper={formatCurrency(worst.pnl)} tooltip="Symbol with the lowest realized P&L." tone={tone(worst.pnl)} variant="compact" />
+      <KpiCard label="Win rate" value={formatPercent((winners / rows.length) * 100, 0)} helper="Profitable symbols" tooltip="Share of symbols that ended profitable." tone="neutral" variant="compact" />
+    </MetricGroup>
+  );
+}
+
+type PerfView = "Monthly" | "By symbol";
+
 export function PerformanceTab({
   result,
   annualGoal,
@@ -453,48 +492,61 @@ export function PerformanceTab({
   onSelectEvent: (event: RealizedPnLEvent) => void;
 }) {
   void onSelectEvent; // DetailDrawer wiring — available for future drill-down
-
-  // This tab is intentionally index-comparison + visuals only. The numeric KPI
-  // strip (Net P&L · YTD, Return on capital, Profit factor) now lives on the
-  // Overview tab to avoid duplicating headline metrics across tabs.
+  const [view, setView] = useState<PerfView>("Monthly");
 
   return (
     <div className="space-y-5 py-2">
-      {/* ── 1. Benchmark vs SPY/QQQ ── */}
-      <BenchmarkComparison result={result} />
+      <SegmentedControl<PerfView> value={view} options={["Monthly", "By symbol"]} onChange={setView} />
 
-      {/* ── 2. Equity curve ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Equity curve
-        </h2>
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <EquityCurveChart result={result} annualGoal={annualGoal} />
+      {view === "Monthly" && (
+        <div className="space-y-5">
+          {/* Section metrics */}
+          <MonthlyMetrics result={result} />
+
+          {/* Benchmark vs SPY/QQQ */}
+          <BenchmarkComparison result={result} />
+
+          {/* Equity curve */}
+          <section className="space-y-2">
+            <h2 className="font-sans text-[13px] font-medium text-foreground">
+              Equity curve
+            </h2>
+            <div className="rounded-[12px] border border-hairline bg-surface p-3">
+              <EquityCurveChart result={result} annualGoal={annualGoal} />
+            </div>
+          </section>
+
+          {/* Monthly realized P&L + ROI */}
+          <section className="space-y-2">
+            <h2 className="font-sans text-[13px] font-medium text-foreground">
+              Monthly realized P&amp;L &amp; ROI
+            </h2>
+            <div className="rounded-[12px] border border-hairline bg-surface p-3">
+              <MonthlyComposedChart result={result} annualGoal={annualGoal} />
+            </div>
+            <MonthlyRoiTable rows={result.monthlyReturns} />
+            <p className="font-sans text-[12px] text-muted-foreground">
+              Monthly ROI = realized P&amp;L ÷ average capital deployed all month (how hard your whole book worked). Closed Trade ROI = realized P&amp;L ÷ capital in just the trades that closed (return on the positions you realized).
+            </p>
+          </section>
         </div>
-      </section>
+      )}
 
-      {/* ── 3. Monthly realized P&L + ROI ComposedChart ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Monthly realized P&amp;L &amp; ROI
-        </h2>
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <MonthlyComposedChart result={result} annualGoal={annualGoal} />
+      {view === "By symbol" && (
+        <div className="space-y-5">
+          {/* Section metrics */}
+          <SymbolMetrics rows={result.aggregates.symbolBreakdown} />
+
+          {/* Leaderboard + detail table */}
+          <section className="space-y-2">
+            <h2 className="font-sans text-[13px] font-medium text-foreground">
+              Returns by symbol
+            </h2>
+            <SymbolLeaderboard rows={result.aggregates.symbolBreakdown} />
+            <SymbolReturnsTable rows={result.aggregates.symbolBreakdown} />
+          </section>
         </div>
-        <MonthlyRoiTable rows={result.monthlyReturns} />
-        <p className="font-sans text-[12px] text-muted-foreground">
-          Monthly ROI = realized P&amp;L ÷ average capital deployed all month (how hard your whole book worked). Closed Trade ROI = realized P&amp;L ÷ capital in just the trades that closed (return on the positions you realized).
-        </p>
-      </section>
-
-      {/* ── 4. Returns by symbol ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Returns by symbol
-        </h2>
-        <SymbolLeaderboard rows={result.aggregates.symbolBreakdown} />
-        <SymbolReturnsTable rows={result.aggregates.symbolBreakdown} />
-      </section>
+      )}
     </div>
   );
 }
