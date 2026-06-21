@@ -20,7 +20,6 @@
 import { useMemo, useSyncExternalStore } from "react";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
@@ -341,47 +340,43 @@ function MonthlyComposedChart({
 
 type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number];
 
-/** Horizontal bar leaderboard: symbols ranked by realized P&L, colored by sign. */
-function SymbolLeaderboardChart({ rows }: { rows: SymbolRow[] }) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false
-  );
-  const data = useMemo(
-    () => [...rows].sort((a, b) => b.pnl - a.pnl).slice(0, 15).map((r) => ({ symbol: r.symbol, pnl: r.pnl })),
-    [rows]
-  );
-  if (data.length === 0) return null;
-  if (!mounted) return <div className="h-[220px] animate-pulse rounded-md bg-surface-inset" />;
-  const height = Math.max(140, data.length * 28 + 24);
+/**
+ * Ranked leaderboard — Top winners / Top losers by realized P&L. A ranked list
+ * (not bars) so a single large outlier can't compress the rest of the field.
+ */
+function LeaderColumn({ title, rows }: { title: string; rows: SymbolRow[] }) {
   return (
-    <div style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
-          <CartesianGrid horizontal={false} strokeDasharray="0" stroke={C_HAIRLINE} />
-          <XAxis
-            type="number"
-            tick={TICK_STYLE}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => (v >= 1000 || v <= -1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`)}
-          />
-          <YAxis type="category" dataKey="symbol" tick={TICK_STYLE} axisLine={false} tickLine={false} width={52} />
-          <Tooltip
-            formatter={(value: unknown) => [formatCurrency(typeof value === "number" ? value : Number(value)), "Realized P&L"]}
-            contentStyle={TOOLTIP_CONTENT_STYLE}
-            itemStyle={TOOLTIP_ITEM_STYLE}
-            labelStyle={TOOLTIP_LABEL_STYLE}
-            cursor={{ fill: C_HAIRLINE, opacity: 0.3 }}
-          />
-          <Bar dataKey="pnl" radius={[0, 3, 3, 0]}>
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? C_POS : C_NEG} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="rounded-[12px] border border-hairline bg-surface p-3">
+      <div className="mb-1 font-sans text-[12px] font-medium text-muted-foreground">{title}</div>
+      {rows.length === 0 ? (
+        <div className="py-2 font-sans text-[12px] text-dim">None</div>
+      ) : (
+        <ul className="divide-y divide-hairline-soft">
+          {rows.map((r, i) => (
+            <li key={r.symbol} className="flex items-center gap-2 py-1.5">
+              <span className="w-4 shrink-0 text-right font-sans text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate font-sans text-[12.5px] font-medium text-foreground">{r.symbol}</span>
+              <span className="shrink-0 font-sans text-[11px] tabular-nums">
+                {r.roiPercent == null ? <span className="text-dim">—</span> : signedPercent(r.roiPercent)}
+              </span>
+              <span className="w-[88px] shrink-0 text-right font-sans text-[12.5px] tabular-nums">{signedMoney(r.pnl)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function SymbolLeaderboard({ rows }: { rows: SymbolRow[] }) {
+  const sorted = [...rows].sort((a, b) => b.pnl - a.pnl);
+  const winners = sorted.filter((r) => r.pnl > 0).slice(0, 5);
+  const losers = sorted.filter((r) => r.pnl < 0).reverse().slice(0, 5); // most negative first
+  if (winners.length === 0 && losers.length === 0) return null;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <LeaderColumn title="Top winners" rows={winners} />
+      <LeaderColumn title="Top losers" rows={losers} />
     </div>
   );
 }
@@ -493,9 +488,7 @@ export function PerformanceTab({
         <h2 className="font-sans text-[13px] font-medium text-foreground">
           Returns by symbol
         </h2>
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <SymbolLeaderboardChart rows={result.aggregates.symbolBreakdown} />
-        </div>
+        <SymbolLeaderboard rows={result.aggregates.symbolBreakdown} />
         <SymbolReturnsTable rows={result.aggregates.symbolBreakdown} />
       </section>
     </div>
