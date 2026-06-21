@@ -114,7 +114,8 @@ export function toAllPositionRows(
     long: "Long options",
     swing: "Swing",
   };
-  return (["csp", "cc", "long", "swing"] as StrategyKey[]).flatMap((k) =>
+  // Option plays only — swing positions are reached via the Swing strategy tile.
+  return (["csp", "cc", "long"] as StrategyKey[]).flatMap((k) =>
     toPositionRows(result, k, state).map((row) => ({
       ...row,
       strategyLabel: labels[k],
