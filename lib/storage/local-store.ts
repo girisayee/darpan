@@ -1,9 +1,12 @@
 import type { AppSettings, TradeTransaction } from "@/types/trading";
 
-const TRANSACTIONS_KEY = "positioniq.transactions.v1";
-const SETTINGS_KEY = "positioniq.settings.v1";
-const LEGACY_TRANSACTIONS_KEY = "realizededge.transactions.v1";
-const LEGACY_SETTINGS_KEY = "realizededge.settings.v1";
+const TRANSACTIONS_KEY = "darpan.transactions.v1";
+const SETTINGS_KEY = "darpan.settings.v1";
+
+// Legacy localStorage keys, read once to migrate previously-saved data into the
+// current keys. Kept solely for that migration — never written to.
+const LEGACY_TRANSACTION_KEYS = ["positioniq.transactions.v1", "realizededge.transactions.v1"];
+const LEGACY_SETTINGS_KEYS = ["positioniq.settings.v1", "realizededge.settings.v1"];
 
 export const defaultSettings: AppSettings = {
   showSampleData: true,
@@ -25,9 +28,17 @@ export type BackupPayload = {
   settings: AppSettings;
 };
 
+function readFirst(keys: string[]): string | null {
+  for (const key of keys) {
+    const value = window.localStorage.getItem(key);
+    if (value) return value;
+  }
+  return null;
+}
+
 export function loadTransactions(): TradeTransaction[] {
   if (typeof window === "undefined") return [];
-  const raw = window.localStorage.getItem(TRANSACTIONS_KEY) ?? window.localStorage.getItem(LEGACY_TRANSACTIONS_KEY);
+  const raw = readFirst([TRANSACTIONS_KEY, ...LEGACY_TRANSACTION_KEYS]);
   if (!raw) return [];
   try {
     return JSON.parse(raw) as TradeTransaction[];
@@ -42,7 +53,7 @@ export function saveTransactions(transactions: TradeTransaction[]) {
 
 export function loadSettings(): AppSettings {
   if (typeof window === "undefined") return defaultSettings;
-  const raw = window.localStorage.getItem(SETTINGS_KEY) ?? window.localStorage.getItem(LEGACY_SETTINGS_KEY);
+  const raw = readFirst([SETTINGS_KEY, ...LEGACY_SETTINGS_KEYS]);
   if (!raw) return defaultSettings;
   try {
     return { ...defaultSettings, ...(JSON.parse(raw) as Partial<AppSettings>) };
@@ -56,10 +67,9 @@ export function saveSettings(settings: AppSettings) {
 }
 
 export function clearLocalData() {
-  window.localStorage.removeItem(TRANSACTIONS_KEY);
-  window.localStorage.removeItem(SETTINGS_KEY);
-  window.localStorage.removeItem(LEGACY_TRANSACTIONS_KEY);
-  window.localStorage.removeItem(LEGACY_SETTINGS_KEY);
+  for (const key of [TRANSACTIONS_KEY, SETTINGS_KEY, ...LEGACY_TRANSACTION_KEYS, ...LEGACY_SETTINGS_KEYS]) {
+    window.localStorage.removeItem(key);
+  }
 }
 
 export function createBackup(transactions: TradeTransaction[], settings: AppSettings): BackupPayload {
@@ -74,7 +84,7 @@ export function createBackup(transactions: TradeTransaction[], settings: AppSett
 export function parseBackup(raw: string): BackupPayload {
   const parsed = JSON.parse(raw) as BackupPayload;
   if (parsed.version !== 1 || !Array.isArray(parsed.transactions) || !parsed.settings) {
-    throw new Error("Backup file is not a PositionIQ v1 backup.");
+    throw new Error("Backup file is not a Darpan v1 backup.");
   }
   return parsed;
 }

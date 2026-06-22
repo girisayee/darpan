@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 // Set the .dark class before paint (from stored/system preference) so there is no
 // theme flash on first load. Runs before hydration; useTheme() reads this class.
 const NO_FLASH_THEME =
-  "(function(){try{var t=localStorage.getItem('positioniq.theme');if(t!=='light'){document.documentElement.classList.add('dark');}}catch(e){}})();";
+  "(function(){try{var t=localStorage.getItem('darpan.theme')||localStorage.getItem('positioniq.theme');if(t!=='light'){document.documentElement.classList.add('dark');}}catch(e){}})();";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

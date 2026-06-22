@@ -1,107 +1,74 @@
-# PositionIQ
+# Darpan
 
-PositionIQ is a personal-use, local-first dashboard for tracking realized P&L, option income, and capital efficiency from Robinhood trading activity.
+**The mirror for your trades.** It doesn't flatter — it reflects.
 
-It focuses on:
+Darpan is a personal, local-first dashboard for short-term traders who track their own
+performance. It imports your broker activity (Robinhood-style CSV), reconstructs realized
+P&L, option income, and capital usage, and shows it back to you across four focused views:
+**Home**, **Performance**, **Tickers**, and **Positions**.
 
-- Covered calls
-- Cash-secured puts
-- Covered call assignments
-- Cash-secured put assignments
-- Swing trades
-- Tax lots and realized P&L explanations
+Darpan does not connect to any broker and sends nothing to the cloud. You import a CSV (or
+paste rows); everything is computed and stored locally.
 
-The app does not connect to Robinhood. It imports Robinhood-style CSV exports or pasted transaction data and stores normalized trade data in a local SQLite database at `data/positioniq.sqlite`.
-
-## Run Locally
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open the local URL printed by Next.js.
+Open the local URL Next.js prints. The app ships with sample data so the dashboard is
+populated before you import anything; turn it off in Settings once you import your own.
 
-## Documentation Map
+## What it does
 
-For future agents and contributors:
+A short-term trader's "game tape." The four tabs:
 
-- `AGENTS.md` is the fast-start guide for coding agents.
-- `docs/FEATURES.md` summarizes current product behavior.
-- `docs/ARCHITECTURE.md` explains data flow, persistence, API routes, and calculations.
-- `docs/DESIGN.md` captures UI and dashboard design conventions.
-- `docs/OPERATIONS.md` lists commands, verification steps, and data privacy notes.
+- **Home** — year-to-date verdict at a glance: Net P&L, Expectancy, Profit factor, Win
+  rate, a daily-P&L calendar heatmap (year or month), your capital deployed vs. your
+  configured max, your open option positions, and a by-strategy snapshot.
+- **Performance** — equity curve, capital-matched benchmark vs. SPY / QQQ / VTI, annual
+  goal pacing, capital-deployed metrics (return on capital, utilization, turnover,
+  income/day, concentration), and a monthly P&L breakdown (chart + by-strategy ROI table).
+- **Tickers** — a per-symbol leaderboard ("Money makers" / "Account killers") plus a full
+  sortable, searchable table of every symbol you've traded.
+- **Positions** — your book organized by strategy (Cash-secured puts, Covered calls, Long
+  options, Swing), each with its own metrics and an Active / Closed / All drill-down. Click
+  any position for a full P&L breakdown.
 
-## Import Robinhood Data
+Import and Settings live behind the **⋯** menu in the top bar. On a phone, the four tabs
+become a bottom tab bar.
 
-Use the header **Import** action, upload a CSV or paste transaction rows, then parse and review the preview. PositionIQ attempts to detect common column names for dates, symbols, actions, quantities, prices, amounts, option type, strike, and expiration.
+## How it computes P&L
 
-Rows that cannot be interpreted are kept as unresolved instead of being silently discarded.
+- **Stock / swing sale:** net proceeds − allocated cost basis − fees. Partial sales
+  allocate basis by the configured method (FIFO / LIFO / average).
+- **Covered call / cash-secured put (expired or bought to close):** premium received −
+  buy-to-close cost − fees.
+- **Covered-call assignment:** strike proceeds − allocated share basis + net premium − fees.
+- **Cash-secured put assignment:** creates a stock lot at an effective basis of strike −
+  net premium + fees; stock P&L is realized when those shares are later sold.
 
-## Supported Transaction Types
+ROI is shown as `—` when the capital base is unknown or zero. Annualized ROI is the simple
+`ROI × (365 / holding days)`.
 
-- Stock buys and sells
-- Option sell-to-open
-- Option buy-to-close
-- Option expiration
-- Option assignment
-- Fees, dividends, transfers, and unknown rows as non-core or unresolved activity
+## Data & privacy
 
-## Calculation Assumptions
+- Imported transactions and settings persist in a local SQLite file (`data/darpan.sqlite`),
+  read/written only through the app's local API routes.
+- The SQLite file and any CSVs are git-ignored — they contain personal financial data.
+- Export a JSON backup (transactions + settings) any time from the **⋯** menu or Settings.
 
-- Stock sale realized P&L = net proceeds - allocated cost basis - fees.
-- Partial stock sales allocate cost basis using the selected method: FIFO, LIFO, or average cost.
-- Covered call expiration or buy-to-close P&L = premium received - buy-to-close cost - fees.
-- Covered call assignment P&L = assignment sale proceeds - allocated stock cost basis + net option premium - fees.
-- Cash-secured put expiration or buy-to-close P&L = premium received - buy-to-close cost - fees.
-- Cash-secured put assignment creates a stock lot. Effective basis = strike purchase cost - net premium received + fees.
-- Put assignment does not create stock P&L until assigned shares are later sold.
+## Documentation
 
-## ROI Formulas
+- [`AGENTS.md`](AGENTS.md) — fast-start guide for coding agents and contributors.
+- [`docs/FEATURES.md`](docs/FEATURES.md) — capability catalogue, screen by screen.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — data flow, persistence, engine, and UI structure.
 
-- Monthly ROI % = monthly realized P&L / average deployed capital.
-- Average deployed capital = capital-days / days in month.
-- Covered call ROI = net covered call P&L / underlying stock cost basis when available.
-- Cash-secured put return on collateral = net option P&L / collateral required.
-- Swing trade ROI = realized stock P&L / allocated cost basis.
-- Covered call assignment ROI = assignment realized P&L / assigned stock cost basis.
-- Annualized ROI is simple annualized return: ROI % * (365 / holding days).
+## Known limitations
 
-ROI is shown as N/A when capital is unknown or zero.
+- No broker API, cloud sync, or multi-user support.
+- No live prices, option marks, or Greeks — only realized results from your imported data.
+- No wash-sale handling or tax filing. Verify against official brokerage and tax documents.
 
-## Capital And Collateral
-
-Default collateral assumptions:
-
-- Covered calls use the underlying stock cost basis when the app can link the option to open shares.
-- Cash-secured puts use conservative collateral: strike * shares.
-- Stock swing trades use cost basis while the position is open.
-
-Settings allow changing cost basis method and put collateral denominator.
-
-## Backup
-
-Use the header export action or the Settings screen to export a JSON backup. The backup contains imported transactions and settings only. Sample data is generated by the app.
-
-## Local Database
-
-PositionIQ uses SQLite through the local Next.js API routes:
-
-- `GET /api/store` reads transactions and settings.
-- `PUT /api/store` replaces transactions/settings.
-- `POST /api/import/robinhood` imports a Robinhood CSV into SQLite.
-- `DELETE /api/store` clears local app data.
-
-The SQLite file is ignored by git because it contains personal trading data.
-
-## Known Limitations
-
-- No Robinhood API integration.
-- No cloud sync or multi-user support.
-- No wash sale handling.
-- No tax filing support.
-- No options Greeks.
-- No real-time market prices.
-- Assignment linking depends on available transaction details and may require review.
-
-PositionIQ is for personal tracking and analysis only. Verify results against official brokerage and tax documents.
+Darpan is for personal tracking and analysis only.

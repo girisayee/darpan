@@ -14,18 +14,21 @@ type DatabaseSyncType = {
 };
 
 const dbDir = path.join(process.cwd(), "data");
-const legacyDbPath = path.join(dbDir, "realizededge.sqlite");
-const dbPath = path.join(dbDir, "positioniq.sqlite");
+const dbPath = path.join(dbDir, "darpan.sqlite");
+// Older database filenames, renamed to the current path on first use. Migration only.
+const legacyDbPaths = [path.join(dbDir, "positioniq.sqlite"), path.join(dbDir, "realizededge.sqlite")];
 
 let db: DatabaseSyncType | null = null;
 
 function resolveDbPath() {
-  if (existsSync(dbPath) || !existsSync(legacyDbPath)) return dbPath;
+  if (existsSync(dbPath)) return dbPath;
+  const legacy = legacyDbPaths.find((p) => existsSync(p));
+  if (!legacy) return dbPath;
   try {
-    renameSync(legacyDbPath, dbPath);
+    renameSync(legacy, dbPath);
     return dbPath;
   } catch {
-    return legacyDbPath;
+    return legacy;
   }
 }
 

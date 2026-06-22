@@ -1,69 +1,94 @@
 # Agent Guide
 
-This file is the fast-start guide for future coding agents working in this repo.
+Fast-start guide for coding agents and contributors working in this repo.
 
-## Product Snapshot
+## Product snapshot
 
-PositionIQ is a local-first Next.js dashboard for personal trading analytics. It imports Robinhood-style CSV activity, normalizes transactions into SQLite, and calculates realized P&L, option income, current CC/CSP exposure, tax lots, monthly ROI, and goal progress.
+Darpan is a local-first Next.js dashboard for short-term retail traders. It imports
+Robinhood-style CSV activity, reconstructs realized P&L / option income / capital usage in a
+pure calculation engine, and presents it across four tabs: **Home**, **Performance**,
+**Tickers**, **Positions** (Import and Settings live behind a `⋯` overflow menu).
 
-The current product, UI, package, and documentation name is `PositionIQ`. Keep `realizededge` references only where they are explicitly legacy migration keys or paths.
+The product, package, UI, and docs name is **Darpan**. A few storage and database keys
+retain older app-name prefixes **only** as one-time data-migration fallbacks (see
+`local-store.ts`, `database.ts`, and the no-flash theme script in `app/layout.tsx`) — never
+reintroduce old branding anywhere else.
 
-## Where To Start
+## Tech stack
 
-- App entry: `app/page.tsx`
-- Main UI: `components/dashboard/DashboardApp.tsx`
-- Chart UI: `components/charts/DashboardCharts.tsx`
-- KPI card/tooltip pattern: `components/dashboard/KpiCard.tsx`
-- Table component: `components/tables/DataTable.tsx`
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind 3 (the "Aurora" dark-first token
+set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env).
+
+## Where to start
+
+- App entry: `app/page.tsx`, `app/layout.tsx`
+- Shell / nav: `components/shell/AppShell.tsx` (desktop top bar + `OverflowMenu` + mobile `BottomNav`)
+- Main container: `components/dashboard/DashboardApp.tsx` (tab state, filters, drawer, import/settings)
+- Tabs: `components/dashboard/tabs/{HomeTab,PerformanceTab,TickersTab,PositionsTab}.tsx`
+- Shared tab helpers: `components/dashboard/tabs/shared.tsx` (`SegmentedControl`, `MonthlyRoiTable`, tone/format helpers, `ClosedCyclesTable`)
+- Reusable UI: `KpiCard`, `MetricGroup`, `BuyingPowerGauge`, `CalendarHeatmap`, `DayDetail`,
+  `Leaderboard`, `StrategyStrip`, `StrategyMetrics`, `DetailDrawer`, `ReviewFixPanel`,
+  `common/{StatusChip,InfoTooltip,TickerLogo,Logo}.tsx`, `tables/DataTable.tsx`
+  (sortable + searchable + paginated), `dashboard/positions/columns.tsx`
 - Domain types: `types/trading.ts`
-- Calculation engine: `lib/calculations/engine.ts`
+- Calculation engine: `lib/calculations/engine.ts` (`calculateDashboard`)
+- Selectors (pure, derive view data from a `CalculationResult`): `lib/selectors/*`
+  — `trade-quality`, `premium-capture`, `allocation`, `capital-efficiency`, `goal-pace`,
+  `top-movers`, `daily-pnl`, `leaderboard`, `strategy-analytics`, `filter-result`, `analytics`
 - Robinhood CSV parser: `lib/import/robinhood.ts`
-- SQLite persistence: `lib/db/database.ts`
-- Client store bridge: `lib/storage/server-store-client.ts`
-- API routes: `app/api/store/route.ts`, `app/api/import/robinhood/route.ts`
-- Tests: `tests/calculations.test.ts`, `tests/import.test.ts`
+- Benchmarks: `lib/benchmark/{compare,fetch}.ts` (capital-matched SPY/QQQ/VTI)
+- Persistence: SQLite via `lib/db/database.ts`; client bridge `lib/storage/server-store-client.ts`;
+  `lib/storage/local-store.ts` holds `defaultSettings`, backup parsing, and legacy localStorage migration
+- API routes: `app/api/store/route.ts`, `app/api/import/robinhood/route.ts`, `app/api/benchmark/route.ts`
+- Tests: `tests/**/*.test.ts`
 
-Read these docs before broad changes:
+Read `docs/ARCHITECTURE.md` and `docs/FEATURES.md` before broad changes.
 
-- `docs/FEATURES.md`
-- `docs/ARCHITECTURE.md`
-- `docs/DESIGN.md`
-- `docs/OPERATIONS.md`
-
-## Run And Verify
-
-Use these checks before handing off meaningful code changes:
+## Run and verify
 
 ```bash
-npm run lint
-npx tsc --noEmit
-npm test
-npm run build
+npm run typecheck   # tsc --noEmit
+npm run lint        # eslint
+npm test            # vitest run (tests/**/*.test.ts, Node env)
+npm run build       # next build
 ```
 
-For frontend changes, verify in the in-app browser at `http://localhost:3000/` when the dev server is running.
+Tests run in a **Node** environment (`vitest.config.ts`) — unit-test pure logic
+(selectors, engine) under `tests/`. There is no jsdom setup, so verify UI via
+typecheck/lint/build and the running dev server rather than component render tests.
 
-## Important Invariants
+## Important invariants
 
-- Do not store trading data in `localStorage`. Transactions and settings live in local SQLite through `/api/store`.
-- Do not commit `data/*.sqlite` or user CSV files. They contain personal financial data.
-- Preserve Robinhood import rows unless the user explicitly asks to dedupe. Duplicate warnings are informational; duplicates can represent real separate executions.
-- Assignment stock settlement rows from Robinhood are intentionally ignored to avoid double counting the linked option assignment.
-- Assignment events still exist in the ledger and calculations, but the dashboard should not promote separate assignment stat cards or chart series.
-- LEU-style same-day option open/close rows must process opens before closes.
-- A stock sell with no matching opening buy yields an unresolved SWING_TRADE event (`costBasis === null`, "Missing cost basis" warning); the opener is added via Review & fix.
-- Current covered-call capital uses known stock basis when available and strike exposure as a fallback for open-cycle display.
-- The annual realized P&L goal is configurable in settings and defaults to `40000`.
+- The calculation engine (`lib/calculations/engine.ts`) and the Robinhood importer are the
+  domain core — change their math only deliberately, and update/extend tests when you do.
+- Transactions and settings persist in local SQLite through `/api/store`. Do not commit
+  `data/*.sqlite` or user CSVs — they contain personal financial data.
+- Preserve imported rows unless the user explicitly asks to dedupe; duplicate ids are
+  informational warnings (they can be genuinely separate executions).
+- A stock sell with no matching opening buy yields an unresolved `SWING_TRADE` event
+  (`costBasis === null`, "Missing cost basis" warning); the opener is added via Review & fix.
+- Same-day option open/close rows must process opens before closes.
+- Do **not** surface max drawdown, Sortino, Calmar, payoff ratio, a discipline streak, live
+  option marks, or a social leaderboard — these were explicitly cut from the product.
+- `winRate` convention is inconsistent by source and easy to get wrong: `tradeQuality().winRate`
+  is a **fraction (0–1)**, while `aggregates.winRate` and `symbolBreakdown[].winRate` are a
+  **percent (0–100)**. `formatPercent` does not multiply — it appends `%`.
+- Positions: the combined "All strategies" board lists **option plays only** (CSP/CC/Long);
+  Swing shows **closed** positions only. Per-strategy and combined views default to **All**.
+- Chart axes use month abbreviations (`monthTick`); tooltips use `monthLabel` ("Jun '26").
+  Dates everywhere use `formatDisplayDate`.
 
-## Editing Style
+## Editing style
 
-- Keep changes scoped and follow existing component patterns.
-- Use `apply_patch` for manual edits.
-- Prefer typed helpers over ad hoc string logic for domain behavior.
-- Add or update tests when calculation, import, or persistence behavior changes.
-- Keep UI dense, professional, and dashboard-like. Avoid marketing-page patterns.
-- Keep user-visible wording concise and practical.
+- Keep changes scoped; follow existing component and token patterns.
+- Use the Aurora CSS tokens (`rgb(var(--pos))`, `text-muted-foreground`, etc.) — never
+  hardcode hex; everything must work in light and dark.
+- Numeric cells use `tabular-nums` and the helpers in `lib/utils/format.ts`.
+- Prefer typed selectors over ad hoc logic for domain behavior; add tests when calculation,
+  import, or persistence behavior changes.
+- Keep the UI dense, professional, and readable — generous metric type, not marketing copy.
 
-## Data Privacy
+## Data privacy
 
-Treat imported CSVs, SQLite DBs, backups, and transaction contents as private financial data. Do not paste large raw transaction data into docs, tests, or final responses. Use small synthetic examples for tests and documentation.
+Treat imported CSVs, the SQLite DB, backups, and transaction contents as private financial
+data. Use small synthetic examples in tests and docs — never paste real transaction data.

@@ -1,114 +1,103 @@
 # Architecture
 
-PositionIQ is a Next.js App Router application with a client-heavy dashboard, local API routes, and SQLite persistence.
+Darpan is a Next.js App Router application with a client-rendered dashboard, local API
+routes, SQLite persistence, and a pure calculation engine. Everything runs and stores
+locally; nothing is sent off-device.
 
-## High-Level Flow
+## High-level flow
 
 ```text
-Robinhood CSV
-  -> lib/import/robinhood.ts
+Robinhood CSV / pasted rows
+  -> lib/import/robinhood.ts            (parse + normalize to TradeTransaction[])
   -> app/api/import/robinhood/route.ts
-  -> lib/db/database.ts
-  -> SQLite data/positioniq.sqlite
-  -> /api/store
-  -> lib/storage/server-store-client.ts
+  -> lib/db/database.ts                 (SQLite: data/darpan.sqlite)
+  -> app/api/store/route.ts             (GET/PUT/DELETE)
+  -> lib/storage/server-store-client.ts (client snapshot via useSyncExternalStore)
   -> components/dashboard/DashboardApp.tsx
-  -> lib/calculations/engine.ts
-  -> UI tables/charts/KPIs
+  -> lib/calculations/engine.ts         (calculateDashboard -> CalculationResult)
+  -> lib/selectors/*                    (derive per-view data)
+  -> tabs + charts + tables + KPIs
 ```
 
 ## Persistence
 
-SQLite is accessed from `lib/db/database.ts` using Node's built-in `node:sqlite` module through `process.getBuiltinModule`.
+SQLite is accessed in `lib/db/database.ts` via Node's built-in `node:sqlite`
+(`process.getBuiltinModule`). Tables:
 
-Tables:
+- `transactions` — each normalized `TradeTransaction` as a JSON payload plus query metadata.
+- `settings` — a single `app` JSON payload.
 
-- `transactions`: stores each normalized `TradeTransaction` as JSON payload plus query metadata.
-- `settings`: stores one `app` JSON payload.
+The database file is `data/darpan.sqlite`. On first use, if it is absent but an
+older-named database file exists, the helper renames it forward — those legacy filenames
+exist purely for that one-time migration.
 
-Current DB path:
+`lib/storage/local-store.ts` holds `defaultSettings`, backup create/parse, and a localStorage
+migration path (the current key plus older-named legacy keys) used as a fallback. The theme
+preference (`darpan.theme`) is the one thing intentionally kept in `localStorage`, set before
+paint by the no-flash script in `app/layout.tsx`. Trading data itself lives in SQLite.
 
-- `data/positioniq.sqlite`
-
-Legacy migration:
-
-- If `data/positioniq.sqlite` does not exist but `data/realizededge.sqlite` does, the DB helper renames the legacy file.
-
-Do not move transaction/settings persistence back to browser localStorage.
-
-## API Routes
+## API routes
 
 `app/api/store/route.ts`
-
-- `GET`: returns transactions and settings.
-- `PUT`: replaces transactions and/or settings.
-- `DELETE`: clears transactions and resets settings.
+- `GET` — returns transactions and settings.
+- `PUT` — replaces transactions and/or settings.
+- `DELETE` — clears transactions and resets settings.
 
 `app/api/import/robinhood/route.ts`
+- `POST` — parses raw CSV text and writes rows to SQLite (`mode: "replace" | "append"`).
+  Duplicate rows are preserved; duplicate ids are returned as warning metadata.
 
-- `POST`: parses raw CSV text and writes rows to SQLite.
-- `mode: "replace"` imports into a fresh transaction set.
-- `mode: "append"` appends to existing rows.
-- Duplicate rows are preserved; duplicate ids are warning metadata.
+`app/api/benchmark/route.ts`
+- Fetches benchmark closes (SPY/QQQ/VTI) for capital-matched comparison; see
+  `lib/benchmark/{compare,fetch}.ts`.
 
-## Client Store
+## Calculation engine
 
-`lib/storage/server-store-client.ts` exposes a tiny external store used through `useSyncExternalStore`.
+`lib/calculations/engine.ts` is the domain core. Main export:
 
-It keeps the client snapshot in sync with `/api/store` responses and merges settings with `defaultSettings` so new settings get defaults when old DBs/backups are loaded.
+- `calculateDashboard(transactions, settings, today?) => CalculationResult`
 
-## Calculation Engine
+`CalculationResult` contains: sorted `transactions`, `realizedEvents` (per-close P&L with
+explanations), `taxLots`, `optionLifecycles`, `capitalUsage`, `monthlyReturns`,
+`positionCapital`, `aggregates` (totals, win rate, strategy/symbol breakdowns, deployed
+capital), `unresolvedTransactions`, `duplicateTransactionIds`, and `warnings`.
 
-`lib/calculations/engine.ts` is the domain core.
-
-Main export:
-
-- `calculateDashboard(transactions, settings, today?)`
-
-Important outputs:
-
-- sorted transactions
-- realized P&L events
-- tax lots
-- option lifecycles
-- capital usage intervals
-- monthly returns
-- aggregate dashboard stats
-- warnings and unresolved transactions
-
-Important behaviors:
-
-- Transaction sorting processes same-day opens before closes.
-- Stock lots use FIFO/LIFO/AVERAGE based on settings.
-- A stock sell with no covering buy lot is left unresolved (`costBasis === null`) and surfaced in Review & fix, where the user adds the opening buy.
+Key behaviors:
+- Same-day opens are processed before closes.
+- Stock lots use FIFO / LIFO / AVERAGE per settings.
+- A stock sell with no covering buy is left unresolved (`costBasis === null`) and surfaced in
+  Review & fix, where the user supplies the opener.
 - Option lifecycles are keyed by underlying, option type, strike, and expiration.
-- Put assignment creates a stock tax lot; stock P&L is realized later when shares are sold.
+- A put assignment creates a stock tax lot; its stock P&L realizes when the shares are sold.
 
-## UI Structure
+## Selectors
 
-`components/dashboard/DashboardApp.tsx` is the main container. It owns:
+Pure functions in `lib/selectors/` derive view data from a `CalculationResult` (or its
+events), so the engine stays UI-agnostic:
 
-- active view state
-- filters
-- settings updates
-- transaction replacement
-- overview layout persistence
-- drawer selection
+- `trade-quality` — win rate, profit factor, payoff ratio, expectancy, avg win/loss.
+- `premium-capture` — premium collected, capture rate (CC/CSP), assignment rates.
+- `capital-efficiency` — annualized return on capital, capital turnover, income/day.
+- `allocation` — symbol/strategy concentration (HHI + level).
+- `goal-pace` — YTD vs. annual goal, projection, required monthly run-rate.
+- `daily-pnl` — bins realized events by calendar day (powers the calendar heatmap).
+- `leaderboard` — ranks symbols into winners/losers (Tickers).
+- `strategy-analytics` — scopes quality/premium/capital metrics to one strategy (Positions).
+- `top-movers`, `filter-result` (period/strategy/account scoping), `analytics` (wheel rollup).
 
-Repeated UI primitives:
+`lib/selectors/risk.ts` exists but is intentionally **not** surfaced (drawdown/Sortino/Calmar).
 
-- `KpiCard`: card with visible hover/focus tooltip.
-- `DataTable`: sortable table.
-- `MonthlyRoiChart`: Recharts-based monthly ROI bar chart.
+## UI structure
+
+`components/dashboard/DashboardApp.tsx` owns the active tab, filters (year/account), the
+detail-drawer selection, and Import/Settings panels. `components/shell/AppShell.tsx` renders
+the brand, the desktop tab bar + `OverflowMenu`, and the mobile `BottomNav`.
+
+Repeated primitives: `KpiCard` (label/value/helper with tooltip), `DataTable` (sortable +
+searchable + paginated, per-usage column definitions), `SegmentedControl`, `CalendarHeatmap`,
+`BuyingPowerGauge`, and `DetailDrawer` (event- and lifecycle-aware P&L breakdown).
 
 ## Types
 
-Domain contracts live in `types/trading.ts`. Keep this file aligned with:
-
-- parser output
-- database payloads
-- calculation engine inputs/outputs
-- UI table/chart expectations
-- backup payloads
-
-When changing a type, check parser, DB save/load, tests, and dashboard rendering.
+Domain contracts live in `types/trading.ts`. When changing a type, check the parser, DB
+save/load, the engine, selectors, the tables/charts that consume it, and the backup payload.

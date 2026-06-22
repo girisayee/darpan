@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 
 export type Theme = "dark" | "light";
 
-const KEY = "positioniq.theme";
+const KEY = "darpan.theme";
 
 /**
  * Pure helper: resolve the initial theme from a stored string and a media query result.

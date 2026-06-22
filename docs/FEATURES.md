@@ -1,64 +1,103 @@
 # Features
 
-PositionIQ is built around realized trading analytics rather than live portfolio management.
+Darpan is built around realized trading analytics for short-term traders, not live portfolio
+management. Everything below is computed from your imported activity.
 
-## Core Workflows
+## Core workflow
 
-- Import Robinhood CSV activity from upload or pasted text.
-- Normalize stock, option, cash, fee, dividend, transfer, and unknown rows.
-- Store imported transactions and settings in local SQLite.
-- Review unresolved import rows and duplicate warnings.
-- Track realized P&L across stock sales, covered calls, cash-secured puts, option expirations, buy-to-close cycles, and assignments.
-- Inspect tax lots and per-event P&L explanations.
-- View monthly realized P&L, ROI, deployed capital, and goal progress.
-- Use top header actions for Import, Settings, backup export, and theme toggle.
+1. Import Robinhood-style CSV activity (upload or paste) via the **⋯** menu → Import.
+2. Rows are normalized into stock, option, cash, fee, dividend, transfer, and unknown
+   transactions; anything uninterpretable is kept as **unresolved**, not discarded.
+3. Imported transactions and settings persist in local SQLite.
+4. The dashboard reconstructs realized P&L, option lifecycles, tax lots, capital usage, and
+   monthly returns, and presents them across four tabs.
+5. Resolve gaps (e.g. a sale missing its opening buy) through **Review & fix**.
 
-## Current Dashboard Tabs
+Sample data is on by default so the dashboard is populated before you import; disable it in
+Settings.
 
-- `Overview`: goal cards, performance snapshot, KPI matrix, and insights. Sections are rearrangeable and hideable.
-- `Capital & ROI`: monthly ROI, capital efficiency KPIs, charts, monthly ROI table, and capital efficiency ledger.
-- `Covered Calls`: option-cycle stats, current open covered-call capital, open covered calls, and covered-call results.
-- `Cash-Secured Puts`: option-cycle stats, current open CSP collateral, open CSPs, and CSP results.
-- `Swing Trades`: realized stock-trade ledger.
-- `Tax Lots`: open/closed/partially closed tax lots.
-- `Trades`: normalized transaction list.
+## Navigation
 
-Import and Settings are header actions, not primary tabs.
+Four primary tabs. On desktop they sit in the top bar; on a phone they become a fixed bottom
+tab bar. Import, Settings, account switch, theme toggle, and backup export live behind the
+**⋯** overflow menu.
 
-## Goal Tracking
+### Home
 
-The annual realized P&L goal is stored in settings as `annualRealizedPnlGoal`.
+At-a-glance, year-to-date by default:
+- **Verdict KPIs:** Net P&L · YTD (with return on capital), Expectancy, Profit factor,
+  Win rate.
+- **Daily P&L calendar** — a heatmap of daily realized P&L, toggling between a full year and
+  a single month; click any day to see that day's trades.
+- **Capital deployed** — a gauge of current deployed capital against your configured max
+  buying power.
+- **Open positions** — your active option plays (roll-soon first); click one for its detail
+  drawer, or jump to the full Positions tab.
+- **By strategy** — a P&L / ROI / win-rate snapshot per strategy; tap to open that strategy
+  in Positions.
 
-- Default: `$40,000`.
-- YTD goal card compares current-year realized P&L against the annual goal.
-- Monthly target card uses annual goal divided by 12.
-- Monthly P&L chart uses the same monthly target line.
+### Performance
 
-## Current Capital Views
+- **You vs. the market** — capital-matched return against SPY / QQQ / VTI.
+- **Annual goal** — progress, pacing, projection, and required monthly run-rate.
+- **Equity curve** — cumulative realized P&L over the year vs. goal pace.
+- **Capital deployed** — average and peak deployed, return on capital, capital utilization,
+  capital turnover, income per day, and concentration (HHI).
+- **Monthly P&L** — a bar chart plus a breakdown table (P&L, ROI, average capital, and ROI by
+  strategy: CSP / CC / Swing).
 
-The CC/CSP tabs emphasize currently open capital rather than closed-event capital.
+### Tickers
 
-- Covered calls: current capital uses linked stock basis when known. For open covered calls with missing stock basis, the display falls back to strike exposure.
-- Cash-secured puts: current collateral uses strike times controlled shares by default, or net collateral after premium when configured.
+- **Leaderboard** — "Money makers" and "Account killers": your symbols ranked by net P&L,
+  annotated with win rate and trade count so a single lucky trade can't top the board.
+- **Full symbol table** — every symbol you've traded, sortable and searchable (net P&L, ROI,
+  trades, win rate).
 
-## Import Support
+### Positions
 
-The Robinhood parser recognizes common headers including:
+Your book organized **by strategy**: All strategies, Cash-secured puts, Covered calls, Long
+options, Swing.
+- The **All strategies** board lists option plays (CSP/CC/Long) with an Active / Closed / All
+  filter (default All) and a per-strategy summary tile row.
+- Each **strategy drill-down** shows its own metric set — e.g. premium collected, capture
+  rate, and assignment rate for options; profit factor and avg win/loss for swing — plus an
+  Active / Closed / All table.
+- Tables carry strategy-appropriate columns (Premium + Capital for CSP/CC, Cost for long
+  options, Qty + Cost basis for swing) along with **Opened** and **Closed** dates.
+- **Swing** shows closed positions only (open share lots aren't tracked as positions).
+- Click any position for a full P&L breakdown drawer.
 
-- `Activity Date`, `Process Date`, `Settle Date`
-- `Instrument`
-- `Description`
-- `Trans Code`
-- `Quantity`
-- `Price`
-- `Amount`
+## Goal tracking
 
-Supported transaction codes include stock buy/sell, `STO`, `BTC`, `BTO`, `STC`, `OASGN`, `OEXP`, dividends, fees, transfers, and unknown/misc activity.
+The annual realized P&L goal (`annualRealizedPnlGoal`, default `$40,000`) drives the
+Performance goal card and the equity-curve goal-pace line.
 
-## Known Product Boundaries
+## Capital & collateral
 
-- No Robinhood API integration.
-- No cloud sync.
-- No live prices or Greeks.
-- No tax filing or wash-sale handling.
-- Results are for personal analysis and should be checked against official brokerage/tax documents.
+- **Covered calls** use linked stock cost basis when known, falling back to strike exposure
+  for open cycles with missing basis.
+- **Cash-secured puts** use conservative collateral (strike × shares) by default, or net
+  collateral after premium when configured.
+- **Swing trades** use cost basis while open.
+
+Cost-basis method and the put-collateral denominator are configurable in Settings.
+
+## Import support
+
+The Robinhood parser recognizes common headers (`Activity Date`, `Process Date`, `Settle
+Date`, `Instrument`, `Description`, `Trans Code`, `Quantity`, `Price`, `Amount`) and
+transaction codes (stock buy/sell, `STO`, `BTC`, `BTO`, `STC`, `OASGN`, `OEXP`, dividends,
+fees, transfers, and unknown/misc). Unrecognized rows are preserved as unresolved.
+
+## Backup
+
+Export a JSON backup (transactions + settings) from the **⋯** menu or Settings. Sample data
+is generated by the app and is not part of the backup.
+
+## Product boundaries
+
+- No broker API, cloud sync, or multi-user support.
+- No live prices, option marks, or Greeks.
+- No max-drawdown / Sortino / Calmar / payoff-ratio surfacing, no discipline streak, and no
+  social leaderboard — deliberately out of scope.
+- No wash-sale handling or tax filing. Verify against official brokerage and tax documents.
