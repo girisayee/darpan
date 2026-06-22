@@ -4,7 +4,7 @@
 
 **Goal:** Add Google SSO (allowlisted) and make every transaction/setting owned by a signed-in user, replacing the local SQLite store with managed Postgres.
 
-**Architecture:** Auth.js v5 (Google provider, Drizzle adapter, database sessions) on a standard Next.js Node server; Postgres via Drizzle ORM; routes gated server-side via `auth()`; all data queries scoped by `session.user.id`.
+**Architecture:** Auth.js v5 (Google provider, Drizzle adapter, **JWT sessions**) on a standard Next.js Node server; Postgres via Drizzle ORM; routes gated server-side via `auth()`; all data queries scoped by `session.user.id`. JWT (not database sessions) because Phase B adds a Credentials provider for the admin, which Auth.js only supports with JWT.
 
 **Tech Stack:** `next-auth@5`, `@auth/drizzle-adapter`, `drizzle-orm`, `drizzle-kit`, `postgres` (postgres-js driver), Postgres, Next.js 16 App Router, TypeScript, Vitest.
 
@@ -352,19 +352,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verificationTokensTable: verificationTokens,
   }),
   providers: [Google],
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   pages: { signIn: "/signin" },
   callbacks: {
     signIn({ user }) {
       return isAllowedEmail(user.email);
     },
-    session({ session, user }) {
-      if (session.user) session.user.id = user.id;
+    async jwt({ token, user }) {
+      // `user` is present only on first sign-in (from the adapter).
+      if (user?.id) token.id = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user && token.id) session.user.id = token.id as string;
       return session;
     },
   },
 });
 ```
+
+(JWT session strategy — see Architecture. The adapter still persists Google users in Postgres; the JWT carries the user id. Phase B extends the `jwt`/`session` callbacks with `role`.)
 
 - [ ] **Step 2: Augment the session type**
 
@@ -587,3 +594,17 @@ After the tasks, in a dev environment with services:
 - **Spec coverage:** Google SSO (T5), allowlist (T4/T5), Postgres+Drizzle replacing SQLite (T1–T3), per-user scoping of data + endpoints (T3/T7), sign-in screen + gate (T6), user menu/sign-out (T8), drop local migration (T8), env/secrets + OAuth + docs (T1/T9). Migration-by-backup and non-goals are documented in the spec; no code task needed.
 - **Placeholders:** none — the one deliberate temporary (`"dev-user"` in Task 3) is explicitly removed in Task 7.
 - **Type consistency:** helper signatures in Task 3 (`userId: string`, async) match call-sites in Task 7; `session.user.id` is provided by the Task 5 callback and the Task 5 type augmentation; schema table names in Task 2 match the adapter wiring in Task 5 and queries in Task 3.
+
+---
+
+## Phase B — Admin (non-SSO credentials admin) — roadmap
+
+Built after Phase A is verified; will be expanded into bite-sized tasks (with full code) before execution. Decisions locked with the user:
+
+- **Credentials provider** for a single admin from env: `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH` (bcrypt via `bcryptjs`); verified in `authorize()`. Added alongside Google in `auth.ts`. (JWT sessions — already chosen in Phase A — make this possible.)
+- **Roles:** `role: "user" | "admin"` carried in the JWT (`jwt`/`session` callbacks); Google users → `user`, the credentials admin → `admin`.
+- **Allowlist moves to the DB:** new `allowlist` table (email, addedBy, createdAt); the Google `signIn` callback checks it instead of `ALLOWED_EMAILS`. The env admin bootstraps access (signs in, adds the first emails). `ALLOWED_EMAILS` is retired once this lands.
+- **`/admin` screen + `/api/admin/*`** guarded by `role === "admin"`: list users, invite/revoke allowlisted emails, deactivate a user.
+- **Read-only "view as user":** admin can load any user's portfolio read-only (a target user id honored by `/api/store` GET only when `role === "admin"`); all writes (PUT/DELETE/import) are blocked while viewing, with a "Viewing `<email>` — read-only" banner + exit.
+- **Sign-in page** gains a collapsible "Admin sign in" email/password form below the Google button.
+- New deps: `bcryptjs` (+ `@types/bcryptjs`). New env: `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`.

@@ -24,9 +24,10 @@ plus managed Postgres — deployable later to AWS, Azure, or anywhere that runs 
 
 ## 2. Stack
 
-- **Auth: Auth.js v5 (`next-auth@5`)** — Google provider, database-backed sessions,
+- **Auth: Auth.js v5 (`next-auth@5`)** — Google provider, **JWT sessions**,
   `@auth/drizzle-adapter`. App Router integration (`auth.ts` exporting
-  `handlers/auth/signIn/signOut`).
+  `handlers/auth/signIn/signOut`). JWT (not database sessions) so the Phase B admin
+  Credentials provider works (Auth.js only supports Credentials with JWT).
 - **DB: Postgres** via **Drizzle ORM** (`drizzle-orm` + `drizzle-kit`, `postgres` driver).
   Replaces `node:sqlite` in `lib/db/database.ts`.
 - **Allowlist:** a `signIn` callback that rejects any Google email not in `ALLOWED_EMAILS`
@@ -58,7 +59,7 @@ account switcher keeps working, now within a single user's data).
 ## 4. Auth flow
 
 - `auth.ts` (repo root or `lib/auth.ts`): NextAuth config — `GoogleProvider`,
-  `DrizzleAdapter(db)`, `session: { strategy: "database" }`, callbacks:
+  `DrizzleAdapter(db)`, `session: { strategy: "jwt" }`, callbacks:
   - `signIn({ user })` → return `ALLOWED_EMAILS.includes(user.email)`.
   - `session({ session, user })` → attach `session.user.id = user.id`.
 - `app/api/auth/[...nextauth]/route.ts` → `export const { GET, POST } = handlers`.
