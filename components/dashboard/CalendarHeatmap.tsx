@@ -1,5 +1,6 @@
 "use client";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
+import { formatDisplayDate } from "@/lib/utils/format";
 
 export function intensity(pnl: number, maxAbs: number): number {
   if (maxAbs <= 0) return 0.2;
@@ -26,7 +27,7 @@ export function CalendarHeatmap({ days, mode, year: yearProp, onSelectDay }: {
     const d = byKey.get(key);
     if (!d) return <div key={key} className="aspect-square rounded-[4px] bg-background" />;
     return (
-      <button key={key} type="button" title={key} onClick={() => onSelectDay(d)}
+      <button key={key} type="button" title={formatDisplayDate(key)} onClick={() => onSelectDay(d)}
         className="aspect-square rounded-[4px] border border-transparent hover:border-accent"
         style={{ background: color(d.pnl) }} />
     );

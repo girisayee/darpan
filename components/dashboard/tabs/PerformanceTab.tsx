@@ -9,7 +9,10 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -23,11 +26,12 @@ import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { capitalEfficiency } from "@/lib/selectors/capital-efficiency";
 import { allocation } from "@/lib/selectors/allocation";
 import { goalPace } from "@/lib/selectors/goal-pace";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatPercent, monthLabel, monthTick } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult } from "@/types/trading";
 import { MonthlyRoiTable, tone } from "./shared";
 
 const C_POS      = "rgb(var(--pos))";
+const C_NEG      = "rgb(var(--neg))";
 const C_MUTED    = "rgb(var(--text-muted))";
 const C_HAIRLINE = "rgb(var(--hairline))";
 const C_SURFACE  = "rgb(var(--surface))";
@@ -119,7 +123,7 @@ function EquityCurveChart({
             <XAxis
               dataKey="month"
               tick={TICK_STYLE}
-              tickFormatter={(v: string) => v.slice(5)}
+              tickFormatter={monthTick}
               axisLine={{ stroke: C_HAIRLINE }}
               tickLine={false}
             />
@@ -139,6 +143,7 @@ function EquityCurveChart({
                 formatCurrency(typeof value === "number" ? value : Number(value)),
                 name === "goalPace" ? "Goal pace" : "Cumulative P&L",
               ]}
+              labelFormatter={(label) => monthLabel(String(label))}
               contentStyle={TOOLTIP_CONTENT_STYLE}
               itemStyle={TOOLTIP_ITEM_STYLE}
               labelStyle={TOOLTIP_LABEL_STYLE}
@@ -167,6 +172,69 @@ function EquityCurveChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+    </div>
+  );
+}
+
+function MonthlyPnlBar({ result }: { result: CalculationResult }) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
+
+  const data = useMemo(
+    () =>
+      result.monthlyReturns.map((m) => ({
+        month: `${m.year}-${String(m.month).padStart(2, "0")}`,
+        pnl: m.realizedPnl,
+      })),
+    [result.monthlyReturns]
+  );
+
+  if (!mounted) {
+    return <div className="h-[180px] animate-pulse rounded-md bg-surface-inset" />;
+  }
+
+  return (
+    <div className="h-[180px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
+          <CartesianGrid vertical={false} strokeDasharray="0" stroke={C_HAIRLINE} opacity={1} />
+          <XAxis
+            dataKey="month"
+            tick={TICK_STYLE}
+            tickFormatter={monthTick}
+            axisLine={{ stroke: C_HAIRLINE }}
+            tickLine={false}
+          />
+          <YAxis
+            tick={TICK_STYLE}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) =>
+              v >= 1000 || v <= -1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`
+            }
+            width={52}
+          />
+          <Tooltip
+            formatter={(value: unknown) => [
+              formatCurrency(typeof value === "number" ? value : Number(value)),
+              "Monthly P&L",
+            ]}
+            labelFormatter={(label) => monthLabel(String(label))}
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
+            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.3 }}
+          />
+          <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? C_POS : C_NEG} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -298,9 +366,12 @@ export function PerformanceTab({
         />
       </MetricGroup>
 
-      {/* ── Monthly breakdown table ── */}
+      {/* ── Monthly breakdown ── */}
       <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">Monthly breakdown</h2>
+        <h2 className="font-sans text-[13px] font-medium text-foreground">Monthly P&amp;L</h2>
+        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+          <MonthlyPnlBar result={result} />
+        </div>
         <MonthlyRoiTable rows={result.monthlyReturns} />
       </section>
     </div>

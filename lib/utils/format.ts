@@ -29,6 +29,23 @@ export function compactMonth(year: number, month: number) {
   return `${mon} '${String(year).slice(2)}`;
 }
 
+/** "2026-06" → "Jun" — short month label for chart axis ticks. */
+export function monthTick(ym: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(ym);
+  if (!m) return ym;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1)).toLocaleDateString("en-US", {
+    month: "short",
+    timeZone: "UTC"
+  });
+}
+
+/** "2026-06" → "Jun '26" — month label for chart tooltips (matches compactMonth). */
+export function monthLabel(ym: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(ym);
+  if (!m) return ym;
+  return compactMonth(Number(m[1]), Number(m[2]));
+}
+
 /**
  * Display formatter for date strings. Abbreviated month, day (when present), 2-digit year:
  *   "2026-01-30" → "Jan 30, '26"  (full date)
