@@ -7,28 +7,91 @@ import { CalendarHeatmap } from "@/components/dashboard/CalendarHeatmap";
 import { DayDetail } from "@/components/dashboard/DayDetail";
 import { StrategyStrip } from "@/components/dashboard/StrategyStrip";
 import { SegmentedControl } from "@/components/dashboard/tabs/shared";
+import { TickerLogo } from "@/components/common/TickerLogo";
+import { signedMoney, currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
 import { dailyPnl } from "@/lib/selectors/daily-pnl";
 import { tradeQuality } from "@/lib/selectors/trade-quality";
-import { currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
+import { toAllPositionRows } from "@/components/dashboard/positions/columns";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
-import type { AppSettings, CalculationResult, RealizedPnLEvent } from "@/types/trading";
+import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
 import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
 
 type CalMode = "YTD" | "Month";
+
+function OpenPositions({
+  result,
+  onSelect,
+  onViewAll,
+}: {
+  result: CalculationResult;
+  onSelect: (l: OptionLifecycle) => void;
+  onViewAll: () => void;
+}) {
+  const open = toAllPositionRows(result, "active").filter((r) => r.lifecycle);
+  // Roll-soon first, then by expiry proximity (shorter "When" string sorts naturally enough).
+  const rows = [...open].sort((a, b) => (b.warm ? 1 : 0) - (a.warm ? 1 : 0)).slice(0, 6);
+
+  return (
+    <div className="rounded-[14px] border border-hairline bg-surface p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[13px] font-medium text-foreground">
+          Open positions <span className="text-muted-foreground">· {open.length}</span>
+        </span>
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
+        >
+          View all →
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-[12.5px] text-muted-foreground">No open positions.</p>
+      ) : (
+        <div className="flex flex-col">
+          {rows.map((r, i) => (
+            <button
+              key={`${r.sym}-${i}`}
+              type="button"
+              onClick={() => r.lifecycle && onSelect(r.lifecycle)}
+              className="flex items-center gap-3 border-b border-hairline-soft py-2.5 text-left last:border-0 hover:bg-accent/[0.04]"
+            >
+              <TickerLogo symbol={r.sym} size={24} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium text-foreground">
+                  {r.sym} <span className="font-normal text-muted-foreground">{r.detail}</span>
+                </div>
+                <div className="text-[12px]">
+                  <span className={r.warm ? "text-warn" : "text-muted-foreground"}>{r.tag}</span>
+                  <span className="text-muted-foreground"> · {r.when}</span>
+                </div>
+              </div>
+              <div className="text-[13px] font-medium tabular-nums">{signedMoney(r.pnl)}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function HomeTab({
   result,
   settings,
   year,
   onOpenStrategy,
+  onOpenPositions,
   onSelectEvent,
+  onSelectLifecycle,
 }: {
   result: CalculationResult;
   settings: AppSettings;
   year?: string;
   onOpenStrategy: (k: StrategyKey) => void;
+  onOpenPositions: () => void;
   onSelectEvent: (e: RealizedPnLEvent) => void;
+  onSelectLifecycle: (l: OptionLifecycle) => void;
 }) {
   const [calMode, setCalMode] = useState<CalMode>("YTD");
   const [selectedDay, setSelectedDay] = useState<DailyPnl | null>(null);
@@ -42,76 +105,78 @@ export function HomeTab({
   const days = useMemo(() => dailyPnl(result.realizedEvents), [result.realizedEvents]);
   const calModeToHeatmap = calMode === "YTD" ? "year" : "month";
 
-  // Sum filtered monthly returns so the card tracks the selected year (not the system year).
   const ytdPnl = result.monthlyReturns.reduce((s, m) => s + m.realizedPnl, 0);
   const ytdRoi = result.aggregates.ytdRoi;
 
   return (
     <div className="space-y-5 py-2">
-      {/* ── Verdict strip — 4 KPI cards ── */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <KpiCard
-          label="Net P&L · YTD"
-          value={formatCurrency(ytdPnl)}
-          helper={`${ytdRoi != null ? formatPercent(ytdRoi) : "—"} on capital`}
-          tooltip="Calendar-year realized P&L across all closed events."
-          tone={tone(ytdPnl)}
-          variant="hero"
-        />
-        <KpiCard
-          label="Expectancy"
-          value={quality.expectancy != null ? formatCurrency(quality.expectancy) : "—"}
-          helper="avg per trade"
-          tooltip="Mean realized P&L per closed event."
-          tone={tone(quality.expectancy ?? 0)}
-          variant="hero"
-        />
-        <KpiCard
-          label="Profit factor"
-          value={quality.profitFactor != null ? quality.profitFactor.toFixed(2) : "—"}
-          helper="$ won ÷ lost"
-          tooltip="Gross profit divided by gross loss."
-          tone={tone((quality.profitFactor ?? 1) - 1)}
-          variant="hero"
-        />
-        <KpiCard
-          label="Win rate"
-          value={quality.winRate != null ? `${Math.round(quality.winRate * 100)}%` : "—"}
-          helper={`${quality.wins} / ${quality.totalTrades} trades`}
-          tooltip="Share of closed events that were profitable."
-          tone="neutral"
-          variant="hero"
-        />
+      {/* ── Top metrics band: capital deployed + verdict ── */}
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,240px)_1fr]">
+        <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <KpiCard
+            label="Net P&L · YTD"
+            value={formatCurrency(ytdPnl)}
+            helper={`${ytdRoi != null ? formatPercent(ytdRoi) : "—"} on capital`}
+            tooltip="Calendar-year realized P&L across all closed events."
+            tone={tone(ytdPnl)}
+            variant="standard"
+          />
+          <KpiCard
+            label="Expectancy"
+            value={quality.expectancy != null ? formatCurrency(quality.expectancy) : "—"}
+            helper="avg per trade"
+            tooltip="Mean realized P&L per closed event."
+            tone={tone(quality.expectancy ?? 0)}
+            variant="standard"
+          />
+          <KpiCard
+            label="Profit factor"
+            value={quality.profitFactor != null ? quality.profitFactor.toFixed(2) : "—"}
+            helper="$ won ÷ lost"
+            tooltip="Gross profit divided by gross loss."
+            tone={tone((quality.profitFactor ?? 1) - 1)}
+            variant="standard"
+          />
+          <KpiCard
+            label="Win rate"
+            value={quality.winRate != null ? `${Math.round(quality.winRate * 100)}%` : "—"}
+            helper={`${quality.wins} / ${quality.totalTrades} trades`}
+            tooltip="Share of closed events that were profitable."
+            tone="neutral"
+            variant="standard"
+          />
+        </div>
       </div>
 
+      {/* ── Open positions ── */}
+      <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} />
+
       {/* ── By-strategy strip ── */}
-      <StrategyStrip result={result} onOpen={onOpenStrategy} />
-
-      {/* ── Calendar heatmap + capital deployed ── */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="rounded-[14px] border border-hairline bg-surface p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-[12px] font-medium text-foreground">Daily P&amp;L</span>
-            <SegmentedControl<CalMode>
-              value={calMode}
-              options={["YTD", "Month"]}
-              onChange={setCalMode}
-            />
-          </div>
-          <CalendarHeatmap
-            days={days}
-            mode={calModeToHeatmap}
-            year={year}
-            onSelectDay={setSelectedDay}
-          />
-          {days.length > 0 && (
-            <div className="mt-3 border-t border-hairline-soft pt-3">
-              <DayDetail day={selectedDay} onSelect={onSelectEvent} />
-            </div>
-          )}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[12.5px] font-medium text-muted-foreground">By strategy · YTD</span>
+          <span className="text-[12px] text-muted-foreground">tap to open →</span>
         </div>
+        <StrategyStrip result={result} onOpen={onOpenStrategy} />
+      </div>
 
-        <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
+      {/* ── Calendar heatmap ── */}
+      <div className="rounded-[14px] border border-hairline bg-surface p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-[13px] font-medium text-foreground">Daily P&amp;L</span>
+          <SegmentedControl<CalMode>
+            value={calMode}
+            options={["YTD", "Month"]}
+            onChange={setCalMode}
+          />
+        </div>
+        <CalendarHeatmap days={days} mode={calModeToHeatmap} year={year} onSelectDay={setSelectedDay} />
+        {days.length > 0 && (
+          <div className="mt-3 border-t border-hairline-soft pt-3">
+            <DayDetail day={selectedDay} onSelect={onSelectEvent} />
+          </div>
+        )}
       </div>
     </div>
   );

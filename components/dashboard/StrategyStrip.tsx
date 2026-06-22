@@ -24,9 +24,9 @@ export function StrategyStrip({ result, onOpen }: { result: CalculationResult; o
         return (
           <button key={k} type="button" onClick={() => onOpen(k)}
             className="rounded-[10px] border border-hairline bg-surface p-3 text-left hover:border-accent">
-            <div className="text-[10.5px] text-muted-foreground">{LABELS[k]}</div>
-            <div className="text-[16px] font-medium tabular-nums">{signedMoney(a.pnl)}</div>
-            <div className="text-[9.5px] text-dim">ROI {formatPercent(roi)} · {a.quality.winRate != null ? `${Math.round(a.quality.winRate * 100)}%` : "—"} win</div>
+            <div className="text-[12.5px] font-medium text-muted-foreground">{LABELS[k]}</div>
+            <div className="mt-0.5 text-[19px] font-medium tabular-nums">{signedMoney(a.pnl)}</div>
+            <div className="mt-0.5 text-[12px] text-muted-foreground">ROI {formatPercent(roi)} · {a.quality.winRate != null ? `${Math.round(a.quality.winRate * 100)}%` : "—"} win</div>
           </button>
         );
       })}

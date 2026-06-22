@@ -168,7 +168,12 @@ export function DashboardApp() {
             settings={settings}
             year={year}
             onOpenStrategy={openStrategyInPositions}
+            onOpenPositions={() => {
+              setPositionsInitialStrategy(undefined);
+              setActiveTab("Positions");
+            }}
             onSelectEvent={setSelectedEvent}
+            onSelectLifecycle={setSelectedLifecycle}
           />
         )}
         {activeTab === "Performance" && (

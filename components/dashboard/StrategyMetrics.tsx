@@ -7,11 +7,11 @@ type Tone = "pos" | "neg" | "neutral";
 
 function Cell({ label, value, tone = "neutral" }: { label: string; value: string; tone?: Tone }) {
   return (
-    <div className="rounded-[10px] border border-hairline bg-surface p-2.5">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
+    <div className="rounded-[10px] border border-hairline bg-surface p-3">
+      <div className="text-[12.5px] font-medium text-muted-foreground">{label}</div>
       <div
         className={cn(
-          "text-[16px] font-medium tabular-nums",
+          "mt-0.5 text-[19px] font-medium tabular-nums",
           tone === "pos" && "text-pos",
           tone === "neg" && "text-neg",
           tone === "neutral" && "text-foreground"

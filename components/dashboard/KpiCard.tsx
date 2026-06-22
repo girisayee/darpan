@@ -25,8 +25,8 @@ export function KpiCard({
   const valueClass = cn(
     "tabular-nums leading-snug flex items-center gap-0.5",
     variant === "hero"    && "text-[30px] font-semibold tracking-[-0.01em]",
-    variant === "compact" && "text-[16px] font-medium",
-    (variant === "standard" || variant === "exposure") && "text-[20px] font-medium",
+    variant === "compact" && "text-[19px] font-medium",
+    (variant === "standard" || variant === "exposure") && "text-[22px] font-medium",
     tone === "positive" && "text-pos",
     tone === "negative" && "text-neg",
     tone === "neutral"  && "text-foreground"
@@ -34,7 +34,7 @@ export function KpiCard({
 
   const inner = (
     <div className="flex flex-col gap-0.5">
-      <div className="flex items-center gap-1 text-[12px] text-muted-foreground">
+      <div className="flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground">
         {label}
         <InfoTooltip text={tooltip} label={label} />
       </div>
@@ -47,7 +47,7 @@ export function KpiCard({
         )}
         {value}
       </div>
-      <div className="text-[12px] text-muted-foreground">{helper}</div>
+      <div className="text-[12px] text-muted-foreground mt-0.5">{helper}</div>
     </div>
   );
 

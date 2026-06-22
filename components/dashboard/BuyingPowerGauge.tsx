@@ -94,15 +94,15 @@ export function BuyingPowerGauge({
 
       {/* Text */}
       <div className="min-w-0">
-        <div className="font-sans text-[12px] font-medium text-foreground">
+        <div className="font-sans text-[12.5px] font-medium text-muted-foreground">
           Capital deployed
         </div>
-        <div className="mt-0.5 font-sans text-[11px] tabular-nums text-muted-foreground">
+        <div className="mt-0.5 font-sans text-[14px] font-medium tabular-nums text-foreground">
           {valid
             ? `${formatCurrency(deployed)} / ${formatCurrency(maxBP!)}`
             : "—"}
         </div>
-        <div className="mt-0.5 font-sans text-[10.5px] text-muted-foreground opacity-70">
+        <div className="mt-0.5 font-sans text-[11.5px] text-muted-foreground">
           of configured max
         </div>
       </div>
