@@ -172,7 +172,8 @@ export function columnsFor(key: StrategyKey): Column<PositionRow>[] {
 export function toPositionRows(
   result: CalculationResult,
   key: StrategyKey,
-  state: "all" | "active" | "closed"
+  state: "all" | "active" | "closed",
+  showSwingOpen = false
 ): PositionRow[] {
   const today = new Date();
 
@@ -290,10 +291,38 @@ export function toPositionRows(
       });
   }
 
-  // key === "swing" — closed positions only (open swing lots aren't tracked as positions)
-  if (state === "active") return [];
-  return result.realizedEvents
-    .filter((e) => e.strategy === "SWING_TRADE")
+  // key === "swing"
+  // Open swing lots (held stock) are shown only when the user opts in; they have
+  // no realized P&L yet (the app doesn't track live quotes), so P&L reads $0.
+  const openSwingRows: PositionRow[] =
+    showSwingOpen && state !== "closed"
+      ? result.taxLots
+          .filter((l) => l.status !== "closed" && l.remainingQuantity > 0)
+          .map((l): PositionRow => {
+            const daysHeld = Math.round(
+              (today.getTime() - new Date(l.openDate + "T00:00:00").getTime()) / DAY_MS
+            );
+            return {
+              sym: l.symbol,
+              detail: `${l.remainingQuantity} sh`,
+              status: "active",
+              tag: "Holding",
+              warm: false,
+              when: `${daysHeld}d`,
+              pnl: 0,
+              qty: `${l.remainingQuantity} sh`,
+              costBasis: `$${l.costBasisPerShare.toFixed(2)}`,
+              openDate: l.openDate,
+            };
+          })
+      : [];
+
+  // Closed swing positions come from realized events (open lots aren't realized yet).
+  const closedSwingRows: PositionRow[] =
+    state === "active"
+      ? []
+      : result.realizedEvents
+          .filter((e) => e.strategy === "SWING_TRADE")
     .map((e): PositionRow => {
       let openDate: string | undefined;
       if (e.holdingDays != null) {
@@ -317,4 +346,6 @@ export function toPositionRows(
         event: e,
       };
     });
+
+  return [...openSwingRows, ...closedSwingRows];
 }

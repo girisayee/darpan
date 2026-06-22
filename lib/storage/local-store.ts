@@ -18,7 +18,8 @@ export const defaultSettings: AppSettings = {
   coveredCallDenominator: "UNDERLYING_COST_BASIS",
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL",
   monthlyRoiDenominator: "AVERAGE_DEPLOYED_CAPITAL",
-  annualizedReturn: true
+  annualizedReturn: true,
+  showSwingOpenPositions: false
 };
 
 export type BackupPayload = {

@@ -7,7 +7,7 @@ import { DataTable } from "@/components/tables/DataTable";
 import { SegmentedControl } from "@/components/dashboard/tabs/shared";
 import { allColumns, columnsFor, toAllPositionRows, toPositionRows } from "@/components/dashboard/positions/columns";
 import { strategyAnalytics, type StrategyKey } from "@/lib/selectors/strategy-analytics";
-import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
+import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 
 type SegmentValue = "all" | StrategyKey;
 type StateFilter = "All" | "Active" | "Closed";
@@ -21,12 +21,14 @@ const STRATEGY_LABELS: Record<StrategyKey, string> = {
 
 export function PositionsTab({
   result,
+  settings,
   initialStrategy,
   onReviewFix,
   onSelectEvent,
   onSelectLifecycle,
 }: {
   result: CalculationResult;
+  settings: AppSettings;
   initialStrategy?: StrategyKey;
   onReviewFix?: () => void;
   onSelectEvent: (e: RealizedPnLEvent) => void;
@@ -92,7 +94,7 @@ export function PositionsTab({
 
   const a = strategyAnalytics(result, segment);
   const stateKey = stateFilter.toLowerCase() as "all" | "active" | "closed";
-  const rows = toPositionRows(result, segment, stateKey);
+  const rows = toPositionRows(result, segment, stateKey, settings.showSwingOpenPositions);
 
   return (
     <div className="space-y-4 py-2">

@@ -185,6 +185,7 @@ export function DashboardApp() {
         {activeTab === "Positions" && (
           <PositionsTab
             result={result}
+            settings={settings}
             initialStrategy={positionsInitialStrategy}
             onReviewFix={() => setReviewFixOpen(true)}
             onSelectEvent={setSelectedEvent}
@@ -435,6 +436,13 @@ function SettingsTab({
           checked={settings.annualizedReturn}
           onChange={(checked) =>
             onChange({ ...settings, annualizedReturn: checked })
+          }
+        />
+        <Toggle
+          label="Show open swing positions"
+          checked={settings.showSwingOpenPositions}
+          onChange={(checked) =>
+            onChange({ ...settings, showSwingOpenPositions: checked })
           }
         />
         <label className="grid gap-1">
