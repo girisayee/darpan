@@ -260,45 +260,38 @@ export function PerformanceTab({
 
   return (
     <div className="space-y-5 py-2">
-      {/* ── Annual goal (headline) + equity curve, side by side ── */}
-      <div
-        className={`grid items-start gap-4 ${
-          annualGoal > 0 ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)]" : ""
-        }`}
-      >
-        {annualGoal > 0 && (
-          <div className="rounded-[14px] border border-hairline bg-surface p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-[12.5px] font-medium text-muted-foreground">Annual goal</span>
-              <span className="text-[12px] text-muted-foreground">
-                {formatPercent(pace.pct, 0)} of goal
-              </span>
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-[28px] font-semibold tabular-nums leading-none text-foreground">
-                {formatCurrency(pace.actual)}
-              </span>
-              <span className="text-[13px] tabular-nums text-muted-foreground">
-                / {formatCurrency(annualGoal)}
-              </span>
-            </div>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
-              <div
-                className="h-full rounded-full bg-aurora transition-all"
-                style={{ width: `${Math.max(0, Math.min(100, (pace.actual / annualGoal) * 100)).toFixed(1)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[12px] text-muted-foreground">
-              Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo to hit goal
-            </p>
+      {/* ── Annual goal (headline) ── */}
+      {annualGoal > 0 && (
+        <div className="rounded-[14px] border border-hairline bg-surface p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-[12.5px] font-medium text-muted-foreground">Annual goal</span>
+            <span className="text-[12px] text-muted-foreground">{formatPercent(pace.pct, 0)} of goal</span>
           </div>
-        )}
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-[28px] font-semibold tabular-nums leading-none text-foreground">
+              {formatCurrency(pace.actual)}
+            </span>
+            <span className="text-[13px] tabular-nums text-muted-foreground">/ {formatCurrency(annualGoal)}</span>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
+            <div
+              className="h-full rounded-full bg-aurora transition-all"
+              style={{ width: `${Math.max(0, Math.min(100, (pace.actual / annualGoal) * 100)).toFixed(1)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo to hit goal
+          </p>
+        </div>
+      )}
 
+      {/* ── Equity curve ── */}
+      <section className="space-y-2">
+        <h2 className="font-sans text-[13px] font-medium text-foreground">Equity curve</h2>
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <h2 className="mb-2 px-1 font-sans text-[13px] font-medium text-foreground">Equity curve</h2>
           <EquityCurveChart result={result} annualGoal={annualGoal} />
         </div>
-      </div>
+      </section>
 
       {/* ── Benchmark comparison ── */}
       <BenchmarkComparison result={result} />
