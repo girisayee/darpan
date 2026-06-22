@@ -6,7 +6,6 @@ import { BuyingPowerGauge } from "@/components/dashboard/BuyingPowerGauge";
 import { CalendarHeatmap } from "@/components/dashboard/CalendarHeatmap";
 import { DayDetail } from "@/components/dashboard/DayDetail";
 import { StrategyStrip } from "@/components/dashboard/StrategyStrip";
-import { SegmentedControl } from "@/components/dashboard/tabs/shared";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { signedMoney, currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
 import { dailyPnl } from "@/lib/selectors/daily-pnl";
@@ -16,8 +15,6 @@ import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
 import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
-
-type CalMode = "YTD" | "Month";
 
 function MetricCard(props: {
   label: string;
@@ -106,7 +103,6 @@ export function HomeTab({
   onSelectEvent: (e: RealizedPnLEvent) => void;
   onSelectLifecycle: (l: OptionLifecycle) => void;
 }) {
-  const [calMode, setCalMode] = useState<CalMode>("YTD");
   const [selectedDay, setSelectedDay] = useState<DailyPnl | null>(null);
 
   const nonIssueEvents = result.realizedEvents.filter((e) => e.strategy !== "DATA_ISSUE");
@@ -116,7 +112,6 @@ export function HomeTab({
   const currentDeployed = currentDeployedCapital(result);
 
   const days = useMemo(() => dailyPnl(result.realizedEvents), [result.realizedEvents]);
-  const calModeToHeatmap = calMode === "YTD" ? "year" : "month";
 
   const ytdPnl = result.monthlyReturns.reduce((s, m) => s + m.realizedPnl, 0);
   const ytdRoi = result.aggregates.ytdRoi;
@@ -159,14 +154,9 @@ export function HomeTab({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,1fr)]">
         <div className="rounded-[14px] border border-hairline bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-foreground">Daily P&amp;L</span>
-            <SegmentedControl<CalMode>
-              value={calMode}
-              options={["YTD", "Month"]}
-              onChange={setCalMode}
-            />
+            <span className="text-[13px] font-medium text-foreground">Daily P&amp;L · YTD</span>
           </div>
-          <CalendarHeatmap days={days} mode={calModeToHeatmap} year={year} onSelectDay={setSelectedDay} />
+          <CalendarHeatmap days={days} mode="year" year={year} onSelectDay={setSelectedDay} />
           {days.length > 0 && (
             <div className="mt-3 border-t border-hairline-soft pt-3">
               <DayDetail day={selectedDay} onSelect={onSelectEvent} />
