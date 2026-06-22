@@ -290,57 +290,31 @@ export function toPositionRows(
       });
   }
 
-  // key === "swing"
-  const activeRows: PositionRow[] =
-    state === "closed"
-      ? []
-      : result.taxLots
-          .filter((lot) => lot.status !== "closed")
-          .map(
-            (lot): PositionRow => ({
-              sym: lot.symbol,
-              detail: `${lot.remainingQuantity} sh`,
-              status: "active",
-              tag: "Working",
-              warm: false,
-              when: "—",
-              pnl: 0,
-              qty: `${lot.remainingQuantity} sh`,
-              costBasis: `$${lot.costBasisPerShare.toFixed(2)}`,
-              openDate: lot.openDate,
-            })
-          );
-
-  const closedRows: PositionRow[] =
-    state === "active"
-      ? []
-      : result.realizedEvents
-          .filter((e) => e.strategy === "SWING_TRADE")
-          .map((e): PositionRow => {
-            let openDate: string | undefined;
-            if (e.holdingDays != null) {
-              const d = new Date(e.date + "T00:00:00");
-              d.setDate(d.getDate() - e.holdingDays);
-              openDate = d.toISOString().slice(0, 10);
-            }
-            return {
-              sym: e.symbol,
-              detail: `${e.quantity} sh`,
-              status: "closed",
-              tag: "Closed",
-              warm: false,
-              when: e.holdingDays != null ? `${e.holdingDays}d` : "—",
-              pnl: e.realizedPnl,
-              qty: `${e.quantity} sh`,
-              costBasis:
-                e.costBasis != null
-                  ? `$${(e.costBasis / e.quantity).toFixed(2)}`
-                  : "—",
-              openDate,
-              closeDate: e.date,
-              event: e,
-            };
-          });
-
-  return [...activeRows, ...closedRows];
+  // key === "swing" — closed positions only (open swing lots aren't tracked as positions)
+  if (state === "active") return [];
+  return result.realizedEvents
+    .filter((e) => e.strategy === "SWING_TRADE")
+    .map((e): PositionRow => {
+      let openDate: string | undefined;
+      if (e.holdingDays != null) {
+        const d = new Date(e.date + "T00:00:00");
+        d.setDate(d.getDate() - e.holdingDays);
+        openDate = d.toISOString().slice(0, 10);
+      }
+      return {
+        sym: e.symbol,
+        detail: `${e.quantity} sh`,
+        status: "closed",
+        tag: "Closed",
+        warm: false,
+        when: e.holdingDays != null ? `${e.holdingDays}d` : "—",
+        pnl: e.realizedPnl,
+        qty: `${e.quantity} sh`,
+        costBasis:
+          e.costBasis != null ? `$${(e.costBasis / e.quantity).toFixed(2)}` : "—",
+        openDate,
+        closeDate: e.date,
+        event: e,
+      };
+    });
 }
