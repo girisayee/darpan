@@ -19,6 +19,20 @@ import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
 
 type CalMode = "YTD" | "Month";
 
+function MetricCard(props: {
+  label: string;
+  value: string;
+  helper: string;
+  tooltip: string;
+  tone?: "positive" | "negative" | "neutral";
+}) {
+  return (
+    <div className="rounded-[12px] border border-hairline bg-surface p-3.5">
+      <KpiCard {...props} variant="standard" />
+    </div>
+  );
+}
+
 function OpenPositions({
   result,
   onSelect,
@@ -29,12 +43,11 @@ function OpenPositions({
   onViewAll: () => void;
 }) {
   const open = toAllPositionRows(result, "active").filter((r) => r.lifecycle);
-  // Roll-soon first, then by expiry proximity (shorter "When" string sorts naturally enough).
   const rows = [...open].sort((a, b) => (b.warm ? 1 : 0) - (a.warm ? 1 : 0)).slice(0, 6);
 
   return (
     <div className="rounded-[14px] border border-hairline bg-surface p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <span className="text-[13px] font-medium text-foreground">
           Open positions <span className="text-muted-foreground">· {open.length}</span>
         </span>
@@ -110,47 +123,62 @@ export function HomeTab({
 
   return (
     <div className="space-y-5 py-2">
-      {/* ── Top metrics band: capital deployed + verdict ── */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,240px)_1fr]">
-        <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <KpiCard
-            label="Net P&L · YTD"
-            value={formatCurrency(ytdPnl)}
-            helper={`${ytdRoi != null ? formatPercent(ytdRoi) : "—"} on capital`}
-            tooltip="Calendar-year realized P&L across all closed events."
-            tone={tone(ytdPnl)}
-            variant="standard"
-          />
-          <KpiCard
-            label="Expectancy"
-            value={quality.expectancy != null ? formatCurrency(quality.expectancy) : "—"}
-            helper="avg per trade"
-            tooltip="Mean realized P&L per closed event."
-            tone={tone(quality.expectancy ?? 0)}
-            variant="standard"
-          />
-          <KpiCard
-            label="Profit factor"
-            value={quality.profitFactor != null ? quality.profitFactor.toFixed(2) : "—"}
-            helper="$ won ÷ lost"
-            tooltip="Gross profit divided by gross loss."
-            tone={tone((quality.profitFactor ?? 1) - 1)}
-            variant="standard"
-          />
-          <KpiCard
-            label="Win rate"
-            value={quality.winRate != null ? `${Math.round(quality.winRate * 100)}%` : "—"}
-            helper={`${quality.wins} / ${quality.totalTrades} trades`}
-            tooltip="Share of closed events that were profitable."
-            tone="neutral"
-            variant="standard"
-          />
-        </div>
+      {/* ── Verdict KPIs ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MetricCard
+          label="Net P&L · YTD"
+          value={formatCurrency(ytdPnl)}
+          helper={`${ytdRoi != null ? formatPercent(ytdRoi) : "—"} on capital`}
+          tooltip="Calendar-year realized P&L across all closed events."
+          tone={tone(ytdPnl)}
+        />
+        <MetricCard
+          label="Expectancy"
+          value={quality.expectancy != null ? formatCurrency(quality.expectancy) : "—"}
+          helper="avg per trade"
+          tooltip="Mean realized P&L per closed event."
+          tone={tone(quality.expectancy ?? 0)}
+        />
+        <MetricCard
+          label="Profit factor"
+          value={quality.profitFactor != null ? quality.profitFactor.toFixed(2) : "—"}
+          helper="$ won ÷ lost"
+          tooltip="Gross profit divided by gross loss."
+          tone={tone((quality.profitFactor ?? 1) - 1)}
+        />
+        <MetricCard
+          label="Win rate"
+          value={quality.winRate != null ? `${Math.round(quality.winRate * 100)}%` : "—"}
+          helper={`${quality.wins} / ${quality.totalTrades} trades`}
+          tooltip="Share of closed events that were profitable."
+          tone="neutral"
+        />
       </div>
 
-      {/* ── Open positions ── */}
-      <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} />
+      {/* ── Calendar (left) + right rail: capital deployed + open positions ── */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,1fr)]">
+        <div className="rounded-[14px] border border-hairline bg-surface p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[13px] font-medium text-foreground">Daily P&amp;L</span>
+            <SegmentedControl<CalMode>
+              value={calMode}
+              options={["YTD", "Month"]}
+              onChange={setCalMode}
+            />
+          </div>
+          <CalendarHeatmap days={days} mode={calModeToHeatmap} year={year} onSelectDay={setSelectedDay} />
+          {days.length > 0 && (
+            <div className="mt-3 border-t border-hairline-soft pt-3">
+              <DayDetail day={selectedDay} onSelect={onSelectEvent} />
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
+          <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} />
+        </div>
+      </div>
 
       {/* ── By-strategy strip ── */}
       <div>
@@ -159,24 +187,6 @@ export function HomeTab({
           <span className="text-[12px] text-muted-foreground">tap to open →</span>
         </div>
         <StrategyStrip result={result} onOpen={onOpenStrategy} />
-      </div>
-
-      {/* ── Calendar heatmap ── */}
-      <div className="rounded-[14px] border border-hairline bg-surface p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-[13px] font-medium text-foreground">Daily P&amp;L</span>
-          <SegmentedControl<CalMode>
-            value={calMode}
-            options={["YTD", "Month"]}
-            onChange={setCalMode}
-          />
-        </div>
-        <CalendarHeatmap days={days} mode={calModeToHeatmap} year={year} onSelectDay={setSelectedDay} />
-        {days.length > 0 && (
-          <div className="mt-3 border-t border-hairline-soft pt-3">
-            <DayDetail day={selectedDay} onSelect={onSelectEvent} />
-          </div>
-        )}
       </div>
     </div>
   );
