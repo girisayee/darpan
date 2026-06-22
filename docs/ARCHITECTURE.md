@@ -83,9 +83,10 @@ events), so the engine stays UI-agnostic:
 - `daily-pnl` — bins realized events by calendar day (powers the calendar heatmap).
 - `leaderboard` — ranks symbols into winners/losers (Tickers).
 - `strategy-analytics` — scopes quality/premium/capital metrics to one strategy (Positions).
-- `top-movers`, `filter-result` (period/strategy/account scoping), `analytics` (wheel rollup).
+- `filter-result` — period / strategy / account scoping (recomputes from filtered rows).
 
-`lib/selectors/risk.ts` exists but is intentionally **not** surfaced (drawdown/Sortino/Calmar).
+Risk ratios (max drawdown, Sortino, Calmar, payoff) are intentionally not computed or
+surfaced.
 
 ## UI structure
 
