@@ -6,7 +6,7 @@ import "./globals.css";
 const sans = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Darpan",
+  title: "Darpan — the mirror for your trades",
   description: "The mirror for your trades."
 };
 

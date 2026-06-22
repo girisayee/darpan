@@ -62,10 +62,13 @@ export function AppShell({
 
   return (
     <>
-      <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
+      <header className="flex items-center justify-between border-b border-hairline bg-surface px-4 py-3">
         {/* LEFT: logo + nav pills (desktop only) */}
-        <div className="flex items-center gap-4">
-          <Logo size={28} showWordmark />
+        <div className="flex items-center gap-3.5">
+          <Logo size={30} showWordmark />
+
+          {/* Divider */}
+          <span aria-hidden="true" className="hidden md:block h-5 w-px bg-hairline" />
 
           {/* Nav pills — hidden on mobile, shown md+ */}
           <nav
@@ -87,11 +90,11 @@ export function AppShell({
                   onClick={() => onSelectTab(tab)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   className={cn(
-                    "whitespace-nowrap rounded-[8px] px-3 py-[6px] text-[12.5px] transition-colors",
+                    "whitespace-nowrap rounded-[8px] px-3.5 py-[6px] text-[13px] font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                     isActive
-                      ? "bg-surface-inset text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-accent/10 text-accent"
+                      : "text-muted-foreground hover:bg-surface-inset hover:text-foreground"
                   )}
                 >
                   {tab}
