@@ -3,7 +3,7 @@ import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/typ
 import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { signedMoney } from "@/components/dashboard/tabs/shared";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatDisplayDate } from "@/lib/utils/format";
 
 export interface PositionRow {
   sym: string;
@@ -18,6 +18,8 @@ export interface PositionRow {
   cost?: number;
   qty?: string;
   costBasis?: string;
+  openDate?: string;
+  closeDate?: string;
   strategyLabel?: string;
   lifecycle?: OptionLifecycle;
   event?: RealizedPnLEvent;
@@ -54,11 +56,30 @@ const stage = (): Column<PositionRow> => ({
   ),
 });
 
-const when = (): Column<PositionRow> => ({
-  key: "when",
-  header: "When",
+const opened = (): Column<PositionRow> => ({
+  key: "openDate",
+  header: "Opened",
   align: "right",
-  value: (r) => r.when,
+  value: (r) => r.openDate ?? "",
+  render: (r) =>
+    r.openDate ? (
+      <span className="tabular-nums text-muted-foreground">{formatDisplayDate(r.openDate)}</span>
+    ) : (
+      <span className="opacity-50">—</span>
+    ),
+});
+
+const closed = (): Column<PositionRow> => ({
+  key: "closeDate",
+  header: "Closed",
+  align: "right",
+  value: (r) => r.closeDate ?? "",
+  render: (r) =>
+    r.closeDate ? (
+      <span className="tabular-nums text-muted-foreground">{formatDisplayDate(r.closeDate)}</span>
+    ) : (
+      <span className="opacity-50">—</span>
+    ),
 });
 
 const pnl = (): Column<PositionRow> => ({
@@ -100,7 +121,8 @@ export const allColumns: Column<PositionRow>[] = [
     ),
   },
   stage(),
-  when(),
+  opened(),
+  closed(),
   pnl(),
 ];
 
@@ -130,11 +152,21 @@ export function columnsFor(key: StrategyKey): Column<PositionRow>[] {
       stage(),
       money("premium", "Premium"),
       money("capital", "Capital"),
-      when(),
+      opened(),
+      closed(),
       pnl(),
     ];
-  if (key === "long") return [position(), stage(), money("cost", "Cost"), when(), pnl()];
-  return [position(), stage(), text("qty", "Qty"), text("costBasis", "Cost basis"), when(), pnl()];
+  if (key === "long")
+    return [position(), stage(), money("cost", "Cost"), opened(), closed(), pnl()];
+  return [
+    position(),
+    stage(),
+    text("qty", "Qty"),
+    text("costBasis", "Cost basis"),
+    opened(),
+    closed(),
+    pnl(),
+  ];
 }
 
 export function toPositionRows(
@@ -172,6 +204,7 @@ export function toPositionRows(
             pnl: lc.netOptionPnl,
             premium: lc.premiumReceived,
             capital: lc.capitalDeployed ?? undefined,
+            openDate: lc.openDate,
             lifecycle: lc,
           };
         }
@@ -195,6 +228,8 @@ export function toPositionRows(
           pnl: lc.netOptionPnl + (lc.assignmentStockPnl ?? 0),
           premium: lc.premiumReceived,
           capital: lc.capitalDeployed ?? undefined,
+          openDate: lc.openDate,
+          closeDate: endDate,
           lifecycle: lc,
         };
       });
@@ -226,6 +261,7 @@ export function toPositionRows(
             when: `${daysToExpiry} DTE`,
             pnl: lc.netOptionPnl,
             cost: lc.premiumReceived,
+            openDate: lc.openDate,
             lifecycle: lc,
           };
         }
@@ -247,6 +283,8 @@ export function toPositionRows(
           when: `${daysHeld}d`,
           pnl: lc.netOptionPnl + (lc.assignmentStockPnl ?? 0),
           cost: lc.premiumReceived,
+          openDate: lc.openDate,
+          closeDate: endDate,
           lifecycle: lc,
         };
       });
@@ -269,6 +307,7 @@ export function toPositionRows(
               pnl: 0,
               qty: `${lot.remainingQuantity} sh`,
               costBasis: `$${lot.costBasisPerShare.toFixed(2)}`,
+              openDate: lot.openDate,
             })
           );
 
@@ -277,8 +316,14 @@ export function toPositionRows(
       ? []
       : result.realizedEvents
           .filter((e) => e.strategy === "SWING_TRADE")
-          .map(
-            (e): PositionRow => ({
+          .map((e): PositionRow => {
+            let openDate: string | undefined;
+            if (e.holdingDays != null) {
+              const d = new Date(e.date + "T00:00:00");
+              d.setDate(d.getDate() - e.holdingDays);
+              openDate = d.toISOString().slice(0, 10);
+            }
+            return {
               sym: e.symbol,
               detail: `${e.quantity} sh`,
               status: "closed",
@@ -291,9 +336,11 @@ export function toPositionRows(
                 e.costBasis != null
                   ? `$${(e.costBasis / e.quantity).toFixed(2)}`
                   : "—",
+              openDate,
+              closeDate: e.date,
               event: e,
-            })
-          );
+            };
+          });
 
   return [...activeRows, ...closedRows];
 }

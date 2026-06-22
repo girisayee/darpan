@@ -34,8 +34,8 @@ export function PositionsTab({
 }) {
   const [appliedInitial, setAppliedInitial] = useState<StrategyKey | undefined>(initialStrategy);
   const [segment, setSegment] = useState<SegmentValue>(initialStrategy ?? "all");
-  const [stateFilter, setStateFilter] = useState<StateFilter>("Active");
-  const [allStateFilter, setAllStateFilter] = useState<StateFilter>("Active");
+  const [stateFilter, setStateFilter] = useState<StateFilter>("All");
+  const [allStateFilter, setAllStateFilter] = useState<StateFilter>("All");
 
   // Detect prop changes using only state (avoids effect/ref lint rules).
   // When the parent passes a new initialStrategy, update segment to match.
@@ -46,7 +46,7 @@ export function PositionsTab({
 
   function handleOpenStrategy(k: StrategyKey) {
     setSegment(k);
-    setStateFilter("Active");
+    setStateFilter("All");
   }
 
   if (segment === "all") {
