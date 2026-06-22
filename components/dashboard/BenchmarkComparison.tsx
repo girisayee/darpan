@@ -110,8 +110,9 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   // see benchmarkStartISO for the prior "Jan 25-01" bug this avoids.
   const fromISO: string | null = benchmarkStartISO(result.monthlyReturns);
   const toISO = new Date().toISOString().slice(0, 10);
-  // "v2" invalidates older SPY/QQQ-only cache entries that lack vti.
-  const cacheKey = fromISO ? `benchmark|v2|${fromISO}|${toISO}` : null;
+  // "v3" invalidates older cache entries (SPY/QQQ-only, and empty results that
+  // a prior broken data source cached as "success").
+  const cacheKey = fromISO ? `benchmark|v3|${fromISO}|${toISO}` : null;
 
   // Lazy state init: seed from sessionStorage on first render to avoid a
   // loading flash when the data is already cached. This runs only once.
@@ -143,6 +144,14 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       })
       .then((d) => {
         if (cancelled) return;
+        // If every series came back empty, treat it as a failure rather than
+        // caching a permanent "—" for the session.
+        const hasAny =
+          (d.spy?.length ?? 0) > 0 || (d.qqq?.length ?? 0) > 0 || (d.vti?.length ?? 0) > 0;
+        if (!hasAny) {
+          setStatus("error");
+          return;
+        }
         writeCache(cacheKey, d);
         setData(d);
         setStatus("success");

@@ -1,63 +1,74 @@
 /**
  * lib/benchmark/fetch.ts — SERVER ONLY
  *
- * Fetches daily close prices for a symbol from Yahoo Finance (v8 chart JSON),
- * using a browser-like User-Agent + a session cookie + a crumb token to get past
- * Yahoo's bot defenses.
+ * Fetches weekly close prices for an index/ETF symbol from Alpha Vantage
+ * (TIME_SERIES_WEEKLY) and caches the full series locally so we hit the API at
+ * most once per symbol per CACHE_TTL_MS (4 hours).
  *
- * Stooq was dropped: it now serves a JavaScript proof-of-work anti-bot challenge
- * (verified) that a server-side fetch cannot solve, so it only ever returned [].
+ * Why WEEKLY: on the free tier, TIME_SERIES_DAILY only returns the last ~100
+ * points (outputsize=full is premium), which can't cover a benchmark window that
+ * starts when the user began trading. TIME_SERIES_WEEKLY returns full history for
+ * free, and weekly closes are ample granularity for a buy-and-hold comparison
+ * over months.
  *
- * FAIL-SOFT: returns [] on any error, timeout, block, or empty response — never throws.
+ * Why a local cache: Alpha Vantage's free tier is rate-limited (≈25 req/day),
+ * and benchmark data only moves once a day at the close — there is no reason to
+ * re-fetch on every page view. The cache lives at data/benchmark-cache.json
+ * (gitignored) and survives server restarts.
+ *
+ * FAIL-SOFT: returns [] on any error, rate-limit, or empty response — never
+ * throws. If a live fetch fails but a stale cache entry exists, the stale data
+ * is returned in preference to nothing.
  */
+
+import path from "node:path";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 
 export type ClosePoint = { date: string; close: number };
 
-/**
- * Parse Yahoo Finance v8 chart JSON. Returns [] on any shape mismatch.
- */
-function parseYahooJson(json: unknown): ClosePoint[] {
+const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+const FETCH_TIMEOUT_MS = 8000;
+const MIN_REQUEST_GAP_MS = 1100; // free tier allows ~1 request/sec
+const CACHE_PATH = path.join(process.cwd(), "data", "benchmark-cache.json");
+
+type CacheEntry = { fetchedAt: number; points: ClosePoint[] };
+type CacheFile = Record<string, CacheEntry>;
+
+/** Process-lifetime mirror of the on-disk cache, loaded lazily. */
+let memCache: CacheFile | null = null;
+/** In-flight fetches per symbol, so concurrent requests share one API call. */
+const inFlight = new Map<string, Promise<ClosePoint[]>>();
+
+function apiKey(): string {
+  return process.env.ALPHAVANTAGE_API_KEY ?? "";
+}
+
+async function loadCache(): Promise<CacheFile> {
+  if (memCache) return memCache;
   try {
-    const chart = (json as { chart: { result: Array<{ timestamp: number[]; indicators: { quote: Array<{ close: (number | null)[] }> } }> } }).chart;
-    const res = chart?.result?.[0];
-    if (!res) return [];
-    const timestamps: number[] = res.timestamp ?? [];
-    const closes: (number | null)[] = res.indicators?.quote?.[0]?.close ?? [];
-    const result: ClosePoint[] = [];
-    for (let i = 0; i < timestamps.length; i++) {
-      const ts = timestamps[i];
-      const close = closes[i];
-      if (ts == null || close == null || close <= 0) continue;
-      const date = new Date(ts * 1000).toISOString().slice(0, 10);
-      result.push({ date, close });
-    }
-    return result;
+    const raw = await readFile(CACHE_PATH, "utf8");
+    memCache = JSON.parse(raw) as CacheFile;
   } catch {
-    return [];
+    memCache = {};
+  }
+  return memCache;
+}
+
+async function persistCache(cache: CacheFile): Promise<void> {
+  try {
+    await mkdir(path.dirname(CACHE_PATH), { recursive: true });
+    await writeFile(CACHE_PATH, JSON.stringify(cache), "utf8");
+  } catch {
+    // Non-fatal: cache write failures just mean we re-fetch next time.
   }
 }
 
-/**
- * Realistic browser headers. Yahoo's data hosts reject requests that don't look
- * like a browser (401/429), so these improve the odds of a real response.
- */
-const BROWSER_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  Accept: "application/json,text/plain,*/*",
-  "Accept-Language": "en-US,en;q=0.9",
-};
-
 /** fetch with an abort timeout. Returns null on any error/timeout (never throws). */
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  ms: number
-): Promise<Response | null> {
+async function fetchWithTimeout(url: string, ms: number): Promise<Response | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    return await fetch(url, { ...init, signal: ctrl.signal, cache: "no-store" });
+    return await fetch(url, { signal: ctrl.signal, cache: "no-store" });
   } catch {
     return null;
   } finally {
@@ -66,82 +77,106 @@ async function fetchWithTimeout(
 }
 
 /**
- * Best-effort Yahoo session cookie (cached for the server process lifetime).
- * Yahoo's data hosts often 401/429 without an A1/A3 cookie.
+ * Parse an Alpha Vantage TIME_SERIES_WEEKLY response into ascending ClosePoints.
+ * Returns null (NOT []) on a rate-limit / error / unparseable response so the
+ * caller can distinguish "API said no" from "symbol genuinely has no data" and
+ * fall back to a stale cache.
  */
-let yahooCookie: string | null = null;
-async function getYahooCookie(): Promise<string | null> {
-  if (yahooCookie) return yahooCookie;
-  const resp = await fetchWithTimeout(
-    "https://fc.yahoo.com/",
-    { headers: BROWSER_HEADERS },
-    4000
-  );
-  if (!resp) return null;
-  const raw =
-    typeof resp.headers.getSetCookie === "function"
-      ? resp.headers.getSetCookie()
-      : resp.headers.get("set-cookie")
-        ? [resp.headers.get("set-cookie") as string]
-        : [];
-  const pairs = raw.map((c) => c.split(";")[0]).filter(Boolean);
-  if (pairs.length === 0) return null;
-  yahooCookie = pairs.join("; ");
-  return yahooCookie;
-}
+function parseAlphaVantage(json: unknown): ClosePoint[] | null {
+  if (!json || typeof json !== "object") return null;
+  const obj = json as Record<string, unknown>;
 
-/**
- * Best-effort crumb token paired with the cookie (cached for the process lifetime).
- * Yahoo's query hosts increasingly require a matching cookie+crumb pair.
- */
-let yahooCrumb: string | null = null;
-async function getYahooCrumb(cookie: string | null): Promise<string | null> {
-  if (yahooCrumb) return yahooCrumb;
-  const headers = cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS;
-  for (const host of ["query1", "query2"]) {
-    const resp = await fetchWithTimeout(
-      `https://${host}.finance.yahoo.com/v1/test/getcrumb`,
-      { headers },
-      4000
-    );
-    if (!resp?.ok) continue;
-    const text = (await resp.text()).trim();
-    // A crumb is a short opaque token; reject empty / HTML challenge pages.
-    if (text && text.length > 0 && text.length < 64 && !text.startsWith("<")) {
-      yahooCrumb = text;
-      return yahooCrumb;
-    }
+  // Rate-limit / informational / error envelopes — never contain price data.
+  if (obj["Note"] || obj["Information"] || obj["Error Message"]) return null;
+
+  const series = obj["Weekly Time Series"];
+  if (!series || typeof series !== "object") return null;
+
+  const points: ClosePoint[] = [];
+  for (const [date, bar] of Object.entries(series as Record<string, unknown>)) {
+    const close = Number((bar as Record<string, string>)?.["4. close"]);
+    if (!Number.isFinite(close) || close <= 0) continue;
+    points.push({ date, close });
   }
-  return null;
+  if (points.length === 0) return null;
+  points.sort((a, b) => a.date.localeCompare(b.date));
+  return points;
 }
 
 /**
- * Fetch daily closes for `symbol` between `fromISO` and `toISO` (YYYY-MM-DD).
- * Yahoo v8 chart across query1/query2 with cookie + crumb. Returns [] on all errors.
+ * Serialize outbound Alpha Vantage calls ≥ MIN_REQUEST_GAP_MS apart so a cold
+ * refresh of all three symbols stays under the free-tier ~1/sec burst limit.
+ */
+let throttleChain: Promise<void> = Promise.resolve();
+function nextSlot(): Promise<void> {
+  const gap = Number(process.env.BENCHMARK_REQUEST_GAP_MS ?? MIN_REQUEST_GAP_MS);
+  if (!Number.isFinite(gap) || gap <= 0) return Promise.resolve();
+  const wait = throttleChain.then(
+    () => new Promise<void>((r) => setTimeout(r, gap))
+  );
+  throttleChain = wait;
+  return wait;
+}
+
+/** Fetch the full weekly series for a symbol from Alpha Vantage. null on failure. */
+async function fetchFromAlphaVantage(symbol: string): Promise<ClosePoint[] | null> {
+  const key = apiKey();
+  if (!key) return null;
+  await nextSlot();
+  const url =
+    `https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY` +
+    `&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(key)}`;
+  const resp = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+  if (!resp?.ok) return null;
+  try {
+    return parseAlphaVantage(await resp.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return the cached full series for a symbol, refreshing from Alpha Vantage when
+ * the cache is missing or older than CACHE_TTL_MS. Fail-soft: stale-on-error.
+ */
+async function getSeries(symbol: string): Promise<ClosePoint[]> {
+  const cache = await loadCache();
+  const entry = cache[symbol];
+  const fresh = entry && Date.now() - entry.fetchedAt < CACHE_TTL_MS;
+  if (fresh) return entry.points;
+
+  // Coalesce concurrent refreshes for the same symbol.
+  const existing = inFlight.get(symbol);
+  if (existing) return existing;
+
+  const task = (async (): Promise<ClosePoint[]> => {
+    const fetched = await fetchFromAlphaVantage(symbol);
+    if (fetched) {
+      cache[symbol] = { fetchedAt: Date.now(), points: fetched };
+      await persistCache(cache);
+      return fetched;
+    }
+    // Fetch failed — serve stale data if we have any, else empty.
+    return entry?.points ?? [];
+  })().finally(() => inFlight.delete(symbol));
+
+  inFlight.set(symbol, task);
+  return task;
+}
+
+/**
+ * Fetch daily closes for `symbol` between `fromISO` and `toISO` (YYYY-MM-DD),
+ * served from the local 4-hour cache. Returns [] on all errors.
  */
 export async function fetchDailyCloses(
   symbol: string,
   fromISO: string,
   toISO: string
 ): Promise<ClosePoint[]> {
-  const from = Math.floor(new Date(fromISO + "T00:00:00Z").getTime() / 1000);
-  const to = Math.floor(new Date(toISO + "T23:59:59Z").getTime() / 1000);
-  const cookie = await getYahooCookie();
-  const crumb = await getYahooCrumb(cookie);
-  const headers = cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS;
-  const crumbParam = crumb ? `&crumb=${encodeURIComponent(crumb)}` : "";
-
-  for (const host of ["query1", "query2"]) {
-    const url = `https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${from}&period2=${to}&interval=1d${crumbParam}`;
-    const resp = await fetchWithTimeout(url, { headers }, 4000);
-    if (!resp?.ok) continue;
-    try {
-      const data = parseYahooJson(await resp.json());
-      if (data.length > 0) return data;
-    } catch {
-      // try the next host
-    }
+  try {
+    const series = await getSeries(symbol);
+    return series.filter((p) => p.date >= fromISO && p.date <= toISO);
+  } catch {
+    return [];
   }
-
-  return [];
 }
