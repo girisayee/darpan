@@ -15,11 +15,10 @@ data/*.sqlite.bak-*
 # Personal trading data exports — never commit
 /*.csv
 .omx/
-.codex/*
-!.codex/agents/
-!.codex/agents/**
-!.codex/skills/
-!.codex/skills/**
-.codex/skills/.system/**
-!.codex/prompts/
-!.codex/prompts/**
+
+# Agent tooling & plugins — local only, never commit
+.claude/
+.codex/
+.plugins/
+plugins/
+**/plugins/

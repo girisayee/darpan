@@ -24,7 +24,6 @@ import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison"
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { capitalEfficiency } from "@/lib/selectors/capital-efficiency";
-import { allocation } from "@/lib/selectors/allocation";
 import { goalPace } from "@/lib/selectors/goal-pace";
 import { formatCurrency, formatPercent, monthLabel, monthTick } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult } from "@/types/trading";
@@ -255,36 +254,28 @@ export function PerformanceTab({
 
   const ce = capitalEfficiency(result.realizedEvents, result.monthlyReturns);
 
-  const alloc = allocation(
-    result.aggregates.symbolBreakdown,
-    result.aggregates.strategyBreakdown.map((b) => ({
-      strategy: b.strategy,
-      capital: b.capital,
-    }))
-  );
-
   const avgDeployed = result.aggregates.averageDeployedCapital;
   const peakDeployed = result.aggregates.peakDeployedCapital;
   const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
 
   return (
     <div className="space-y-5 py-2">
-      {/* ── Benchmark comparison ── */}
-      <BenchmarkComparison result={result} />
-
-      {/* ── Goal card ── */}
+      {/* ── Annual goal (headline) ── */}
       {annualGoal > 0 && (
         <div className="rounded-[14px] border border-hairline bg-surface p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-[12px] text-muted-foreground">Annual goal</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[26px] font-semibold tabular-nums leading-none text-foreground">
-                  {formatCurrency(pace.actual)}
-                </span>
-                <span className="text-[13px] tabular-nums text-dim">/ {formatCurrency(annualGoal)}</span>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-[12.5px] font-medium text-muted-foreground">Annual goal</span>
+            <span className="text-[12px] text-muted-foreground">
+              {formatPercent(pace.pct, 0)} of goal
+            </span>
+          </div>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-[28px] font-semibold tabular-nums leading-none text-foreground">
+              {formatCurrency(pace.actual)}
+            </span>
+            <span className="text-[13px] tabular-nums text-muted-foreground">
+              / {formatCurrency(annualGoal)}
+            </span>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
             <div
@@ -293,7 +284,7 @@ export function PerformanceTab({
             />
           </div>
           <p className="mt-2 text-[12px] text-muted-foreground">
-            {formatPercent(pace.pct, 0)} of goal · Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo
+            Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo to hit goal
           </p>
         </div>
       )}
@@ -305,6 +296,9 @@ export function PerformanceTab({
           <EquityCurveChart result={result} annualGoal={annualGoal} />
         </div>
       </section>
+
+      {/* ── Benchmark comparison ── */}
+      <BenchmarkComparison result={result} />
 
       {/* ── Capital deployed metrics ── */}
       <MetricGroup label="Capital deployed" cols={4}>
@@ -346,22 +340,6 @@ export function PerformanceTab({
           helper="Closed capital ÷ avg deployed"
           tooltip="How many times your average deployed capital cycled through closed trades."
           tone="neutral"
-          variant="compact"
-        />
-        <KpiCard
-          label="Income / day"
-          value={ce.incomePerDay != null ? formatCurrency(ce.incomePerDay) : "—"}
-          helper="Option premium per capital-day"
-          tooltip="Option premium P&L divided by total capital-days deployed."
-          tone={tone(ce.incomePerDay ?? 0)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Concentration"
-          value={alloc.bySymbol.level}
-          helper={`HHI ${alloc.bySymbol.hhi.toFixed(2)}`}
-          tooltip="Herfindahl–Hirschman index across symbols. Low < 0.15, moderate 0.15–0.25, high > 0.25."
-          tone={alloc.bySymbol.level === "high" ? "negative" : alloc.bySymbol.level === "moderate" ? "neutral" : "positive"}
           variant="compact"
         />
       </MetricGroup>
