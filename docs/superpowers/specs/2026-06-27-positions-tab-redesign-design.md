@@ -63,7 +63,7 @@ A single `DataTable`, searchable, paginated, row-click opens the existing detail
 |---|---|---|---|
 | Options / All | `toAllPositionRows(result, state)` | `allColumns` (incl. Strategy column) | `optionsAnalytics(result)` |
 | Options / CSP\|CC\|Long | `toPositionRows(result, key, state)` | `columnsFor(key)` | `strategyAnalytics(result, key)` |
-| Swing | `toPositionRows(result, "swing", state, true)` | `columnsFor("swing")` | `strategyAnalytics(result, "swing")` |
+| Swing | `toPositionRows(result, "swing", state, settings.showSwingOpenPositions)` | `columnsFor("swing")` | `strategyAnalytics(result, "swing")` |
 
 ## New code
 
@@ -112,16 +112,16 @@ Preserve the existing prop contract so no caller changes are needed:
 
 ### Open swing positions
 
-On the Positions/Swing tab, **always show open swing lots** (call `toPositionRows(..., "swing", state, /*showSwingOpen*/ true)`), regardless of the `settings.showSwingOpenPositions` flag. Rationale: a positions page exists precisely to show open positions; the global setting historically gated whether unrealized ($0-P&L) lots clutter *other* views. The swing card's "open" count and the Active table will then agree.
+On the Positions/Swing tab, open swing lots appear **only when `settings.showSwingOpenPositions` is enabled** (call `toPositionRows(..., "swing", state, settings.showSwingOpenPositions)`). The swing card's "open" count is gated on the same flag so it stays consistent with the table: when the setting is off, the card reads "0 open" and the Active list is empty (only realized/closed swing trades show).
 
-> If the user prefers to keep respecting `showSwingOpenPositions` here, the alternative is to gate both the card count and the table on that flag instead.
+> An earlier draft always showed open lots regardless of the setting; this was reverted so the Positions tab respects the global `showSwingOpenPositions` preference like the rest of the app.
 
 ## Testing
 
 - **Selector unit test:** `optionsAnalytics` aggregates P&L, trade count, premium, and capital-at-risk correctly across a fixture with CSP + CC + Long + Swing events (swing excluded from the aggregate).
 - **Render checks (manual via preview):**
   - Landing shows both tab-cards with correct counts/P&L; Options active by default.
-  - Switching to Swing renders swing metrics + swing table (incl. open lots).
+  - Switching to Swing renders swing metrics + swing table; open lots show only when `showSwingOpenPositions` is on, and the card's "open" count matches.
   - Options chips filter both the metrics row and the table; "All" shows the Strategy column.
   - State control (All/Active/Closed) filters rows within the active tab.
   - Deep-links from other tabs land on the right tab + chip.

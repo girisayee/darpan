@@ -82,15 +82,14 @@ function TabCard({
 
 export function PositionsTab(props: {
   result: CalculationResult;
-  // Retained for the caller contract; the Swing tab now always shows open lots,
-  // so settings.showSwingOpenPositions is intentionally not consulted here.
   settings: AppSettings;
   initialStrategy?: StrategyKey;
   onReviewFix?: () => void;
   onSelectEvent: (e: RealizedPnLEvent) => void;
   onSelectLifecycle: (l: OptionLifecycle) => void;
 }) {
-  const { result, initialStrategy, onReviewFix, onSelectEvent, onSelectLifecycle } = props;
+  const { result, settings, initialStrategy, onReviewFix, onSelectEvent, onSelectLifecycle } = props;
+  const showSwingOpen = settings.showSwingOpenPositions;
   const initial = mapInitial(initialStrategy);
   const [appliedInitial, setAppliedInitial] = useState<StrategyKey | undefined>(initialStrategy);
   const [tab, setTab] = useState<TabKey>(initial.tab);
@@ -114,7 +113,10 @@ export function PositionsTab(props: {
     const ccActive = toPositionRows(result, "cc", "active").length;
     const longActive = toPositionRows(result, "long", "active").length;
     const swingA = strategyAnalytics(result, "swing");
-    const swingOpen = result.taxLots.filter((l) => l.status !== "closed" && l.remainingQuantity > 0).length;
+    // Only count open lots when the user opts in, so the card matches what the table shows.
+    const swingOpen = showSwingOpen
+      ? result.taxLots.filter((l) => l.status !== "closed" && l.remainingQuantity > 0).length
+      : 0;
     const winRate = swingA.quality.winRate;
     return {
       optionsActive: cspActive + ccActive + longActive,
@@ -124,7 +126,7 @@ export function PositionsTab(props: {
       swingPnl: swingA.pnl,
       swingSub: `${swingA.quality.totalTrades} trades · ${winRate != null ? `${Math.round(winRate * 100)}% win` : "—"}`,
     };
-  }, [result]);
+  }, [result, showSwingOpen]);
 
   const stateKey = stateFilter.toLowerCase() as "all" | "active" | "closed";
 
@@ -146,8 +148,8 @@ export function PositionsTab(props: {
       emptyLabel = `No ${stateFilter.toLowerCase()} ${OPTION_CHIP_LABELS[optionChip].toLowerCase()} positions.`;
     }
   } else {
-    // Positions/Swing always shows open lots — that is the point of a positions page.
-    rows = toPositionRows(result, "swing", stateKey, true);
+    // Open swing lots appear only when the user enables "show open swing positions".
+    rows = toPositionRows(result, "swing", stateKey, showSwingOpen);
     columns = columnsFor("swing");
     metrics = <StrategyMetrics a={strategyAnalytics(result, "swing")} />;
     emptyLabel = `No ${stateFilter.toLowerCase()} swing positions.`;
