@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { StrategyMetrics } from "@/components/dashboard/StrategyMetrics";
 import { DataTable } from "@/components/tables/DataTable";
 import { SegmentedControl, signedMoney } from "@/components/dashboard/tabs/shared";
 import { allColumns, columnsFor, toAllPositionRows, toPositionRows } from "@/components/dashboard/positions/columns";
-import { optionsAnalytics, strategyAnalytics, type StrategyKey } from "@/lib/selectors/strategy-analytics";
+import { optionsAnalytics, strategyAnalytics } from "@/lib/selectors/strategy-analytics";
 import { cn } from "@/lib/utils/cn";
 import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 
@@ -26,13 +27,6 @@ const OPTION_CHIPS: { key: OptionChip; short: string }[] = [
   { key: "cc", short: "CC" },
   { key: "long", short: "Long" },
 ];
-
-/** Map the deep-link strategy to a (tab, chip) pair. */
-function mapInitial(initial?: StrategyKey): { tab: TabKey; chip: OptionChip } {
-  if (initial === "swing") return { tab: "swing", chip: "all" };
-  if (initial === "csp" || initial === "cc" || initial === "long") return { tab: "options", chip: initial };
-  return { tab: "options", chip: "all" };
-}
 
 function ReviewFixBanner({ onReviewFix }: { onReviewFix: () => void }) {
   return (
@@ -83,28 +77,33 @@ function TabCard({
 export function PositionsTab(props: {
   result: CalculationResult;
   settings: AppSettings;
-  initialStrategy?: StrategyKey;
   onReviewFix?: () => void;
   onSelectEvent: (e: RealizedPnLEvent) => void;
   onSelectLifecycle: (l: OptionLifecycle) => void;
 }) {
-  const { result, settings, initialStrategy, onReviewFix, onSelectEvent, onSelectLifecycle } = props;
+  const { result, settings, onReviewFix, onSelectEvent, onSelectLifecycle } = props;
   const showSwingOpen = settings.showSwingOpenPositions;
-  const initial = mapInitial(initialStrategy);
-  const [appliedInitial, setAppliedInitial] = useState<StrategyKey | undefined>(initialStrategy);
-  const [tab, setTab] = useState<TabKey>(initial.tab);
-  const [optionChip, setOptionChip] = useState<OptionChip>(initial.chip);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // The Options/Swing view and the option-strategy chip live in the URL so they are
+  // deep-linkable and survive reload; the All/Active/Closed filter stays local.
+  const tab: TabKey = searchParams.get("view") === "swing" ? "swing" : "options";
+  const strategyParam = searchParams.get("strategy");
+  const optionChip: OptionChip =
+    strategyParam === "csp" || strategyParam === "cc" || strategyParam === "long" ? strategyParam : "all";
   const [stateFilter, setStateFilter] = useState<StateFilter>("All");
 
-  // Detect a new deep-link from the parent using state only (avoids effect/ref lint rules).
-  if (initialStrategy !== appliedInitial) {
-    setAppliedInitial(initialStrategy);
-    if (initialStrategy) {
-      const next = mapInitial(initialStrategy);
-      setTab(next.tab);
-      setOptionChip(next.chip);
-      setStateFilter("All");
+  function navigate(next: { view: TabKey; strategy?: OptionChip }) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", next.view);
+    if (next.view === "options" && next.strategy && next.strategy !== "all") {
+      params.set("strategy", next.strategy);
+    } else {
+      params.delete("strategy");
     }
+    router.replace(`${pathname}?${params.toString()}`);
   }
 
   // Headline numbers shown on both tab cards — visible before any interaction.
@@ -167,7 +166,7 @@ export function PositionsTab(props: {
           sub={cards.optionsSub}
           active={tab === "options"}
           onClick={() => {
-            setTab("options");
+            navigate({ view: "options", strategy: optionChip });
             setStateFilter("All");
           }}
         />
@@ -178,7 +177,7 @@ export function PositionsTab(props: {
           sub={cards.swingSub}
           active={tab === "swing"}
           onClick={() => {
-            setTab("swing");
+            navigate({ view: "swing" });
             setStateFilter("All");
           }}
         />
@@ -191,7 +190,7 @@ export function PositionsTab(props: {
               <button
                 key={c.key}
                 type="button"
-                onClick={() => setOptionChip(c.key)}
+                onClick={() => navigate({ view: "options", strategy: c.key })}
                 aria-pressed={optionChip === c.key}
                 className={cn(
                   "rounded-full border px-3 py-1 text-[12px] font-medium transition-colors",
