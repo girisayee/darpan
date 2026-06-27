@@ -25,30 +25,29 @@ export type YtdResult = {
 /**
  * Calendar year-to-date return for an index/ETF.
  *
- * Baseline is the **last close strictly before Jan 1 of `year`** (the prior
- * year-end close — the true YTD starting point), NOT the first close inside the
- * year. Measuring from the first in-year close systematically biases the return
- * whenever the market moved over the new-year gap, which overstated every
- * benchmark here. End is the last close within `year` (so a past year is capped
- * at its Dec 31; the current year runs to the latest available close).
+ * Baseline is the **year-open close** — the first close on/after Jan 1 of
+ * `year`. True YTD is measured from the prior Dec 31 print, which isn't
+ * available on weekly data (the bar spanning the new year is dated in early
+ * January), so the year-open close is the closest proxy: it sits ~1 trading day
+ * from Dec 31, versus ~3 for the prior December weekly bar. (Anchoring to the
+ * prior-December bar measurably undershoots — e.g. QQQ 13.2% vs ~15% actual.)
  *
- * `closes` must therefore include at least one point before Jan 1 of `year`.
- * Returns null when there is no prior-year baseline or no in-year close.
+ * End is the last close within `year`, so a past year is capped at its Dec 31
+ * and the current year runs to the latest available close. Returns null when
+ * fewer than two in-year closes exist.
  */
 export function ytdReturn(closes: ClosePoint[], year: number): YtdResult | null {
-  const valid = closes.filter((c) => c.close > 0).sort((a, b) => a.date.localeCompare(b.date));
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
+  const inYear = closes
+    .filter((c) => c.close > 0 && c.date >= yearStart && c.date <= yearEnd)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (inYear.length < 2) return null;
 
-  let baseline: ClosePoint | null = null;
-  for (const point of valid) {
-    if (point.date < yearStart) baseline = point; // keep the latest pre-year close
-    else break;
-  }
-  const inYear = valid.filter((p) => p.date >= yearStart && p.date <= yearEnd);
-  if (!baseline || baseline.close <= 0 || inYear.length === 0) return null;
-
+  const baseline = inYear[0];
   const end = inYear[inYear.length - 1];
+  if (baseline.close <= 0) return null;
+
   const returnPct = ((end.close - baseline.close) / baseline.close) * 100;
   return {
     baselineDate: baseline.date,

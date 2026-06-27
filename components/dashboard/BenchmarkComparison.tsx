@@ -105,16 +105,15 @@ function deleteCache(key: string | null): void {
 }
 
 export function BenchmarkComparison({ result }: { result: CalculationResult }) {
-  // The year in view drives YTD: the indices' calendar year-to-date return is
-  // measured from the prior year-end close, so the fetch window must reach back
-  // before Jan 1 of that year to include the baseline close.
+  // The year in view drives YTD: each index's calendar return is measured from
+  // its year-open close (first close on/after Jan 1) to the latest close.
   const months = result.monthlyReturns;
   const benchYear = months.length ? months[months.length - 1].year : null;
-  const fromISO = benchYear ? `${benchYear - 1}-12-01` : null;
+  const fromISO = benchYear ? `${benchYear}-01-01` : null;
   const toISO = new Date().toISOString().slice(0, 10);
-  // "v4" invalidates older cache entries (window-relative buy&hold windows and
+  // "v5" invalidates older cache entries (prior-December baseline windows, plus
   // SPY/QQQ-only or empty results a prior broken data source cached as success).
-  const cacheKey = fromISO ? `benchmark|v4|${fromISO}|${toISO}` : null;
+  const cacheKey = fromISO ? `benchmark|v5|${fromISO}|${toISO}` : null;
 
   // Lazy state init: seed from sessionStorage on first render to avoid a
   // loading flash when the data is already cached. This runs only once.
