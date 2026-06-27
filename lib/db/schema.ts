@@ -4,6 +4,7 @@ import {
   timestamp,
   integer,
   jsonb,
+  boolean,
   primaryKey,
   index,
 } from "drizzle-orm/pg-core";
@@ -58,6 +59,24 @@ export const verificationTokens = pgTable(
   (vt) => ({ pk: primaryKey({ columns: [vt.identifier, vt.token] }) })
 );
 
+// Broker / trading accounts owned by a user (distinct from the Auth.js `account`
+// OAuth table above). Every user has exactly one isDefault account.
+export const tradingAccounts = pgTable(
+  "trading_accounts",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isDefault: boolean("isDefault").notNull().default(false),
+    createdAt: timestamp("createdAt").defaultNow(),
+  },
+  (t) => ({ byUser: index("trading_accounts_user_idx").on(t.userId) })
+);
+
 export const transactions = pgTable(
   "transactions",
   {
@@ -65,6 +84,7 @@ export const transactions = pgTable(
     userId: text("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    accountId: text("accountId").references(() => tradingAccounts.id, { onDelete: "set null" }),
     payload: jsonb("payload").notNull(),
     tradeDate: text("tradeDate"),
     symbol: text("symbol"),
