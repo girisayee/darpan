@@ -1,16 +1,28 @@
 "use client";
 
 /**
- * BenchmarkComparison — index calendar-YTD (SPY / VTI / QQQ) vs your realized return.
+ * BenchmarkComparison — "Market comparison": index calendar-YTD (SPY / VTI / QQQ)
+ * vs your realized return, shown as a horizontal bar chart beside the exact figures.
  *
  * Props: result: CalculationResult
  *
- * The index tiles show each index's calendar year-to-date return (prior
- * year-end close → latest close) for the year in view. Fetches /api/benchmark
- * once per session (keyed in sessionStorage). Fail-soft: never fabricated numbers.
+ * Each bar/row shows that index's calendar year-to-date return (year-open close →
+ * latest close) for the year in view. Fetches /api/benchmark once per session
+ * (keyed in sessionStorage). Fail-soft: never fabricated numbers.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { ytdReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
 import type { CalculationResult } from "@/types/trading";
@@ -20,27 +32,105 @@ import { cn } from "@/lib/utils/cn";
 type BenchmarkData = { spy: ClosePoint[]; qqq: ClosePoint[]; vti: ClosePoint[] };
 type FetchStatus = "loading" | "success" | "error";
 
-type TileProps = {
+const C_POS = "rgb(var(--pos))";
+const C_NEG = "rgb(var(--neg))";
+const C_MUTED = "rgb(var(--text-muted))";
+const C_HAIRLINE = "rgb(var(--hairline))";
+const C_SURFACE = "rgb(var(--surface))";
+
+const TICK_STYLE = { fontFamily: "var(--font-sans)", fontSize: 11, fill: C_MUTED } as const;
+const TOOLTIP_CONTENT_STYLE: React.CSSProperties = {
+  background: C_SURFACE,
+  border: `1px solid ${C_HAIRLINE}`,
+  borderRadius: 8,
+  boxShadow: "none",
+  padding: "6px 10px",
+};
+const TOOLTIP_ITEM_STYLE: React.CSSProperties = { fontFamily: "var(--font-sans)", fontSize: 12, color: C_MUTED };
+const TOOLTIP_LABEL_STYLE: React.CSSProperties = { fontFamily: "var(--font-sans)", fontSize: 11, color: C_MUTED, marginBottom: 2 };
+
+type ChartDatum = { name: string; pct: number; you: boolean };
+
+function ComparisonChart({ data }: { data: ChartDatum[] }) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
+
+  if (!mounted) {
+    return <div className="h-[176px] animate-pulse rounded-md bg-surface-inset" />;
+  }
+
+  return (
+    <div className="h-[176px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
+          <CartesianGrid horizontal={false} stroke={C_HAIRLINE} opacity={1} />
+          <XAxis
+            type="number"
+            tick={TICK_STYLE}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => `${v}%`}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            tick={TICK_STYLE}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+          />
+          <ReferenceLine x={0} stroke={C_HAIRLINE} />
+          <Tooltip
+            formatter={(value: unknown) => [
+              formatPercent(typeof value === "number" ? value : Number(value), 2),
+              "YTD return",
+            ]}
+            contentStyle={TOOLTIP_CONTENT_STYLE}
+            itemStyle={TOOLTIP_ITEM_STYLE}
+            labelStyle={TOOLTIP_LABEL_STYLE}
+            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.3 }}
+          />
+          <Bar dataKey="pct" radius={[0, 3, 3, 0]} barSize={16}>
+            {data.map((d, i) => (
+              <Cell
+                key={`cell-${i}`}
+                fill={d.you ? (d.pct >= 0 ? C_POS : C_NEG) : C_MUTED}
+                fillOpacity={d.you ? 1 : 0.5}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+type MetricRowProps = {
   label: string;
   returnPct: number | null;
   dollarPnl: number | null;
+  emphasis?: boolean;
   unavailable?: boolean;
 };
 
-function Tile({ label, returnPct, dollarPnl, unavailable }: TileProps) {
+function MetricRow({ label, returnPct, dollarPnl, emphasis, unavailable }: MetricRowProps) {
   const pos = returnPct !== null && returnPct > 0;
   const neg = returnPct !== null && returnPct < 0;
-
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
-      <span className="font-sans text-[11px] text-muted-foreground">{label}</span>
+    <div className="flex items-baseline justify-between gap-3 border-b border-hairline py-1.5 last:border-b-0">
+      <span className={cn("font-sans text-[12px]", emphasis ? "font-medium text-foreground" : "text-muted-foreground")}>
+        {label}
+      </span>
       {unavailable || returnPct === null ? (
-        <span className="font-sans text-[16px] font-medium text-muted-foreground">—</span>
+        <span className="font-sans text-[14px] font-medium text-muted-foreground">—</span>
       ) : (
-        <>
+        <span className="flex items-baseline gap-2">
           <span
             className={cn(
-              "font-sans text-[16px] font-medium tabular-nums",
+              "font-sans text-[14px] font-medium tabular-nums",
               pos && "text-pos",
               neg && "text-neg",
               !pos && !neg && "text-foreground"
@@ -51,7 +141,7 @@ function Tile({ label, returnPct, dollarPnl, unavailable }: TileProps) {
           {dollarPnl !== null && (
             <span
               className={cn(
-                "font-sans text-[12px] tabular-nums",
+                "font-sans text-[11px] tabular-nums",
                 dollarPnl > 0 && "text-pos",
                 dollarPnl < 0 && "text-neg",
                 dollarPnl === 0 && "text-muted-foreground"
@@ -60,18 +150,17 @@ function Tile({ label, returnPct, dollarPnl, unavailable }: TileProps) {
               {formatCurrency(dollarPnl)}
             </span>
           )}
-        </>
+        </span>
       )}
     </div>
   );
 }
 
-function SkeletonTile() {
+function SkeletonRow() {
   return (
-    <div className="flex flex-col gap-1.5 min-w-0">
+    <div className="flex items-center justify-between gap-3 py-1.5">
       <div className="h-3 w-16 rounded bg-surface-inset animate-pulse" />
-      <div className="h-5 w-20 rounded bg-surface-inset animate-pulse" />
-      <div className="h-3 w-16 rounded bg-surface-inset animate-pulse" />
+      <div className="h-4 w-20 rounded bg-surface-inset animate-pulse" />
     </div>
   );
 }
@@ -183,12 +272,11 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   const totalPnl = result.aggregates.totalRealizedPnl;
 
   // Your return % = totalRealizedPnl ÷ averageDeployedCapital × 100
-  const yourReturnPct =
-    avgDeployed > 0 ? (totalPnl / avgDeployed) * 100 : null;
+  const yourReturnPct = avgDeployed > 0 ? (totalPnl / avgDeployed) * 100 : null;
 
-  // Dollar figure for an index tile: what the year-to-date index return would
-  // have earned on your average deployed capital (apples-to-apples with the $
-  // shown on "Your return"). Null when no capital was deployed.
+  // Dollar figure for an index: what the year-to-date index return would have
+  // earned on your average deployed capital (apples-to-apples with the $ shown
+  // on "You"). Null when no capital was deployed.
   const dollarsOn = (pct: number | undefined) =>
     pct != null && avgDeployed > 0 ? avgDeployed * (pct / 100) : null;
 
@@ -200,14 +288,23 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   const qqqUnavailable = status === "success" && !qqqResult;
   const vtiUnavailable = status === "success" && !vtiResult;
 
+  // Chart series — keep the You / SPY / VTI / QQQ order, drop entries with no data.
+  const chartData: ChartDatum[] = (
+    [
+      { name: "You", pct: yourReturnPct, you: true },
+      { name: "SPY", pct: spyResult?.returnPct ?? null, you: false },
+      { name: "VTI", pct: vtiResult?.returnPct ?? null, you: false },
+      { name: "QQQ", pct: qqqResult?.returnPct ?? null, you: false },
+    ] as { name: string; pct: number | null; you: boolean }[]
+  )
+    .filter((d): d is ChartDatum => d.pct !== null);
+
   return (
     <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Vs. index YTD (SPY / VTI / QQQ)
-        </h2>
-        <span className="font-sans text-[11px] text-muted-foreground">YTD {benchYear}</span>
+        <h2 className="font-sans text-[13px] font-medium text-foreground">Market comparison</h2>
+        <span className="font-sans text-[11px] text-muted-foreground">YTD {benchYear} · SPY / VTI / QQQ</span>
       </div>
 
       {/* Helper: deployed capital basis */}
@@ -236,42 +333,44 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
         </div>
       )}
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton — chart placeholder beside metric rows */}
       {status === "loading" && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <SkeletonTile />
-          <SkeletonTile />
-          <SkeletonTile />
-          <SkeletonTile />
+        <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
+          <div className="h-[176px] animate-pulse rounded-md bg-surface-inset" />
+          <div>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
         </div>
       )}
 
-      {/* Success state */}
+      {/* Success — comparison chart side by side with the exact figures */}
       {status === "success" && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Tile
-            label="Your return"
-            returnPct={yourReturnPct}
-            dollarPnl={totalPnl}
-          />
-          <Tile
-            label="SPY YTD"
-            returnPct={spyResult?.returnPct ?? null}
-            dollarPnl={dollarsOn(spyResult?.returnPct)}
-            unavailable={spyUnavailable}
-          />
-          <Tile
-            label="VTI YTD"
-            returnPct={vtiResult?.returnPct ?? null}
-            dollarPnl={dollarsOn(vtiResult?.returnPct)}
-            unavailable={vtiUnavailable}
-          />
-          <Tile
-            label="QQQ YTD"
-            returnPct={qqqResult?.returnPct ?? null}
-            dollarPnl={dollarsOn(qqqResult?.returnPct)}
-            unavailable={qqqUnavailable}
-          />
+        <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
+          <ComparisonChart data={chartData} />
+          <div>
+            <MetricRow label="You" returnPct={yourReturnPct} dollarPnl={totalPnl} emphasis />
+            <MetricRow
+              label="SPY YTD"
+              returnPct={spyResult?.returnPct ?? null}
+              dollarPnl={dollarsOn(spyResult?.returnPct)}
+              unavailable={spyUnavailable}
+            />
+            <MetricRow
+              label="VTI YTD"
+              returnPct={vtiResult?.returnPct ?? null}
+              dollarPnl={dollarsOn(vtiResult?.returnPct)}
+              unavailable={vtiUnavailable}
+            />
+            <MetricRow
+              label="QQQ YTD"
+              returnPct={qqqResult?.returnPct ?? null}
+              dollarPnl={dollarsOn(qqqResult?.returnPct)}
+              unavailable={qqqUnavailable}
+            />
+          </div>
         </div>
       )}
     </div>
