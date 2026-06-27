@@ -49,7 +49,7 @@ const tabs = [
 type PrimaryTab = (typeof tabs)[number];
 type Tab = PrimaryTab | "Import" | "Settings";
 
-export function DashboardApp() {
+export function DashboardApp({ user }: { user?: { name?: string | null; email?: string | null; image?: string | null } }) {
   const store = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerSnapshot);
   const settings = store.settings;
   const storedTransactions = store.transactions;
@@ -143,11 +143,12 @@ export function DashboardApp() {
         onImport={() => setActiveTab("Import")}
         onSettings={() => setActiveTab("Settings")}
         onExport={() => downloadBackup(allTransactions, settings)}
+        user={user}
       />
 
       {!store.loaded && (
         <div className="mt-3 rounded-lg border border-hairline bg-surface p-3 text-sm text-muted-foreground">
-          Loading SQLite data...
+          Loading your data…
         </div>
       )}
       {store.error && (
