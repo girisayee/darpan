@@ -9,6 +9,8 @@ export default function ImportPage() {
     <ImportTab
       existing={d.storedTransactions}
       onSave={(rows) => d.replaceTransactions([...d.storedTransactions, ...rows])}
+      accounts={d.accounts}
+      defaultAccountId={d.defaultAccountId}
     />
   );
 }

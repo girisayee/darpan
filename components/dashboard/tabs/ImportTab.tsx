@@ -6,7 +6,7 @@ import { label, signedMoney } from "@/components/dashboard/tabs/shared";
 import { parseRobinhoodInput } from "@/lib/import/robinhood";
 import { formatDisplayDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import type { TradeTransaction } from "@/types/trading";
+import type { TradeTransaction, TradingAccount } from "@/types/trading";
 
 type RowStatus = "new" | "warning" | "duplicate" | "ignored";
 
@@ -64,11 +64,17 @@ function Chip({ dot, label: text, count, tone }: { dot: string; label: string; c
 export function ImportTab({
   existing,
   onSave,
+  accounts,
+  defaultAccountId,
 }: {
   existing: TradeTransaction[];
   onSave: (rows: TradeTransaction[]) => void;
+  accounts: TradingAccount[];
+  defaultAccountId: string | null;
 }) {
   const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [accountIdOverride, setAccountIdOverride] = useState<string | null>(null);
+  const accountId = accountIdOverride ?? defaultAccountId ?? "";
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -153,7 +159,9 @@ export function ImportTab({
   }
 
   function doImport() {
-    const toImport = rows.filter((r) => selected.has(r.id));
+    const toImport = rows
+      .filter((r) => selected.has(r.id))
+      .map((r) => ({ ...r, accountId: accountId || r.accountId }));
     if (!toImport.length) return;
     onSave(toImport);
     setImportedCount(toImport.length);
@@ -339,9 +347,27 @@ export function ImportTab({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-caption text-muted-foreground">
-              {selected.size} of {rows.length} selected · duplicates &amp; ignored excluded by default
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {accounts.length > 0 && (
+                <label className="flex items-center gap-2 text-caption text-muted-foreground">
+                  Import to
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountIdOverride(e.target.value)}
+                    className="rounded-md border border-hairline bg-surface px-2 py-1 text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <span className="text-caption text-muted-foreground">
+                {selected.size} of {rows.length} selected · duplicates &amp; ignored excluded by default
+              </span>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
