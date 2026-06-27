@@ -14,6 +14,51 @@ export type CapitalMatchedResult = {
   dollarPnl: number;
 };
 
+export type YtdResult = {
+  baselineDate: string;
+  baselineClose: number;
+  endDate: string;
+  endClose: number;
+  returnPct: number;
+};
+
+/**
+ * Calendar year-to-date return for an index/ETF.
+ *
+ * Baseline is the **last close strictly before Jan 1 of `year`** (the prior
+ * year-end close — the true YTD starting point), NOT the first close inside the
+ * year. Measuring from the first in-year close systematically biases the return
+ * whenever the market moved over the new-year gap, which overstated every
+ * benchmark here. End is the last close within `year` (so a past year is capped
+ * at its Dec 31; the current year runs to the latest available close).
+ *
+ * `closes` must therefore include at least one point before Jan 1 of `year`.
+ * Returns null when there is no prior-year baseline or no in-year close.
+ */
+export function ytdReturn(closes: ClosePoint[], year: number): YtdResult | null {
+  const valid = closes.filter((c) => c.close > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+
+  let baseline: ClosePoint | null = null;
+  for (const point of valid) {
+    if (point.date < yearStart) baseline = point; // keep the latest pre-year close
+    else break;
+  }
+  const inYear = valid.filter((p) => p.date >= yearStart && p.date <= yearEnd);
+  if (!baseline || baseline.close <= 0 || inYear.length === 0) return null;
+
+  const end = inYear[inYear.length - 1];
+  const returnPct = ((end.close - baseline.close) / baseline.close) * 100;
+  return {
+    baselineDate: baseline.date,
+    baselineClose: baseline.close,
+    endDate: end.date,
+    endClose: end.close,
+    returnPct,
+  };
+}
+
 /**
  * Resolve the benchmark window start as a strict YYYY-MM-01 ISO date from the
  * earliest numeric year/month present.

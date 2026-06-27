@@ -1,8 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { benchmarkStartISO, capitalMatchedReturn } from "@/lib/benchmark/compare";
+import { benchmarkStartISO, capitalMatchedReturn, ytdReturn } from "@/lib/benchmark/compare";
 
 const mkCloses = (pairs: [string, number][]) =>
   pairs.map(([date, close]) => ({ date, close }));
+
+describe("ytdReturn", () => {
+  it("measures from the prior year-end close, not the first in-year close", () => {
+    // Market dropped over the new-year gap (690.31 → 683.17). Measuring from the
+    // first in-year close would overstate; the true YTD baseline is the prior close.
+    const closes = mkCloses([
+      ["2025-12-26", 690.31],
+      ["2026-01-02", 683.17],
+      ["2026-06-18", 746.74],
+    ]);
+    const r = ytdReturn(closes, 2026)!;
+    expect(r.baselineDate).toBe("2025-12-26");
+    expect(r.endDate).toBe("2026-06-18");
+    expect(r.returnPct).toBeCloseTo(8.17, 1);
+  });
+
+  it("caps the end at Dec 31 for a past year", () => {
+    const closes = mkCloses([
+      ["2024-12-27", 100],
+      ["2025-06-30", 120],
+      ["2025-12-31", 130],
+      ["2026-03-01", 150],
+    ]);
+    const r = ytdReturn(closes, 2025)!;
+    expect(r.baselineClose).toBe(100);
+    expect(r.endDate).toBe("2025-12-31");
+    expect(r.returnPct).toBeCloseTo(30, 5);
+  });
+
+  it("returns null without a prior-year baseline or any in-year close", () => {
+    expect(ytdReturn(mkCloses([["2026-01-02", 683], ["2026-06-18", 746]]), 2026)).toBeNull();
+    expect(ytdReturn(mkCloses([["2025-12-26", 690]]), 2026)).toBeNull();
+  });
+});
 
 describe("benchmarkStartISO", () => {
   it("returns the earliest month as a valid YYYY-MM-01 ISO date", () => {

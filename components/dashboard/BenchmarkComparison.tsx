@@ -1,17 +1,17 @@
 "use client";
 
 /**
- * BenchmarkComparison — capital-matched SPY/QQQ vs your realized return.
+ * BenchmarkComparison — index calendar-YTD (SPY / VTI / QQQ) vs your realized return.
  *
  * Props: result: CalculationResult
  *
- * Derives the window from result.aggregates.monthlyRealizedPnl
- * (first month → today). Fetches /api/benchmark once per session
- * (keyed in sessionStorage). Fail-soft: never fabricated numbers.
+ * The index tiles show each index's calendar year-to-date return (prior
+ * year-end close → latest close) for the year in view. Fetches /api/benchmark
+ * once per session (keyed in sessionStorage). Fail-soft: never fabricated numbers.
  */
 
 import { useEffect, useState } from "react";
-import { benchmarkStartISO, capitalMatchedReturn } from "@/lib/benchmark/compare";
+import { ytdReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
 import type { CalculationResult } from "@/types/trading";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
@@ -105,14 +105,16 @@ function deleteCache(key: string | null): void {
 }
 
 export function BenchmarkComparison({ result }: { result: CalculationResult }) {
-  // Derive window: earliest month → today. Build the start date from numeric
-  // year/month (result.monthlyReturns), NOT the formatted aggregates label —
-  // see benchmarkStartISO for the prior "Jan 25-01" bug this avoids.
-  const fromISO: string | null = benchmarkStartISO(result.monthlyReturns);
+  // The year in view drives YTD: the indices' calendar year-to-date return is
+  // measured from the prior year-end close, so the fetch window must reach back
+  // before Jan 1 of that year to include the baseline close.
+  const months = result.monthlyReturns;
+  const benchYear = months.length ? months[months.length - 1].year : null;
+  const fromISO = benchYear ? `${benchYear - 1}-12-01` : null;
   const toISO = new Date().toISOString().slice(0, 10);
-  // "v3" invalidates older cache entries (SPY/QQQ-only, and empty results that
-  // a prior broken data source cached as "success").
-  const cacheKey = fromISO ? `benchmark|v3|${fromISO}|${toISO}` : null;
+  // "v4" invalidates older cache entries (window-relative buy&hold windows and
+  // SPY/QQQ-only or empty results a prior broken data source cached as success).
+  const cacheKey = fromISO ? `benchmark|v4|${fromISO}|${toISO}` : null;
 
   // Lazy state init: seed from sessionStorage on first render to avoid a
   // loading flash when the data is already cached. This runs only once.
@@ -176,7 +178,7 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   }
 
   // No monthly data at all → render nothing
-  if (!fromISO) return null;
+  if (!fromISO || benchYear === null) return null;
 
   const avgDeployed = result.aggregates.averageDeployedCapital;
   const totalPnl = result.aggregates.totalRealizedPnl;
@@ -185,40 +187,33 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   const yourReturnPct =
     avgDeployed > 0 ? (totalPnl / avgDeployed) * 100 : null;
 
-  const spyResult =
-    data && data.spy.length >= 2
-      ? capitalMatchedReturn(data.spy, avgDeployed)
-      : null;
+  // Dollar figure for an index tile: what the year-to-date index return would
+  // have earned on your average deployed capital (apples-to-apples with the $
+  // shown on "Your return"). Null when no capital was deployed.
+  const dollarsOn = (pct: number | undefined) =>
+    pct != null && avgDeployed > 0 ? avgDeployed * (pct / 100) : null;
 
-  const qqqResult =
-    data && data.qqq.length >= 2
-      ? capitalMatchedReturn(data.qqq, avgDeployed)
-      : null;
+  const spyResult = data && data.spy.length >= 2 ? ytdReturn(data.spy, benchYear) : null;
+  const qqqResult = data && data.qqq.length >= 2 ? ytdReturn(data.qqq, benchYear) : null;
+  const vtiResult = data && data.vti && data.vti.length >= 2 ? ytdReturn(data.vti, benchYear) : null;
 
-  const vtiResult =
-    data && data.vti && data.vti.length >= 2
-      ? capitalMatchedReturn(data.vti, avgDeployed)
-      : null;
-
-  const spyUnavailable = status === "success" && (!data || data.spy.length < 2);
-  const qqqUnavailable = status === "success" && (!data || data.qqq.length < 2);
-  const vtiUnavailable = status === "success" && (!data || !data.vti || data.vti.length < 2);
+  const spyUnavailable = status === "success" && !spyResult;
+  const qqqUnavailable = status === "success" && !qqqResult;
+  const vtiUnavailable = status === "success" && !vtiResult;
 
   return (
     <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-sans text-[13px] font-medium text-foreground">
-          Vs. buy &amp; hold (SPY / VTI / QQQ)
+          Vs. index YTD (SPY / VTI / QQQ)
         </h2>
-        <span className="font-sans text-[11px] text-muted-foreground">
-          {fromISO} → {toISO}
-        </span>
+        <span className="font-sans text-[11px] text-muted-foreground">YTD {benchYear}</span>
       </div>
 
       {/* Helper: deployed capital basis */}
       <p className="font-sans text-[11px] text-muted-foreground">
-        On your avg deployed capital{" "}
+        Index $ shown on your avg deployed capital{" "}
         {avgDeployed > 0 ? (
           <span className="font-medium text-foreground">{formatCurrency(avgDeployed)}</span>
         ) : (
@@ -261,21 +256,21 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
             dollarPnl={totalPnl}
           />
           <Tile
-            label="SPY (matched)"
+            label="SPY YTD"
             returnPct={spyResult?.returnPct ?? null}
-            dollarPnl={spyResult?.dollarPnl ?? null}
+            dollarPnl={dollarsOn(spyResult?.returnPct)}
             unavailable={spyUnavailable}
           />
           <Tile
-            label="VTI (matched)"
+            label="VTI YTD"
             returnPct={vtiResult?.returnPct ?? null}
-            dollarPnl={vtiResult?.dollarPnl ?? null}
+            dollarPnl={dollarsOn(vtiResult?.returnPct)}
             unavailable={vtiUnavailable}
           />
           <Tile
-            label="QQQ (matched)"
+            label="QQQ YTD"
             returnPct={qqqResult?.returnPct ?? null}
-            dollarPnl={qqqResult?.dollarPnl ?? null}
+            dollarPnl={dollarsOn(qqqResult?.returnPct)}
             unavailable={qqqUnavailable}
           />
         </div>
