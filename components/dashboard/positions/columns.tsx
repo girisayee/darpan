@@ -35,13 +35,13 @@ const position = (): Column<PositionRow> => ({
     <span className="flex items-center gap-2">
       <TickerLogo symbol={r.sym} size={20} />
       <span>
-        <span className="flex items-center gap-1.5 text-caption text-foreground">
+        <span className="flex items-center gap-1.5 text-strong font-medium text-foreground">
           <span
             className={`h-1.5 w-1.5 rounded-full ${r.status === "active" ? "bg-accent" : "bg-dim"}`}
           />
           {r.sym}
         </span>
-        <span className="block text-micro text-muted-foreground">{r.detail}</span>
+        <span className="block text-caption text-muted-foreground">{r.detail}</span>
       </span>
     </span>
   ),
