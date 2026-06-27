@@ -134,7 +134,7 @@ export function toAllPositionRows(
     csp: "Cash-secured puts",
     cc: "Covered calls",
     long: "Long options",
-    swing: "Swing",
+    swing: "Stock trades",
   };
   // Option plays only — swing positions are reached via the Swing strategy tile.
   return (["csp", "cc", "long"] as StrategyKey[]).flatMap((k) =>

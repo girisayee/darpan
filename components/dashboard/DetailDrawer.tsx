@@ -36,7 +36,7 @@ function strategyLabel(strategy: string) {
     COVERED_CALL_ASSIGNMENT_STOCK: "CC assignment (stock sale)",
     CASH_SECURED_PUT: "Cash-secured put",
     PUT_ASSIGNMENT: "Put assignment",
-    SWING_TRADE: "Swing trade",
+    SWING_TRADE: "Stock trade",
     DATA_ISSUE: "Data issue",
   };
   return labels[strategy] ?? strategy.toLowerCase().replace(/_/g, " ");

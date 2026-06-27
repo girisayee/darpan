@@ -35,7 +35,7 @@ export function SettingsTab({
           }
         />
         <Toggle
-          label="Show open swing positions"
+          label="Show open stock positions"
           checked={settings.showSwingOpenPositions}
           onChange={(checked) =>
             onChange({ ...settings, showSwingOpenPositions: checked })

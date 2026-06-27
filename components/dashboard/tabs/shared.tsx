@@ -184,7 +184,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
     },
     {
       key: "swingTradeRoiPercent",
-      header: "Swing ROI",
+      header: "Stock ROI",
       value: (row) => row.swingTradeRoiPercent ?? -999,
       render: (row) => signedPercent(row.swingTradeRoiPercent),
       align: "right",

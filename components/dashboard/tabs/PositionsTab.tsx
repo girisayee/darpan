@@ -151,7 +151,7 @@ export function PositionsTab(props: {
     rows = toPositionRows(result, "swing", stateKey, showSwingOpen);
     columns = columnsFor("swing");
     metrics = <StrategyMetrics a={strategyAnalytics(result, "swing")} />;
-    emptyLabel = `No ${stateFilter.toLowerCase()} swing positions.`;
+    emptyLabel = `No ${stateFilter.toLowerCase()} stock positions.`;
   }
 
   const hasDataIssues = onReviewFix != null && result.realizedEvents.some((e) => e.strategy === "DATA_ISSUE");
@@ -171,7 +171,7 @@ export function PositionsTab(props: {
           }}
         />
         <TabCard
-          name="Swing trades"
+          name="Stock trades"
           count={`${cards.swingOpen} open`}
           pnl={cards.swingPnl}
           sub={cards.swingSub}
@@ -204,7 +204,7 @@ export function PositionsTab(props: {
             ))}
           </div>
         ) : (
-          <span className="text-[13px] font-medium text-foreground">Swing trades</span>
+          <span className="text-[13px] font-medium text-foreground">Stock trades</span>
         )}
         <SegmentedControl<StateFilter>
           value={stateFilter}
