@@ -11,56 +11,30 @@
  * free, and weekly closes are ample granularity for a buy-and-hold comparison
  * over months.
  *
- * Why a local cache: Alpha Vantage's free tier is rate-limited (≈25 req/day),
+ * Why a durable cache: Alpha Vantage's free tier is rate-limited (≈25 req/day),
  * and benchmark data only moves once a day at the close — there is no reason to
- * re-fetch on every page view. The cache lives at data/benchmark-cache.json
- * (gitignored) and survives server restarts.
+ * re-fetch on every page view. The cache lives in Postgres (see cache-store.ts),
+ * so it survives restarts/redeploys and is shared across instances — a transient
+ * rate-limit always has a stale-but-usable fallback.
  *
  * FAIL-SOFT: returns [] on any error, rate-limit, or empty response — never
- * throws. If a live fetch fails but a stale cache entry exists, the stale data
- * is returned in preference to nothing.
+ * throws. If a live fetch fails but a cached entry exists (even stale), that
+ * data is returned in preference to nothing.
  */
 
-import path from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readEntry, writeEntry, type ClosePoint } from "@/lib/benchmark/cache-store";
 
-export type ClosePoint = { date: string; close: number };
+export type { ClosePoint };
 
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const FETCH_TIMEOUT_MS = 8000;
 const MIN_REQUEST_GAP_MS = 1100; // free tier allows ~1 request/sec
-const CACHE_PATH = path.join(process.cwd(), "data", "benchmark-cache.json");
 
-type CacheEntry = { fetchedAt: number; points: ClosePoint[] };
-type CacheFile = Record<string, CacheEntry>;
-
-/** Process-lifetime mirror of the on-disk cache, loaded lazily. */
-let memCache: CacheFile | null = null;
 /** In-flight fetches per symbol, so concurrent requests share one API call. */
 const inFlight = new Map<string, Promise<ClosePoint[]>>();
 
 function apiKey(): string {
   return process.env.ALPHAVANTAGE_API_KEY ?? "";
-}
-
-async function loadCache(): Promise<CacheFile> {
-  if (memCache) return memCache;
-  try {
-    const raw = await readFile(CACHE_PATH, "utf8");
-    memCache = JSON.parse(raw) as CacheFile;
-  } catch {
-    memCache = {};
-  }
-  return memCache;
-}
-
-async function persistCache(cache: CacheFile): Promise<void> {
-  try {
-    await mkdir(path.dirname(CACHE_PATH), { recursive: true });
-    await writeFile(CACHE_PATH, JSON.stringify(cache), "utf8");
-  } catch {
-    // Non-fatal: cache write failures just mean we re-fetch next time.
-  }
 }
 
 /** fetch with an abort timeout. Returns null on any error/timeout (never throws). */
@@ -140,8 +114,7 @@ async function fetchFromAlphaVantage(symbol: string): Promise<ClosePoint[] | nul
  * the cache is missing or older than CACHE_TTL_MS. Fail-soft: stale-on-error.
  */
 async function getSeries(symbol: string): Promise<ClosePoint[]> {
-  const cache = await loadCache();
-  const entry = cache[symbol];
+  const entry = await readEntry(symbol);
   const fresh = entry && Date.now() - entry.fetchedAt < CACHE_TTL_MS;
   if (fresh) return entry.points;
 
@@ -152,11 +125,12 @@ async function getSeries(symbol: string): Promise<ClosePoint[]> {
   const task = (async (): Promise<ClosePoint[]> => {
     const fetched = await fetchFromAlphaVantage(symbol);
     if (fetched) {
-      cache[symbol] = { fetchedAt: Date.now(), points: fetched };
-      await persistCache(cache);
+      await writeEntry(symbol, fetched);
       return fetched;
     }
-    // Fetch failed — serve stale data if we have any, else empty.
+    // Fetch failed (rate-limit / network) — serve stale cached data if we have
+    // any, else empty. Durable Postgres cache means this fallback survives
+    // restarts and redeploys.
     return entry?.points ?? [];
   })().finally(() => inFlight.delete(symbol));
 

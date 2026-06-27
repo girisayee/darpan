@@ -82,3 +82,12 @@ export const settings = pgTable("settings", {
   value: jsonb("value").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow(),
 });
+
+// Global (not per-user) cache of index/ETF close-price series for the benchmark
+// comparison. Durable so a transient Alpha Vantage rate-limit always has a
+// stale-but-usable fallback, and so a redeploy doesn't lose the cache.
+export const benchmarkCache = pgTable("benchmark_cache", {
+  symbol: text("symbol").primaryKey(),
+  fetchedAt: timestamp("fetchedAt", { mode: "date" }).notNull(),
+  points: jsonb("points").notNull(),
+});

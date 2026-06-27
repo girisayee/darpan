@@ -1,27 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Tests for lib/benchmark/fetch.ts — the Alpha Vantage source + 4-hour local
- * cache. `fetch` and `node:fs/promises` are mocked so these run fully offline.
+ * Tests for lib/benchmark/fetch.ts — the Alpha Vantage source + 4-hour cache.
+ * `fetch` and the durable cache store are mocked so these run fully offline (no
+ * network, no Postgres).
  *
- * The module keeps process-lifetime state (in-memory cache + in-flight map), so
- * each test imports a fresh copy via vi.resetModules().
+ * The module keeps process-lifetime state (in-flight map), so each test imports
+ * a fresh copy via vi.resetModules().
  */
 
-// In-memory stand-in for the on-disk cache file.
-let fakeDisk: Record<string, string> = {};
+// In-memory stand-in for the durable Postgres cache store.
+type FakeEntry = { fetchedAt: number; points: { date: string; close: number }[] };
+let fakeStore: Record<string, FakeEntry> = {};
 
-vi.mock("node:fs/promises", () => ({
-  readFile: vi.fn(async (p: string) => {
-    if (p in fakeDisk) return fakeDisk[p];
-    const err = new Error("ENOENT") as NodeJS.ErrnoException;
-    err.code = "ENOENT";
-    throw err;
+vi.mock("@/lib/benchmark/cache-store", () => ({
+  readEntry: vi.fn(async (symbol: string) => fakeStore[symbol] ?? null),
+  writeEntry: vi.fn(async (symbol: string, points: { date: string; close: number }[]) => {
+    fakeStore[symbol] = { fetchedAt: Date.now(), points };
   }),
-  writeFile: vi.fn(async (p: string, data: string) => {
-    fakeDisk[p] = data;
-  }),
-  mkdir: vi.fn(async () => undefined),
 }));
 
 const AV_RESPONSE = (closes: Record<string, string>) => ({
@@ -44,7 +40,7 @@ async function loadModule() {
 }
 
 beforeEach(() => {
-  fakeDisk = {};
+  fakeStore = {};
   process.env.ALPHAVANTAGE_API_KEY = "TEST_KEY";
   process.env.BENCHMARK_REQUEST_GAP_MS = "0"; // disable throttle in tests
   vi.useRealTimers();
