@@ -267,6 +267,40 @@ describe("calculation engine", () => {
     expect(result.aggregates.annualizedReturnOnCapital).toBeCloseTo(7 * (365 / 181), 1);
   });
 
+  it("keeps cost basis for matched shares when a sell slightly exceeds the lot", () => {
+    // Bought 50, sold 51 (the extra share came from elsewhere, e.g. DRIP). The
+    // matched 50 still have a basis — the whole trade must not read as no-opener.
+    const result = calculateDashboard([
+      stockTx("b1", "2026-01-05", "BUY", "UNH", 50, 100),
+      stockTx("s1", "2026-06-26", "SELL", "UNH", 51, 110),
+    ]);
+    const sell = result.realizedEvents.find((e) => e.strategy === "SWING_TRADE")!;
+    expect(sell.costBasis).toBeCloseTo(5000, 2); // 50 × 100, not null
+    expect(sell.warnings.some((w) => w.startsWith("Missing cost basis for 1 of 51 shares"))).toBe(true);
+  });
+
+  it("still nulls basis when a sell has no opening lot at all", () => {
+    const result = calculateDashboard([stockTx("s1", "2026-06-26", "SELL", "ZZZ", 10, 50)]);
+    const sell = result.realizedEvents.find((e) => e.strategy === "SWING_TRADE")!;
+    expect(sell.costBasis).toBeNull();
+    expect(sell.warnings).toContain("Missing cost basis");
+  });
+
+  it("suppresses an orphan put assignment when its shares are covered by an open lot", () => {
+    const result = calculateDashboard([
+      stockTx("b1", "2026-04-09", "BUY", "SNOW", 100, 198.92),
+      optionTx("a1", "2026-04-09", "ASSIGNMENT", "SNOW", "put", 230, "2026-06-18", 0),
+    ]);
+    expect(result.realizedEvents.some((e) => e.strategy === "DATA_ISSUE")).toBe(false);
+  });
+
+  it("still flags an orphan put assignment with no covering shares", () => {
+    const result = calculateDashboard([
+      optionTx("a1", "2026-04-09", "ASSIGNMENT", "SNOW", "put", 230, "2026-06-18", 0),
+    ]);
+    expect(result.realizedEvents.some((e) => e.strategy === "DATA_ISSUE")).toBe(true);
+  });
+
   it("returns N/A-equivalent null ROI when capital is missing", () => {
     const result = calculateDashboard([optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "call", 12, "2025-01-31", 100), optionTx("o2", "2025-01-31", "EXPIRATION", "AMD", "call", 12, "2025-01-31", 0)]);
     expect(result.realizedEvents[0].roiPercent).toBeNull();

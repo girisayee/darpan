@@ -135,6 +135,10 @@ function handleStockTransaction(
     const allocation = allocateLots(lots, transaction.symbol, transaction.quantity, settings, transaction.tradeDate);
     const fees = settings.includeFees ? transaction.fees : 0;
     const realizedPnl = proceeds - allocation.costBasis - fees;
+    // Some shares matched an opening lot iff not everything is missing. A partial
+    // shortfall keeps the matched basis (so the trade isn't read as "no opener");
+    // basis is null only when nothing could be matched at all.
+    const matchedSome = allocation.missingQuantity < transaction.quantity;
     const holdingDays = allocation.openDate ? dateDiffDays(allocation.openDate, transaction.tradeDate) : null;
     const roiPercent = allocation.costBasis > 0 ? (realizedPnl / allocation.costBasis) * 100 : null;
     const annualizedRoiPercent = roiPercent !== null && settings.annualizedReturn && holdingDays && holdingDays > 0 ? roiPercent * (365 / holdingDays) : null;
@@ -145,12 +149,12 @@ function handleStockTransaction(
       symbol: transaction.symbol,
       strategy: "SWING_TRADE",
       grossProceeds: proceeds,
-      costBasis: allocation.costBasisKnown ? allocation.costBasis : null,
+      costBasis: matchedSome ? allocation.costBasis : null,
       optionPremium: 0,
       fees,
       realizedPnl,
       quantity: transaction.quantity,
-      capitalDeployed: allocation.costBasisKnown ? allocation.costBasis : null,
+      capitalDeployed: matchedSome ? allocation.costBasis : null,
       roiPercent,
       annualizedRoiPercent,
       holdingDays,
@@ -223,7 +227,20 @@ function handleOptionTransaction(
     if (idx !== -1) { lifecycle = queue[idx]; queue.splice(idx, 1); }
   }
   if (!lifecycle) {
-    events.push(unresolvedOptionEvent(transaction, "Option trade could not be linked to an opening option trade."));
+    // A put assignment with no recorded sell-to-open would normally be flagged.
+    // But if the shares it delivered are already accounted for by open stock lots
+    // (e.g. a manual opening buy the user added for cost basis), the missing
+    // opener is benign — suppress the data-issue rather than nag about it.
+    const underlying = transaction.underlyingSymbol || transaction.symbol;
+    const assignedShares = (transaction.quantity || 0) * 100;
+    const coveredByLots =
+      transaction.action === "ASSIGNMENT" &&
+      transaction.optionType === "put" &&
+      assignedShares > 0 &&
+      openShareQuantity(lots, underlying) >= assignedShares;
+    if (!coveredByLots) {
+      events.push(unresolvedOptionEvent(transaction, "Option trade could not be linked to an opening option trade."));
+    }
     return;
   }
 
@@ -607,11 +624,20 @@ function handlePutAssignment(
 type Allocation = {
   costBasis: number;
   costBasisKnown: boolean;
+  /** Shares the sell could not match to an opening lot (0 when fully covered). */
+  missingQuantity: number;
   linkedTransactionIds: string[];
   linkedLotIds: string[];
   openDate: string | null;
   warnings: string[];
 };
+
+/** Total currently-open share quantity for a symbol across all lots. */
+function openShareQuantity(lots: MutableLot[], symbol: string): number {
+  return lots
+    .filter((lot) => lot.symbol === symbol && lot.remainingQuantity > 0)
+    .reduce((sum, lot) => sum + lot.remainingQuantity, 0);
+}
 
 function allocateLots(lots: MutableLot[], symbol: string, quantity: number, settings: AppSettings, closeDate: string): Allocation {
   const method = settings.costBasisMethod;
@@ -621,7 +647,15 @@ function allocateLots(lots: MutableLot[], symbol: string, quantity: number, sett
   const missingQuantity = Math.max(0, quantity - availableQuantity);
   const costBasisKnown = missingQuantity <= 0;
   if (!costBasisKnown) {
-    warnings.push("Missing cost basis");
+    // Keep "Missing cost basis" as the prefix (callers/tests match on it) but say
+    // how much is uncovered so a small shortfall reads as a partial gap, not a
+    // wholesale missing opener.
+    const qty = (n: number) => Number(n.toFixed(4));
+    warnings.push(
+      availableQuantity > 0
+        ? `Missing cost basis for ${qty(missingQuantity)} of ${qty(quantity)} shares`
+        : "Missing cost basis",
+    );
   }
 
   if (method === "LIFO") available.sort((a, b) => b.openDate.localeCompare(a.openDate));
@@ -650,6 +684,7 @@ function allocateLots(lots: MutableLot[], symbol: string, quantity: number, sett
     return {
       costBasis: avg * Math.min(quantity, availableQuantity),
       costBasisKnown,
+      missingQuantity,
       linkedTransactionIds: unique(linkedTransactionIds),
       linkedLotIds: unique(linkedLotIds),
       openDate,
@@ -676,7 +711,7 @@ function allocateLots(lots: MutableLot[], symbol: string, quantity: number, sett
     openDate ??= lot.openDate;
     remaining -= used;
   }
-  return { costBasis, costBasisKnown, linkedTransactionIds: unique(linkedTransactionIds), linkedLotIds: unique(linkedLotIds), openDate, warnings };
+  return { costBasis, costBasisKnown, missingQuantity, linkedTransactionIds: unique(linkedTransactionIds), linkedLotIds: unique(linkedLotIds), openDate, warnings };
 }
 
 export function calculateMonthlyReturns(

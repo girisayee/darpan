@@ -165,6 +165,12 @@ function normalizeAction(value: string, description: string): TradeAction {
   if (code === "MINT") return "FEE";
   if (code === "ACH") return "TRANSFER";
   if (code === "SXCH" || code === "MISC") return "OTHER";
+  // A literal "Buy"/"Sell" Trans Code is authoritative — honor it before the
+  // description-text fallback. Dividend-reinvestment rows carry Trans Code "Buy"
+  // with "Dividend Reinvestment" in the description; without this they fall
+  // through to the "dividend" text match below and are dropped as cash.
+  if (code === "BUY") return "BUY";
+  if (code === "SELL") return "SELL";
   const text = `${value} ${description}`.toLowerCase();
   if (text.includes("sell to open") || text.includes("sto")) return "SELL_TO_OPEN";
   if (text.includes("buy to close") || text.includes("btc")) return "BUY_TO_CLOSE";

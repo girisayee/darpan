@@ -74,6 +74,13 @@ typecheck/lint/build and the running dev server rather than component render tes
 - A stock sell with no matching opening buy yields an unresolved `SWING_TRADE` event
   (`costBasis === null`, "Missing cost basis" warning); the opener is added via Review & fix.
 - Same-day option open/close rows must process opens before closes.
+- A "Dividend Reinvestment" row carries Trans Code `Buy` — it's a (fractional) stock
+  purchase, not a cash dividend. `normalizeAction` honors a literal `BUY`/`SELL` code
+  before the description-text fallback; don't reorder that.
+- A stock sell that exceeds its opening lots keeps the matched cost basis (and warns
+  "Missing cost basis for N of M shares"); basis is null only when nothing matched.
+  A put assignment with no sell-to-open is suppressed (not a DATA_ISSUE) when open
+  stock lots already cover the assigned shares.
 - Do **not** surface max drawdown, Sortino, Calmar, payoff ratio, a discipline streak, live
   option marks, or a social leaderboard — these were explicitly cut from the product.
 - **Return on capital has one definition**: realized P&L ÷ time-weighted average

@@ -10,6 +10,29 @@ describe("Robinhood import", () => {
     expect(preview.rows[0].status).toBe("normalized");
   });
 
+  it("treats a dividend-reinvestment Buy as a stock purchase, not a dropped dividend", () => {
+    // Trans Code "Buy" with "Dividend Reinvestment" in the description must classify
+    // as a stock BUY (it adds shares), not fall through to the cash/dividend match.
+    const csv = [
+      "Activity Date,Instrument,Description,Trans Code,Quantity,Price,Amount",
+      "3/18/2026,UNH,UnitedHealth Dividend Reinvestment,Buy,0.386794,$287.57,($111.23)",
+    ].join("\n");
+    const preview = parseRobinhoodInput(csv);
+    expect(preview.rows[0].action).toBe("BUY");
+    expect(preview.rows[0].instrumentType).toBe("stock");
+    expect(preview.rows[0].quantity).toBeCloseTo(0.386794, 6);
+  });
+
+  it("still classifies a CDIV cash dividend as a dividend", () => {
+    const csv = [
+      "Activity Date,Instrument,Description,Trans Code,Quantity,Price,Amount",
+      "3/17/2026,UNH,Cash Div: R/D 2026-03-09 - 50.33 shares at 2.21,CDIV,,,$111.23",
+    ].join("\n");
+    const preview = parseRobinhoodInput(csv);
+    expect(preview.rows[0].action).toBe("DIVIDEND");
+    expect(preview.rows[0].instrumentType).toBe("cash");
+  });
+
   it("flags unknown import rows", () => {
     const csv = "Date,Symbol,Action,Quantity,Price,Amount,Description\n2025-01-02,,Journal,0,0,0,Ambiguous Robinhood journal";
     const preview = parseRobinhoodInput(csv);
