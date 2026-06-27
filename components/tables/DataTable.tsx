@@ -15,12 +15,26 @@ export type Column<T> = {
   tooltip?: string;
 };
 
+/** Compare two rows on one column. Missing / empty values always sort last. */
+export function compareOn<T>(column: Column<T>, a: T, b: T, direction: "asc" | "desc"): number {
+  const av = column.value(a);
+  const bv = column.value(b);
+  const aEmpty = av == null || av === "" || av === -Infinity;
+  const bEmpty = bv == null || bv === "" || bv === -Infinity;
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return 1;
+  if (bEmpty) return -1;
+  const result = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
+  return direction === "asc" ? result : -result;
+}
+
 export function DataTable<T>({
   rows,
   columns,
   onRowClick,
   empty = "No rows to show.",
   defaultSort,
+  tiebreak,
   pageSize,
   searchable = false,
   searchPlaceholder = "Search…"
@@ -30,6 +44,8 @@ export function DataTable<T>({
   onRowClick?: (row: T) => void;
   empty?: string;
   defaultSort?: { key: string; direction: "asc" | "desc" };
+  /** Secondary sort applied as a stable tiebreak after the active column (skipped when it is the active column). */
+  tiebreak?: { key: string; direction: "asc" | "desc" };
   /** When set, rows are paginated at this size with a prev/next footer. */
   pageSize?: number;
   /** When true, shows a search box that filters rows across all column values. */
@@ -56,19 +72,14 @@ export function DataTable<T>({
   const sorted = useMemo(() => {
     const column = columns.find((item) => item.key === sort.key);
     if (!column) return filtered;
+    const tieColumn =
+      tiebreak && tiebreak.key !== sort.key ? columns.find((item) => item.key === tiebreak.key) : undefined;
     return [...filtered].sort((a, b) => {
-      const av = column.value(a);
-      const bv = column.value(b);
-      // Missing / empty values always sort last, regardless of direction
-      const aEmpty = av == null || av === "" || av === -Infinity;
-      const bEmpty = bv == null || bv === "" || bv === -Infinity;
-      if (aEmpty && bEmpty) return 0;
-      if (aEmpty) return 1;
-      if (bEmpty) return -1;
-      const result = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
-      return sort.direction === "asc" ? result : -result;
+      const primary = compareOn(column, a, b, sort.direction);
+      if (primary !== 0 || !tieColumn) return primary;
+      return compareOn(tieColumn, a, b, tiebreak!.direction);
     });
-  }, [columns, filtered, sort]);
+  }, [columns, filtered, sort, tiebreak]);
 
   const totalPages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
   // Clamp without setState-in-render: derive the effective page from current state.
