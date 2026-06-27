@@ -8,83 +8,97 @@ import { formatPercent } from "@/lib/utils/format";
 /** Where a Home tile navigates: the aggregate Options tab, or the Stock-trades tab. */
 export type StrategyTarget = StrategyKey | "options";
 
-/** Running cumulative realized P&L (oldest → newest) for the given strategy enums. */
-function cumulativeSeries(result: CalculationResult, enums: string[]): number[] {
-  const events = result.realizedEvents
-    .filter((e) => enums.includes(e.strategy))
-    .slice()
-    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
-  let sum = 0;
-  return events.map((e) => (sum += e.realizedPnl));
-}
-
-function Sparkline({ values, positive }: { values: number[]; positive: boolean }) {
-  if (values.length < 2) return <div className="h-7" aria-hidden="true" />;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const w = 100;
-  const h = 28;
-  const points = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * w;
-      const y = h - ((v - min) / range) * h;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-7 w-full" aria-hidden="true">
-      <polyline
-        points={points}
-        fill="none"
-        stroke={positive ? "rgb(var(--pos))" : "rgb(var(--neg))"}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-
-function Tile({
-  name,
-  pnl,
-  roi,
-  winRate,
-  hint,
-  series,
-  onClick,
-}: {
-  name: string;
-  pnl: number;
-  roi: number | null;
-  winRate: number | null;
-  hint: string;
-  series: number[];
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-[12px] border border-hairline bg-surface p-4 text-left hover:border-accent"
-    >
-      <div className="text-[13px] font-medium text-foreground">{name}</div>
-      <div className="mt-1 text-[24px] font-semibold tabular-nums">{signedMoney(pnl)}</div>
-      <div className="mt-0.5 text-[12px] text-muted-foreground">
-        ROC {formatPercent(roi)} · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
-      </div>
-      <Sparkline values={series} positive={pnl >= 0} />
-      <div className="text-[10.5px] text-dim">{hint}</div>
-    </button>
-  );
-}
-
 const OPTION_ENUMS = [
   ...STRATEGY_EVENT_ENUMS.csp,
   ...STRATEGY_EVENT_ENUMS.cc,
   ...STRATEGY_EVENT_ENUMS.long,
 ];
+
+const OPTION_SUBS: { key: StrategyKey; label: string }[] = [
+  { key: "csp", label: "Cash-secured puts" },
+  { key: "cc", label: "Covered calls" },
+  { key: "long", label: "Long options" },
+];
+
+function rocClass(roc: number | null) {
+  if (roc == null) return "text-muted-foreground";
+  return roc > 0 ? "text-pos" : roc < 0 ? "text-neg" : "text-muted-foreground";
+}
+
+/** Options tile: aggregate header (opens the Options tab) + a per-strategy breakdown. */
+function OptionsTile({
+  result,
+  asOf,
+  onOpen,
+}: {
+  result: CalculationResult;
+  asOf: string;
+  onOpen: (target: StrategyTarget) => void;
+}) {
+  const a = optionsAnalytics(result);
+  const roc = strategyReturnOnCapital(result.capitalUsage, OPTION_ENUMS, a.pnl, asOf).roc;
+  return (
+    <div className="rounded-[12px] border border-hairline bg-surface p-4">
+      <button type="button" onClick={() => onOpen("options")} className="block w-full text-left">
+        <div className="text-strong font-medium text-foreground">Options</div>
+        <div className="mt-1 text-[24px] font-semibold tabular-nums">{signedMoney(a.pnl)}</div>
+        <div className="mt-0.5 text-body text-muted-foreground">
+          ROC {formatPercent(roc)} · {a.quality.winRate != null ? `${Math.round(a.quality.winRate * 100)}%` : "—"} win
+        </div>
+      </button>
+      <div className="mt-2.5 border-t border-hairline pt-2">
+        {OPTION_SUBS.map((s) => {
+          const sa = strategyAnalytics(result, s.key);
+          const sroc = strategyReturnOnCapital(result.capitalUsage, STRATEGY_EVENT_ENUMS[s.key], sa.pnl, asOf).roc;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => onOpen(s.key)}
+              className="flex w-full items-center justify-between gap-2 rounded px-1 py-1 text-left hover:bg-surface-inset"
+            >
+              <span className="text-caption text-muted-foreground">{s.label}</span>
+              <span className="flex items-baseline gap-1.5 tabular-nums">
+                <span className="text-caption">{signedMoney(sa.pnl)}</span>
+                <span className={`text-micro ${rocClass(sroc)}`}>{formatPercent(sroc)}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Stock-trades tile: a single clickable summary. */
+function StockTile({
+  result,
+  asOf,
+  onOpen,
+}: {
+  result: CalculationResult;
+  asOf: string;
+  onOpen: (target: StrategyTarget) => void;
+}) {
+  const a = strategyAnalytics(result, "swing");
+  const roc = strategyReturnOnCapital(result.capitalUsage, STRATEGY_EVENT_ENUMS.swing, a.pnl, asOf).roc;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen("swing")}
+      className="rounded-[12px] border border-hairline bg-surface p-4 text-left hover:border-accent"
+    >
+      <div className="text-strong font-medium text-foreground">Stock trades</div>
+      <div className="mt-1 text-[24px] font-semibold tabular-nums">{signedMoney(a.pnl)}</div>
+      <div className="mt-0.5 text-body text-muted-foreground">
+        ROC {formatPercent(roc)} · {a.quality.winRate != null ? `${Math.round(a.quality.winRate * 100)}%` : "—"} win
+      </div>
+      <div className="mt-1.5 text-micro text-dim">
+        {a.quality.totalTrades} trade{a.quality.totalTrades === 1 ? "" : "s"}
+      </div>
+    </button>
+  );
+}
 
 export function StrategyStrip({
   result,
@@ -93,29 +107,11 @@ export function StrategyStrip({
   result: CalculationResult;
   onOpen: (target: StrategyTarget) => void;
 }) {
-  const options = optionsAnalytics(result);
-  const swing = strategyAnalytics(result, "swing");
   const asOf = new Date().toISOString().slice(0, 10);
   return (
     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-      <Tile
-        name="Options"
-        pnl={options.pnl}
-        roi={strategyReturnOnCapital(result.capitalUsage, OPTION_ENUMS, options.pnl, asOf).roc}
-        winRate={options.quality.winRate}
-        hint="CSP · Covered calls · Long"
-        series={cumulativeSeries(result, OPTION_ENUMS)}
-        onClick={() => onOpen("options")}
-      />
-      <Tile
-        name="Stock trades"
-        pnl={swing.pnl}
-        roi={strategyReturnOnCapital(result.capitalUsage, STRATEGY_EVENT_ENUMS.swing, swing.pnl, asOf).roc}
-        winRate={swing.quality.winRate}
-        hint={`${swing.quality.totalTrades} trade${swing.quality.totalTrades === 1 ? "" : "s"}`}
-        series={cumulativeSeries(result, STRATEGY_EVENT_ENUMS.swing)}
-        onClick={() => onOpen("swing")}
-      />
+      <OptionsTile result={result} asOf={asOf} onOpen={onOpen} />
+      <StockTile result={result} asOf={asOf} onOpen={onOpen} />
     </div>
   );
 }
