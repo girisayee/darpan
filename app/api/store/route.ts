@@ -4,34 +4,22 @@ import { clearDbData, getDbSettings, listDbTransactions, replaceDbTransactions, 
 
 export const runtime = "nodejs";
 
+const DEV_USER = "dev-user";
+
 export async function GET() {
-  return NextResponse.json({
-    transactions: listDbTransactions(),
-    settings: getDbSettings()
-  });
+  const [txns, s] = await Promise.all([listDbTransactions(DEV_USER), getDbSettings(DEV_USER)]);
+  return NextResponse.json({ transactions: txns, settings: s });
 }
 
 export async function PUT(request: Request) {
-  const body = (await request.json()) as {
-    transactions?: TradeTransaction[];
-    settings?: AppSettings;
-  };
-  if (Array.isArray(body.transactions)) {
-    replaceDbTransactions(body.transactions);
-  }
-  if (body.settings) {
-    saveDbSettings(body.settings);
-  }
-  return NextResponse.json({
-    transactions: listDbTransactions(),
-    settings: getDbSettings()
-  });
+  const body = (await request.json()) as { transactions?: TradeTransaction[]; settings?: AppSettings };
+  if (Array.isArray(body.transactions)) await replaceDbTransactions(DEV_USER, body.transactions);
+  if (body.settings) await saveDbSettings(DEV_USER, body.settings);
+  const [txns, s] = await Promise.all([listDbTransactions(DEV_USER), getDbSettings(DEV_USER)]);
+  return NextResponse.json({ transactions: txns, settings: s });
 }
 
 export async function DELETE() {
-  clearDbData();
-  return NextResponse.json({
-    transactions: [],
-    settings: getDbSettings()
-  });
+  await clearDbData(DEV_USER);
+  return NextResponse.json({ transactions: [], settings: await getDbSettings(DEV_USER) });
 }
