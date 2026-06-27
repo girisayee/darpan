@@ -33,6 +33,19 @@ const config: Config = {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
+      /**
+       * Semantic type scale (readability revamp). 11px floor — never smaller —
+       * with line-heights baked in. Replaces the ad-hoc text-[Npx] sizes:
+       *   ≤10.5 → micro · 11–11.5 → caption · 12–12.5 → body · 13–14 → strong.
+       * Larger headline/number sizes keep their explicit px.
+       */
+      fontSize: {
+        micro: ["11px", { lineHeight: "1.4" }],
+        caption: ["12px", { lineHeight: "1.45" }],
+        body: ["13px", { lineHeight: "1.5" }],
+        strong: ["14px", { lineHeight: "1.5" }],
+        lead: ["16px", { lineHeight: "1.5" }],
+      },
       borderRadius: { md: "8px", lg: "12px", xl: "14px" },
       keyframes: {},
       animation: {},

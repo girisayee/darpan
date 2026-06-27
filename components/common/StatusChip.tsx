@@ -24,7 +24,7 @@ export function StatusChip({ kind }: { kind: StatusKind }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none",
+        "inline-flex items-center rounded-full px-2 py-0.5 text-micro font-medium leading-none",
         classes
       )}
     >

@@ -13,7 +13,7 @@ export function MetricGroup({
   return (
     <div className="space-y-2">
       {label && (
-        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
           {label}
         </div>
       )}

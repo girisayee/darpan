@@ -92,7 +92,7 @@ export function AppShell({
                   onClick={() => onSelectTab(tab)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   className={cn(
-                    "whitespace-nowrap rounded-[8px] px-3.5 py-[6px] text-[13px] font-medium transition-colors",
+                    "whitespace-nowrap rounded-[8px] px-3.5 py-[6px] text-strong font-medium transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                     isActive
                       ? "bg-accent/10 text-accent"
@@ -116,7 +116,7 @@ export function AppShell({
               aria-label="Filter by year"
               className={cn(
                 "rounded-[8px] border border-hairline bg-surface",
-                "px-2.5 py-[5px] text-[12px] text-muted-foreground",
+                "px-2.5 py-[5px] text-body text-muted-foreground",
                 "hover:text-foreground transition-colors cursor-pointer",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               )}

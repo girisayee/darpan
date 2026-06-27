@@ -69,7 +69,7 @@ function DataBarRow({
     <div className="grid grid-cols-[34px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
       <span
         className={cn(
-          "font-sans text-[12px]",
+          "font-sans text-body",
           emphasis ? "font-medium text-foreground" : "text-muted-foreground"
         )}
       >
@@ -88,12 +88,12 @@ function DataBarRow({
 
       <div className="text-right leading-tight">
         {value === null ? (
-          <span className="font-sans text-[13px] font-medium text-muted-foreground">—</span>
+          <span className="font-sans text-strong font-medium text-muted-foreground">—</span>
         ) : (
           <>
             <div
               className={cn(
-                "font-sans text-[13px] font-medium tabular-nums",
+                "font-sans text-strong font-medium tabular-nums",
                 pos && "text-pos",
                 neg && "text-neg",
                 !pos && !neg && "text-foreground"
@@ -104,7 +104,7 @@ function DataBarRow({
             {dollarPnl !== null && (
               <div
                 className={cn(
-                  "font-sans text-[11px] tabular-nums",
+                  "font-sans text-caption tabular-nums",
                   dollarPnl > 0 && "text-pos",
                   dollarPnl < 0 && "text-neg",
                   dollarPnl === 0 && "text-muted-foreground"
@@ -283,12 +283,12 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
     <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">Market comparison</h2>
-        <span className="font-sans text-[11px] text-muted-foreground">YTD {benchYear} · SPY / VTI / QQQ</span>
+        <h2 className="font-sans text-strong font-medium text-foreground">Market comparison</h2>
+        <span className="font-sans text-caption text-muted-foreground">YTD {benchYear} · SPY / VTI / QQQ</span>
       </div>
 
       {/* Helper: deployed capital basis */}
-      <p className="font-sans text-[11px] text-muted-foreground">
+      <p className="font-sans text-caption text-muted-foreground">
         Index $ shown on your avg deployed capital{" "}
         {avgDeployed > 0 ? (
           <span className="font-medium text-foreground">{formatCurrency(avgDeployed)}</span>
@@ -300,13 +300,13 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       {/* Error state */}
       {status === "error" && (
         <div className="flex flex-col items-center gap-2 py-4 text-center">
-          <span className="font-sans text-[13px] text-muted-foreground">
+          <span className="font-sans text-strong text-muted-foreground">
             Benchmark unavailable — couldn&apos;t reach market data
           </span>
           <button
             type="button"
             onClick={retry}
-            className="rounded-md border border-hairline bg-surface-inset px-4 py-1.5 font-sans text-[12px] font-medium text-foreground transition hover:bg-surface active:opacity-80"
+            className="rounded-md border border-hairline bg-surface-inset px-4 py-1.5 font-sans text-body font-medium text-foreground transition hover:bg-surface active:opacity-80"
           >
             Retry
           </button>

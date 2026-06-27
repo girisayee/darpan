@@ -96,12 +96,12 @@ function EquityCurveChart({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-4 px-1">
-        <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5 font-sans text-caption text-muted-foreground">
           <span className="inline-block h-0.5 w-5 rounded-full" style={{ background: C_EQUITY }} />
           Cumulative P&amp;L
         </span>
         {annualGoal > 0 && (
-          <span className="flex items-center gap-1.5 font-sans text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5 font-sans text-caption text-muted-foreground">
             <span
               className="inline-block h-0.5 w-5 rounded-full bg-muted-foreground opacity-50"
               style={{ borderTop: "2px dashed" }}
@@ -266,14 +266,14 @@ export function PerformanceTab({
       {annualGoal > 0 && (
         <div className="rounded-[14px] border border-hairline bg-surface p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-[12.5px] font-medium text-muted-foreground">Annual goal</span>
-            <span className="text-[12px] text-muted-foreground">{formatPercent(pace.pct, 0)} of goal</span>
+            <span className="text-body font-medium text-muted-foreground">Annual goal</span>
+            <span className="text-body text-muted-foreground">{formatPercent(pace.pct, 0)} of goal</span>
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-[28px] font-semibold tabular-nums leading-none text-foreground">
               {formatCurrency(pace.actual)}
             </span>
-            <span className="text-[13px] tabular-nums text-muted-foreground">/ {formatCurrency(annualGoal)}</span>
+            <span className="text-strong tabular-nums text-muted-foreground">/ {formatCurrency(annualGoal)}</span>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
             <div
@@ -281,7 +281,7 @@ export function PerformanceTab({
               style={{ width: `${Math.max(0, Math.min(100, (pace.actual / annualGoal) * 100)).toFixed(1)}%` }}
             />
           </div>
-          <p className="mt-2 text-[12px] text-muted-foreground">
+          <p className="mt-2 text-body text-muted-foreground">
             Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo to hit goal
           </p>
         </div>
@@ -290,7 +290,7 @@ export function PerformanceTab({
       {/* ── Equity curve + market comparison (side by side on large screens) ── */}
       <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
-          <h2 className="font-sans text-[13px] font-medium text-foreground">Equity curve</h2>
+          <h2 className="font-sans text-strong font-medium text-foreground">Equity curve</h2>
           <EquityCurveChart result={result} annualGoal={annualGoal} />
         </div>
         <BenchmarkComparison result={result} />
@@ -342,7 +342,7 @@ export function PerformanceTab({
 
       {/* ── Monthly breakdown ── */}
       <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">Monthly P&amp;L</h2>
+        <h2 className="font-sans text-strong font-medium text-foreground">Monthly P&amp;L</h2>
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <MonthlyPnlBar result={result} />
         </div>

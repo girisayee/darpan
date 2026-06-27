@@ -14,7 +14,7 @@ export function BottomNav({ tabs, activeTab, onSelectTab }: { tabs: readonly str
         const active = tab === activeTab;
         return (
           <button key={tab} type="button" onClick={() => onSelectTab(tab)} aria-current={active ? "page" : undefined}
-            className={cn("flex flex-1 flex-col items-center gap-1 py-2 text-[10px]", active ? "text-accent" : "text-muted-foreground")}>
+            className={cn("flex flex-1 flex-col items-center gap-1 py-2 text-micro", active ? "text-accent" : "text-muted-foreground")}>
             <Icon className="h-5 w-5" />
             {tab}
           </button>

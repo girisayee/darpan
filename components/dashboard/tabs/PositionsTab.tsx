@@ -31,8 +31,8 @@ const OPTION_CHIPS: { key: OptionChip; short: string }[] = [
 function ReviewFixBanner({ onReviewFix }: { onReviewFix: () => void }) {
   return (
     <div className="flex items-center justify-between rounded-[10px] border border-warn/30 bg-warn/10 px-3 py-2">
-      <span className="text-[12px] text-warn">Some trades have unresolved data issues.</span>
-      <button type="button" onClick={onReviewFix} className="text-[12px] font-medium text-warn underline">
+      <span className="text-body text-warn">Some trades have unresolved data issues.</span>
+      <button type="button" onClick={onReviewFix} className="text-body font-medium text-warn underline">
         Review &amp; fix
       </button>
     </div>
@@ -65,11 +65,11 @@ function TabCard({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-medium text-foreground">{name}</span>
-        <span className="text-[12px] text-muted-foreground">{count}</span>
+        <span className="text-strong font-medium text-foreground">{name}</span>
+        <span className="text-body text-muted-foreground">{count}</span>
       </div>
       <div className="mt-0.5 text-[19px] font-medium tabular-nums">{signedMoney(pnl)}</div>
-      <div className="mt-0.5 text-[12px] text-muted-foreground">{sub}</div>
+      <div className="mt-0.5 text-body text-muted-foreground">{sub}</div>
     </button>
   );
 }
@@ -193,7 +193,7 @@ export function PositionsTab(props: {
                 onClick={() => navigate({ view: "options", strategy: c.key })}
                 aria-pressed={optionChip === c.key}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-[12px] font-medium transition-colors",
+                  "rounded-full border px-3 py-1 text-body font-medium transition-colors",
                   optionChip === c.key
                     ? "border-accent bg-accent/15 text-accent"
                     : "border-hairline text-muted-foreground hover:text-foreground"
@@ -204,7 +204,7 @@ export function PositionsTab(props: {
             ))}
           </div>
         ) : (
-          <span className="text-[13px] font-medium text-foreground">Stock trades</span>
+          <span className="text-strong font-medium text-foreground">Stock trades</span>
         )}
         <SegmentedControl<StateFilter>
           value={stateFilter}

@@ -40,7 +40,7 @@ export function CalendarHeatmap({ days, mode, year: yearProp, onSelectDay }: {
         const dim = new Date(Number(year), m, 0).getDate();
         return (
           <div key={m} className="grid items-center gap-1" style={{ gridTemplateColumns: `30px repeat(31, 1fr)` }}>
-            <span className="text-[10px] text-muted-foreground">{MONTHS[m - 1]}</span>
+            <span className="text-micro text-muted-foreground">{MONTHS[m - 1]}</span>
             {Array.from({ length: 31 }, (_, i) => {
               const day = i + 1;
               if (day > dim) return <div key={i} />;

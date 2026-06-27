@@ -104,7 +104,7 @@ export function DataTable<T>({
             }}
             placeholder={searchPlaceholder}
             aria-label="Search table"
-            className="h-9 w-full max-w-[280px] rounded-md border border-hairline bg-surface pl-8 pr-2.5 font-sans text-[12px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="h-9 w-full max-w-[280px] rounded-md border border-hairline bg-surface pl-8 pr-2.5 font-sans text-body text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40"
           />
         </div>
       )}
@@ -136,7 +136,7 @@ export function DataTable<T>({
                         >
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-[11.5px] font-normal normal-case tracking-normal text-muted-foreground"
+                            className="inline-flex items-center gap-1 text-caption font-normal normal-case tracking-normal text-muted-foreground"
                             onClick={() => {
                               setPage(0);
                               setSort((current) => ({
@@ -197,7 +197,7 @@ export function DataTable<T>({
 
         {pageSize && totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-hairline-soft px-3 py-2">
-            <span className="font-sans text-[11.5px] tabular-nums text-muted-foreground">
+            <span className="font-sans text-caption tabular-nums text-muted-foreground">
               {safePage * pageSize + 1}–{Math.min((safePage + 1) * pageSize, sorted.length)} of {sorted.length}
             </span>
             <div className="flex items-center gap-1">
@@ -210,7 +210,7 @@ export function DataTable<T>({
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="min-w-[4rem] text-center font-sans text-[11.5px] tabular-nums text-muted-foreground">
+              <span className="min-w-[4rem] text-center font-sans text-caption tabular-nums text-muted-foreground">
                 {safePage + 1} / {totalPages}
               </span>
               <button

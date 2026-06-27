@@ -269,7 +269,7 @@ function AddOptionOpenForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 space-y-3 rounded-lg border border-hairline bg-surface-inset p-3">
-      <div className="font-sans text-[11.5px] font-medium text-foreground">Add opening trade</div>
+      <div className="font-sans text-caption font-medium text-foreground">Add opening trade</div>
 
       {/* Read-only inherited fields */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -281,14 +281,14 @@ function AddOptionOpenForm({
 
       {/* Opener action (editable) */}
       <div className="grid gap-1">
-        <label className="font-sans text-[11px] text-muted-foreground">
+        <label className="font-sans text-caption text-muted-foreground">
           Opening action
         </label>
         <select
           value={state.openerAction}
           onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as OptionOpenerState["openerAction"] }))}
           className={cn(
-            "h-9 rounded-md border bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+            "h-9 rounded-md border bg-surface px-2.5 font-sans text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
             errors.openerAction ? "border-neg/60" : "border-hairline"
           )}
         >
@@ -297,10 +297,10 @@ function AddOptionOpenForm({
           <option value="BUY_TO_OPEN">{openerActionLabel("BUY_TO_OPEN")}</option>
         </select>
         {errors.openerAction && (
-          <span className="font-sans text-[10.5px] text-neg">{errors.openerAction}</span>
+          <span className="font-sans text-micro text-neg">{errors.openerAction}</span>
         )}
         {ambiguousOpener && (
-          <span className="font-sans text-[10.5px] text-warn">
+          <span className="font-sans text-micro text-warn">
             This {actionLabel(row.action).toLowerCase()} is ambiguous: if you <strong>sold</strong> it to open
             (covered call / cash-secured put) the premium was kept; if you <strong>bought</strong> it (long) the
             premium was lost. Pick the one that matches your trade.
@@ -350,7 +350,7 @@ function AddOptionOpenForm({
       <div className="flex justify-end">
         <button
           type="submit"
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-body font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Add opener
         </button>
@@ -456,7 +456,7 @@ function AddStockOpenForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 space-y-3 rounded-lg border border-hairline bg-surface-inset p-3">
-      <div className="font-sans text-[11.5px] font-medium text-foreground">
+      <div className="font-sans text-caption font-medium text-foreground">
         Add opening share purchase{lots.length > 1 ? "s" : ""}
       </div>
 
@@ -470,14 +470,14 @@ function AddStockOpenForm({
         {lots.map((lot, i) => (
           <div key={i} className="rounded-md border border-hairline bg-surface p-2.5">
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="font-sans text-[10.5px] font-medium text-muted-foreground">
+              <span className="font-sans text-micro font-medium text-muted-foreground">
                 Lot {i + 1}
               </span>
               {lots.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeLot(i)}
-                  className="inline-flex h-6 items-center rounded-md border border-hairline bg-surface px-2 font-sans text-[10.5px] font-medium text-muted-foreground transition-colors hover:bg-surface-inset hover:text-neg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  className="inline-flex h-6 items-center rounded-md border border-hairline bg-surface px-2 font-sans text-micro font-medium text-muted-foreground transition-colors hover:bg-surface-inset hover:text-neg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                   aria-label={`Remove lot ${i + 1}`}
                 >
                   Remove
@@ -521,13 +521,13 @@ function AddStockOpenForm({
         <button
           type="button"
           onClick={addLot}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-caption font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
           + Add lot
         </button>
         <span
           className={cn(
-            "font-sans text-[11px] tabular-nums",
+            "font-sans text-caption tabular-nums",
             sharesMismatch ? "text-warn" : "text-muted-foreground"
           )}
         >
@@ -550,7 +550,7 @@ function AddStockOpenForm({
       <div className="flex justify-end">
         <button
           type="submit"
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-body font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Add {lots.length > 1 ? `${lots.length} lots` : "opener"}
         </button>
@@ -576,8 +576,8 @@ function AddOpenForm({
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-0.5">
-      <span className="font-sans text-[10.5px] text-muted-foreground">{label}</span>
-      <span className="font-sans text-[12px] text-foreground">{value}</span>
+      <span className="font-sans text-micro text-muted-foreground">{label}</span>
+      <span className="font-sans text-body text-foreground">{value}</span>
     </div>
   );
 }
@@ -605,7 +605,7 @@ function FormField({
 }) {
   return (
     <div className="grid gap-0.5">
-      <label className="font-sans text-[11px] text-muted-foreground">{label}</label>
+      <label className="font-sans text-caption text-muted-foreground">{label}</label>
       <input
         type={type}
         value={value}
@@ -615,12 +615,12 @@ function FormField({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          "h-9 rounded-md border bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          "h-9 rounded-md border bg-surface px-2.5 font-sans text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
           error ? "border-neg/60" : "border-hairline"
         )}
       />
       {error && (
-        <span className="font-sans text-[10.5px] text-neg">{error}</span>
+        <span className="font-sans text-micro text-neg">{error}</span>
       )}
     </div>
   );
@@ -680,11 +680,11 @@ function EditOptionForm({
         <ReadOnlyField label="Expiration" value={tx.expirationDate ? formatDisplayDate(tx.expirationDate) : "—"} />
       </div>
       <div className="grid gap-1">
-        <label className="font-sans text-[11px] text-muted-foreground">Opening action</label>
+        <label className="font-sans text-caption text-muted-foreground">Opening action</label>
         <select
           value={state.openerAction}
           onChange={(e) => setState((s) => ({ ...s, openerAction: e.target.value as OptionFormState["openerAction"] }))}
-          className="h-9 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="h-9 rounded-md border border-hairline bg-surface px-2.5 font-sans text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
           <option value="SELL_TO_OPEN">{openerActionLabel("SELL_TO_OPEN")}</option>
           <option value="BUY_TO_OPEN">{openerActionLabel("BUY_TO_OPEN")}</option>
@@ -702,11 +702,11 @@ function EditOptionForm({
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel}
-          className="inline-flex h-8 items-center px-3 font-sans text-[12px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          className="inline-flex h-8 items-center px-3 font-sans text-body text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           Cancel
         </button>
         <button type="submit"
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-body font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           Save changes
         </button>
       </div>
@@ -772,11 +772,11 @@ function EditStockForm({
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel}
-          className="inline-flex h-8 items-center px-3 font-sans text-[12px] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          className="inline-flex h-8 items-center px-3 font-sans text-body text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           Cancel
         </button>
         <button type="submit"
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent/15 px-3 font-sans text-body font-medium text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
           Save changes
         </button>
       </div>
@@ -808,14 +808,14 @@ export function ManualEntryCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-sans text-[13px] font-medium text-foreground">{tx.symbol}</span>
-            <span className="font-sans text-[11px] text-muted-foreground">{actionLabel(tx.action)}</span>
-            <span className="font-sans text-[11px] tabular-nums text-muted-foreground">× {tx.quantity}</span>
+            <span className="font-sans text-strong font-medium text-foreground">{tx.symbol}</span>
+            <span className="font-sans text-caption text-muted-foreground">{actionLabel(tx.action)}</span>
+            <span className="font-sans text-caption tabular-nums text-muted-foreground">× {tx.quantity}</span>
           </div>
           {details.length > 0 && (
-            <div className="font-sans text-[11px] text-muted-foreground">{details.join(" · ")}</div>
+            <div className="font-sans text-caption text-muted-foreground">{details.join(" · ")}</div>
           )}
-          <div className="font-sans text-[11px] tabular-nums text-muted-foreground">
+          <div className="font-sans text-caption tabular-nums text-muted-foreground">
             {formatDisplayDate(tx.tradeDate)} · ${tx.price.toFixed(2)}{isOption ? "/contract" : "/share"}
           </div>
         </div>
@@ -823,14 +823,14 @@ export function ManualEntryCard({
           <button
             type="button"
             onClick={() => setEditing((x) => !x)}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-caption font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             {editing ? "Cancel" : "Edit"}
           </button>
           <button
             type="button"
             onClick={() => onDelete(tx.id)}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-neg/30 bg-surface px-2.5 font-sans text-[11.5px] font-medium text-neg transition-colors hover:bg-neg/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-neg/30 bg-surface px-2.5 font-sans text-caption font-medium text-neg transition-colors hover:bg-neg/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             Delete
           </button>
@@ -892,37 +892,37 @@ function OrphanRowCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-0.5">
           <div className="flex items-center gap-2">
-            <span className="font-sans text-[13px] font-medium text-foreground">{row.symbol}</span>
-            <span className="font-sans text-[11px] text-muted-foreground">{actionLabel(row.action)}</span>
+            <span className="font-sans text-strong font-medium text-foreground">{row.symbol}</span>
+            <span className="font-sans text-caption text-muted-foreground">{actionLabel(row.action)}</span>
             {row.qty > 0 && (
-              <span className="font-sans text-[11px] tabular-nums text-muted-foreground">× {row.qty}</span>
+              <span className="font-sans text-caption tabular-nums text-muted-foreground">× {row.qty}</span>
             )}
           </div>
           {typeParts.length > 0 && (
-            <div className="font-sans text-[11px] text-muted-foreground">
+            <div className="font-sans text-caption text-muted-foreground">
               {typeParts.join(" · ")}
             </div>
           )}
-          <div className="font-sans text-[11px] tabular-nums text-muted-foreground">{formatDisplayDate(row.date)}</div>
-          <div className="font-sans text-[11px] text-warn">{row.reason}</div>
+          <div className="font-sans text-caption tabular-nums text-muted-foreground">{formatDisplayDate(row.date)}</div>
+          <div className="font-sans text-caption text-warn">{row.reason}</div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           {resolved ? (
-            <span className="inline-flex items-center rounded-full bg-pos/15 px-2 py-0.5 font-sans text-[11px] font-medium text-pos">
+            <span className="inline-flex items-center rounded-full bg-pos/15 px-2 py-0.5 font-sans text-caption font-medium text-pos">
               Added
             </span>
           ) : fixable ? (
             <button
               type="button"
               onClick={() => setExpanded((x) => !x)}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-caption font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               aria-expanded={expanded}
             >
               {expanded ? "Cancel" : "Add opening trade"}
             </button>
           ) : (
-            <span className="font-sans text-[11px] text-muted-foreground">
+            <span className="font-sans text-caption text-muted-foreground">
               {row.kind === "stock" ? "Missing trade details" : "Missing option details"}
             </span>
           )}
@@ -1049,7 +1049,7 @@ export function ReviewFixPanel({
               <h2 className="font-sans text-[16px] font-medium text-foreground">
                 Review &amp; fix data issues
               </h2>
-              <p className="mt-1 font-sans text-[11.5px] text-muted-foreground">
+              <p className="mt-1 font-sans text-caption text-muted-foreground">
                 Add a missing opening trade to resolve orphan option and stock closes.
               </p>
             </div>
@@ -1067,12 +1067,12 @@ export function ReviewFixPanel({
           {/* Body */}
           <div className="mt-4 space-y-3">
             {orphans.length === 0 ? (
-              <div className="rounded-lg border border-pos/30 bg-pos/5 p-4 font-sans text-[12.5px] text-pos">
+              <div className="rounded-lg border border-pos/30 bg-pos/5 p-4 font-sans text-body text-pos">
                 No unresolved closes — all option and stock trades are matched.
               </div>
             ) : (
               <>
-                <p className="font-sans text-[12px] text-muted-foreground">
+                <p className="font-sans text-body text-muted-foreground">
                   {orphans.length} unresolved close{orphans.length !== 1 ? "s" : ""} need an opening leg.
                 </p>
                 {orphans.map((row) => (
@@ -1090,10 +1090,10 @@ export function ReviewFixPanel({
           {manualTransactions.length > 0 && (
             <div className="mt-6 space-y-3">
               <div className="border-t border-hairline pt-5">
-                <h3 className="font-sans text-[13px] font-medium text-foreground">
+                <h3 className="font-sans text-strong font-medium text-foreground">
                   Manual entries
                 </h3>
-                <p className="mt-0.5 font-sans text-[11.5px] text-muted-foreground">
+                <p className="mt-0.5 font-sans text-caption text-muted-foreground">
                   {manualTransactions.length} manually-added transaction{manualTransactions.length !== 1 ? "s" : ""} — edit or remove as needed.
                 </p>
               </div>

@@ -111,7 +111,7 @@ export function SegmentedControl<T extends string>({
           type="button"
           onClick={() => onChange(opt)}
           className={cn(
-            "rounded-md px-4 py-1.5 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+            "rounded-md px-4 py-1.5 font-sans text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
             value === opt
               ? "bg-accent/15 text-accent"
               : "text-muted-foreground hover:text-foreground"
@@ -274,7 +274,7 @@ export function ClosedTradesTable({
           return (
             <div className="flex flex-col gap-0 text-right">
               <span className="font-medium tabular-nums text-foreground">{contracts}</span>
-              <span className="text-[11px] tabular-nums text-muted-foreground">· {shares} sh</span>
+              <span className="text-caption tabular-nums text-muted-foreground">· {shares} sh</span>
             </div>
           );
         }
@@ -367,7 +367,7 @@ export function optionTypeToneClass(row: Pick<OptionLifecycle, "direction" | "op
  */
 export function OptionTypeTag({ row }: { row: OptionLifecycle }) {
   return (
-    <span className={cn("font-sans text-[12px] font-medium", optionTypeToneClass(row))}>
+    <span className={cn("font-sans text-body font-medium", optionTypeToneClass(row))}>
       {optionTypeLabel(row)}
     </span>
   );
@@ -433,12 +433,12 @@ export function ClosedCyclesTable({
               <TickerLogo symbol={row.underlyingSymbol} size={18} />
               <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
               {isManual && (
-                <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-sans text-[9px] font-medium leading-none text-accent">
+                <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-sans text-micro font-medium leading-none text-accent">
                   manual
                 </span>
               )}
             </div>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-caption text-muted-foreground">
               ${row.strikePrice.toFixed(2)}
             </span>
           </div>
@@ -453,7 +453,7 @@ export function ClosedCyclesTable({
       render: (row) => (
         <div className="flex flex-col gap-0">
           <span className="font-medium tabular-nums text-foreground">{row.contracts}</span>
-          <span className="text-[11px] tabular-nums text-muted-foreground">· {row.sharesControlled} sh</span>
+          <span className="text-caption tabular-nums text-muted-foreground">· {row.sharesControlled} sh</span>
         </div>
       ),
       align: "right",

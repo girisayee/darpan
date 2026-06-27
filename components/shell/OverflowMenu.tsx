@@ -12,7 +12,7 @@ export function OverflowMenu(props: {
   user?: { name?: string | null; email?: string | null; image?: string | null };
 }) {
   const [open, setOpen] = useState(false);
-  const item = "flex w-full items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:bg-accent/[0.06] hover:text-foreground";
+  const item = "flex w-full items-center gap-2 px-3 py-2 text-strong text-muted-foreground hover:bg-accent/[0.06] hover:text-foreground";
   return (
     <div className="relative">
       <button type="button" aria-label="More" onClick={() => setOpen((v) => !v)}
@@ -25,11 +25,11 @@ export function OverflowMenu(props: {
           <div role="menu" className="absolute right-0 z-50 mt-1 w-56 rounded-[12px] border border-hairline bg-surface py-1 shadow-lg">
             {props.user?.email && (
               <>
-                <div className="px-3 py-2 text-[12px] text-muted-foreground truncate">{props.user.email}</div>
+                <div className="px-3 py-2 text-body text-muted-foreground truncate">{props.user.email}</div>
                 <div className="my-1 border-t border-hairline-soft" />
               </>
             )}
-            <div className="px-3 py-1.5 text-[10.5px] uppercase tracking-wide text-dim">Account</div>
+            <div className="px-3 py-1.5 text-micro uppercase tracking-wide text-dim">Account</div>
             {props.accounts.map((a) => (
               <button key={a} role="menuitemradio" aria-checked={a === props.account} className={cn(item, a === props.account && "text-foreground")}
                 onClick={() => { props.onAccount(a); setOpen(false); }}>

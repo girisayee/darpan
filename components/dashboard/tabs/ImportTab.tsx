@@ -54,7 +54,7 @@ const STATUS_BADGE: Record<RowStatus, { label: string; cls: string }> = {
 
 function Chip({ dot, label: text, count, tone }: { dot: string; label: string; count: number; tone?: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1 text-[11px] text-muted-foreground">
+    <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1 text-caption text-muted-foreground">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot }} />
       <span className={cn("font-semibold tabular-nums", tone)}>{count}</span> {text}
     </span>
@@ -183,8 +183,8 @@ export function ImportTab({
         )}
       >
         <UploadCloud className="mx-auto h-7 w-7 text-muted-foreground" />
-        <div className="mt-2 text-[13px] font-medium text-foreground">Drop Robinhood CSV files here</div>
-        <div className="mt-1 text-[11px] text-muted-foreground">
+        <div className="mt-2 text-strong font-medium text-foreground">Drop Robinhood CSV files here</div>
+        <div className="mt-1 text-caption text-muted-foreground">
           or <span className="text-accent underline">browse</span> · multiple files OK ·{" "}
           <button
             type="button"
@@ -222,10 +222,10 @@ export function ImportTab({
       {/* Success state */}
       {importedCount !== null && (
         <div className="flex items-center justify-between rounded-[12px] border border-pos/30 bg-pos/10 px-4 py-3">
-          <span className="text-[13px] text-pos">
+          <span className="text-strong text-pos">
             Imported {importedCount} transaction{importedCount === 1 ? "" : "s"}.
           </span>
-          <button type="button" onClick={reset} className="text-[12px] font-medium text-foreground underline">
+          <button type="button" onClick={reset} className="text-body font-medium text-foreground underline">
             Import more
           </button>
         </div>
@@ -239,20 +239,20 @@ export function ImportTab({
             <Chip dot="rgb(var(--accent))" label="duplicates" count={counts.duplicate} tone="text-accent" />
             <Chip dot="rgb(var(--warn))" label="warnings" count={counts.warning} tone="text-warn" />
             <Chip dot="rgb(var(--text-muted))" label="ignored" count={counts.ignored} />
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-caption text-muted-foreground">
               {rows.length} rows parsed from {parsed.fileCount} file{parsed.fileCount === 1 ? "" : "s"}
             </span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[12px] text-muted-foreground">Review &amp; select rows to import</span>
+            <span className="text-body text-muted-foreground">Review &amp; select rows to import</span>
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search rows…"
-                className="w-48 rounded-md border border-hairline bg-surface py-1.5 pl-8 pr-2 text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="w-48 rounded-md border border-hairline bg-surface py-1.5 pl-8 pr-2 text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               />
             </div>
           </div>
@@ -261,7 +261,7 @@ export function ImportTab({
             <div className="max-h-[420px] overflow-auto">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-surface">
-                  <tr className="border-b border-hairline text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <tr className="border-b border-hairline text-micro uppercase tracking-wide text-muted-foreground">
                     <th className="w-9 px-3 py-2 text-left">
                       <input
                         type="checkbox"
@@ -289,7 +289,7 @@ export function ImportTab({
                       <tr
                         key={r.id}
                         className={cn(
-                          "border-b border-hairline text-[11.5px] last:border-b-0",
+                          "border-b border-hairline text-caption last:border-b-0",
                           status === "warning" && "bg-warn/[0.04]"
                         )}
                       >
@@ -304,7 +304,7 @@ export function ImportTab({
                           />
                         </td>
                         <td className="px-2 py-2">
-                          <span className={cn("rounded px-1.5 py-0.5 text-[9.5px] font-semibold", badge.cls)}>
+                          <span className={cn("rounded px-1.5 py-0.5 text-micro font-semibold", badge.cls)}>
                             {badge.label}
                           </span>
                         </td>
@@ -316,7 +316,7 @@ export function ImportTab({
                         <td className="px-2 py-2 text-right tabular-nums text-foreground">{r.quantity || "—"}</td>
                         <td className="px-2 py-2 text-right">
                           {warnings?.length ? (
-                            <span className="text-[10.5px] text-warn" title={warnings.join("; ")}>
+                            <span className="text-micro text-warn" title={warnings.join("; ")}>
                               {warnings[0]}
                             </span>
                           ) : (
@@ -328,7 +328,7 @@ export function ImportTab({
                   })}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-6 text-center text-[12px] text-muted-foreground">
+                      <td colSpan={7} className="px-3 py-6 text-center text-body text-muted-foreground">
                         No rows match “{search}”.
                       </td>
                     </tr>
@@ -339,14 +339,14 @@ export function ImportTab({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-caption text-muted-foreground">
               {selected.size} of {rows.length} selected · duplicates &amp; ignored excluded by default
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={selectRecommended}
-                className="rounded-md border border-hairline bg-surface px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-surface-inset"
+                className="rounded-md border border-hairline bg-surface px-3 py-1.5 text-body font-medium text-foreground transition-colors hover:bg-surface-inset"
               >
                 Select recommended
               </button>
@@ -354,7 +354,7 @@ export function ImportTab({
                 type="button"
                 onClick={doImport}
                 disabled={selected.size === 0}
-                className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-body font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <FileText className="h-3.5 w-3.5" />
                 Import {selected.size} selected

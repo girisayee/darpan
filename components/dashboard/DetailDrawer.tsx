@@ -84,7 +84,7 @@ function Row({
   return (
     <div
       className={cn(
-        "flex items-center justify-between py-2.5 font-sans text-[13px]",
+        "flex items-center justify-between py-2.5 font-sans text-strong",
         topBorder
           ? "border-t border-hairline pt-2.5 mt-0.5"
           : "border-b border-hairline-soft"
@@ -93,7 +93,7 @@ function Row({
       <span className={cn(bold ? "text-foreground font-medium" : "text-dim")}>
         {label}
         {helper ? (
-          <span className="ml-1 text-[11px] text-muted-foreground">{helper}</span>
+          <span className="ml-1 text-caption text-muted-foreground">{helper}</span>
         ) : null}
       </span>
       <span className={cn("font-sans tabular-nums font-medium", valueClass ?? "text-foreground")}>
@@ -106,7 +106,7 @@ function Row({
 /** Section heading used in both views. */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-4 font-sans text-[11px] text-muted-foreground">{children}</div>
+    <div className="mt-4 font-sans text-caption text-muted-foreground">{children}</div>
   );
 }
 
@@ -115,8 +115,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function MetaCell({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <div className="px-3 py-2.5">
-      <div className="font-sans text-[11px] font-normal text-muted-foreground">{label}</div>
-      <div className={cn("mt-0.5 font-sans text-[12.5px] font-medium tabular-nums text-foreground", valueClass)}>
+      <div className="font-sans text-caption font-normal text-muted-foreground">{label}</div>
+      <div className={cn("mt-0.5 font-sans text-body font-medium tabular-nums text-foreground", valueClass)}>
         {value}
       </div>
     </div>
@@ -383,16 +383,16 @@ function EventDetailBody({
               {event.symbol}
             </span>
             {/* Strategy chip — accent-tinted pill, safe kind mapping */}
-            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-micro font-medium leading-none text-accent">
               {strategyLabel(event.strategy)}
             </span>
             {hasManualTx && (
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-micro font-medium leading-none text-accent">
                 manual
               </span>
             )}
           </div>
-          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
+          <div className="mt-1 font-sans text-caption tabular-nums text-muted-foreground">
             Closed {formatDisplayDate(event.date)}
             {event.quantity ? ` · ${formatNumber(event.quantity)} shares` : ""}
           </div>
@@ -411,7 +411,7 @@ function EventDetailBody({
       {/* ── Hero: Realized P&L + ROI ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
-          <div className="font-sans text-[11px] text-muted-foreground">
+          <div className="font-sans text-caption text-muted-foreground">
             Realized P&amp;L
           </div>
           <div
@@ -424,7 +424,7 @@ function EventDetailBody({
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-[11px] text-muted-foreground">ROI</div>
+          <div className="font-sans text-caption text-muted-foreground">ROI</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -439,19 +439,19 @@ function EventDetailBody({
       </div>
 
       {/* ── Calculation waterfall ── */}
-      <div className="font-sans text-[11px] text-muted-foreground mt-4">
+      <div className="font-sans text-caption text-muted-foreground mt-4">
         How this was calculated
       </div>
       <div className="mt-1.5">
         {/* Gross proceeds */}
-        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
           <span className="text-dim">Gross proceeds</span>
           <span className={cn("font-sans tabular-nums font-medium", toneClass(grossProceeds))}>
             {signedCurrency(grossProceeds)}
           </span>
         </div>
         {/* Cost basis */}
-        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
           <span className="text-dim">
             Allocated cost basis
             {event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)
@@ -463,7 +463,7 @@ function EventDetailBody({
           </span>
         </div>
         {/* Fees */}
-        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+        <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
           <span className="text-dim">Fees</span>
           <span className="font-sans tabular-nums font-medium text-foreground">
             {fees !== 0
@@ -472,7 +472,7 @@ function EventDetailBody({
           </span>
         </div>
         {/* Total row */}
-        <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+        <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-strong">
           <span className="text-foreground font-medium">Realized P&amp;L</span>
           <span className={cn("font-sans tabular-nums font-medium", toneClass(realizedPnl))}>
             {signedCurrency(realizedPnl)}
@@ -483,17 +483,17 @@ function EventDetailBody({
       {/* ── Shares section (assignment share leg) ── */}
       {shareDetail && shareDetail.kind === "called-away" && (
         <div className="mt-4">
-          <div className="font-sans text-[11px] text-muted-foreground">
+          <div className="font-sans text-caption text-muted-foreground">
             Called-away shares
           </div>
           <div className="mt-1.5">
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Shares sold at strike</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
                 {formatNumber(shareDetail.shares)}
               </span>
             </div>
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Share cost basis</span>
               <span className="font-sans tabular-nums font-medium text-neg">
                 {shareDetail.costBasis != null
@@ -501,19 +501,19 @@ function EventDetailBody({
                   : "N/A"}
               </span>
             </div>
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Strike proceeds</span>
               <span className="font-sans tabular-nums font-medium text-pos">
                 {`+${formatCurrency(shareDetail.proceeds, { maximumFractionDigits: 2 })}`}
               </span>
             </div>
-            <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-strong">
               <span className="text-foreground font-medium">Assignment P&amp;L (shares)</span>
               <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.pnl))}>
                 {signedCurrency(shareDetail.pnl)}
               </span>
             </div>
-            <div className="flex items-center justify-between py-2.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between py-2.5 font-sans text-strong">
               <span className="text-dim">Share ROI</span>
               <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.roiPercent))}>
                 {shareDetail.roiPercent !== null
@@ -526,29 +526,29 @@ function EventDetailBody({
       )}
       {shareDetail && shareDetail.kind === "acquired" && (
         <div className="mt-4">
-          <div className="font-sans text-[11px] text-muted-foreground">
+          <div className="font-sans text-caption text-muted-foreground">
             Shares acquired
           </div>
           <div className="mt-1.5">
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Shares purchased at strike</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
                 {formatNumber(shareDetail.shares)}
               </span>
             </div>
-            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Cost basis / share</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
                 {formatCurrency(shareDetail.costBasisPerShare, { maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-[13px]">
+            <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-strong">
               <span className="text-foreground font-medium">Total cost basis</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
                 {formatCurrency(shareDetail.costBasisTotal, { maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="py-2 font-sans text-[11px] text-muted-foreground">
+            <div className="py-2 font-sans text-caption text-muted-foreground">
               Strike purchase cost net of premium received.
             </div>
           </div>
@@ -589,10 +589,10 @@ function EventDetailBody({
       {/* ── Basis-allocation note ── */}
       {hasBasisNote && (
         <div className="mt-3.5 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
-          <div className="font-sans text-[12px] font-medium text-foreground">
+          <div className="font-sans text-body font-medium text-foreground">
             Basis allocation
           </div>
-          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground leading-relaxed">
+          <div className="mt-1 font-sans text-caption tabular-nums text-muted-foreground leading-relaxed">
             {event.explanation}
           </div>
         </div>
@@ -601,11 +601,11 @@ function EventDetailBody({
       {/* ── Warnings (if any) ── */}
       {event.warnings.length > 0 && (
         <div className="mt-3.5 space-y-1.5">
-          <div className="font-sans text-[11px] text-muted-foreground">Warnings</div>
+          <div className="font-sans text-caption text-muted-foreground">Warnings</div>
           {event.warnings.map((w, i) => (
             <div
               key={i}
-              className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-[11.5px] text-warn"
+              className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-caption text-warn"
             >
               {w}
             </div>
@@ -696,19 +696,19 @@ function OptionCycleBody({
             <span className="font-sans text-[16px] font-medium text-foreground">
               {lc.underlyingSymbol}
             </span>
-            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-micro font-medium leading-none text-accent">
               {lifecycleStrategyLabel(lc)}
             </span>
-            <span className="inline-flex items-center rounded-full bg-surface-inset px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-muted-foreground">
+            <span className="inline-flex items-center rounded-full bg-surface-inset px-2 py-0.5 font-sans text-micro font-medium leading-none text-muted-foreground">
               {outcomeLabel(lc.status)}
             </span>
             {hasManualTx && (
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+              <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-micro font-medium leading-none text-accent">
                 manual
               </span>
             )}
           </div>
-          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
+          <div className="mt-1 font-sans text-caption tabular-nums text-muted-foreground">
             {contractsNote}
           </div>
         </div>
@@ -726,7 +726,7 @@ function OptionCycleBody({
       {/* ── Hero: total realized + cycle ROI ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
-          <div className="font-sans text-[11px] text-muted-foreground">Total realized</div>
+          <div className="font-sans text-caption text-muted-foreground">Total realized</div>
           <div
             className={cn(
               "font-sans text-[30px] font-medium tabular-nums mt-1",
@@ -737,7 +737,7 @@ function OptionCycleBody({
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-[11px] text-muted-foreground">Cycle ROI</div>
+          <div className="font-sans text-caption text-muted-foreground">Cycle ROI</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -836,7 +836,7 @@ function OptionCycleBody({
           </div>
           {share.basisMissing && (
             <div className="mt-3 rounded-lg border border-warn/25 bg-warn/10 px-3 py-2.5">
-              <div className="font-sans text-[11.5px] text-warn leading-relaxed">
+              <div className="font-sans text-caption text-warn leading-relaxed">
                 Showing strike proceeds only — enter your share purchase to see the
                 true gain/loss.
               </div>
@@ -844,7 +844,7 @@ function OptionCycleBody({
                 <button
                   type="button"
                   onClick={onReviewFix}
-                  className="mt-2 inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-[11.5px] font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  className="mt-2 inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 font-sans text-caption font-medium text-accent transition-colors hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                 >
                   Enter share cost basis →
                 </button>
@@ -871,7 +871,7 @@ function OptionCycleBody({
               topBorder
               value={formatCurrency(share.costBasisTotal, { maximumFractionDigits: 2 })}
             />
-            <div className="py-2 font-sans text-[11px] text-muted-foreground">
+            <div className="py-2 font-sans text-caption text-muted-foreground">
               Strike purchase net of premium received — now held as a stock lot.
             </div>
           </div>
@@ -931,11 +931,11 @@ function OptionCycleBody({
       {/* ── Warnings ── */}
       {lc.warnings.length > 0 && (
         <div className="mt-3.5 space-y-1.5">
-          <div className="font-sans text-[11px] text-muted-foreground">Warnings</div>
+          <div className="font-sans text-caption text-muted-foreground">Warnings</div>
           {lc.warnings.map((w, i) => (
             <div
               key={i}
-              className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-[11.5px] text-warn"
+              className="rounded-lg border border-warn/25 bg-warn/10 px-3 py-2 font-sans text-caption text-warn"
             >
               {w}
             </div>
@@ -970,7 +970,7 @@ function ActivityRow({
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        "flex w-full items-center justify-between gap-3 border-b border-hairline-soft px-1 py-2.5 text-left font-sans text-[13px] transition-colors",
+        "flex w-full items-center justify-between gap-3 border-b border-hairline-soft px-1 py-2.5 text-left font-sans text-strong transition-colors",
         onClick
           ? "hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           : "cursor-default"
@@ -980,12 +980,12 @@ function ActivityRow({
         <span className="flex items-center gap-2">
           <span className="truncate font-medium text-foreground">{title}</span>
           {badge && (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium leading-none text-accent">
+            <span className="inline-flex shrink-0 items-center rounded-full bg-accent/10 px-2 py-0.5 text-micro font-medium leading-none text-accent">
               {badge}
             </span>
           )}
         </span>
-        <span className="mt-0.5 block truncate text-[11px] tabular-nums text-muted-foreground">
+        <span className="mt-0.5 block truncate text-caption tabular-nums text-muted-foreground">
           {subtitle}
         </span>
       </span>
@@ -1051,11 +1051,11 @@ function SymbolDetailBody({
             <span className="font-sans text-[16px] font-medium text-foreground">
               {summary.symbol}
             </span>
-            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-micro font-medium leading-none text-accent">
               {summary.trades} {summary.trades === 1 ? "trade" : "trades"}
             </span>
           </div>
-          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
+          <div className="mt-1 font-sans text-caption tabular-nums text-muted-foreground">
             Realized activity across all strategies
           </div>
         </div>
@@ -1073,7 +1073,7 @@ function SymbolDetailBody({
       {/* ── Hero: Net P&L + ROI ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
-          <div className="font-sans text-[11px] text-muted-foreground">Net P&amp;L</div>
+          <div className="font-sans text-caption text-muted-foreground">Net P&amp;L</div>
           <div
             className={cn(
               "font-sans text-[30px] font-medium tabular-nums mt-1",
@@ -1084,7 +1084,7 @@ function SymbolDetailBody({
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-[11px] text-muted-foreground">Return on capital</div>
+          <div className="font-sans text-caption text-muted-foreground">Return on capital</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -1125,7 +1125,7 @@ function SymbolDetailBody({
 
       {/* ── Capital ROI note ── */}
       <div className="mt-3 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
-        <div className="font-sans text-[11px] tabular-nums text-muted-foreground leading-relaxed">
+        <div className="font-sans text-caption tabular-nums text-muted-foreground leading-relaxed">
           <span className="font-medium text-foreground">Return on capital</span> is P&amp;L
           over the most cash this symbol tied up at once
           {peakCapital > 0 ? ` (${formatCurrency(peakCapital)})` : ""} — recycling the same
@@ -1178,7 +1178,7 @@ function SymbolDetailBody({
       )}
 
       {symbolCycles.length === 0 && standaloneEvents.length === 0 && (
-        <div className="mt-4 rounded-lg border border-hairline bg-surface-inset px-3 py-6 text-center font-sans text-[12px] text-muted-foreground">
+        <div className="mt-4 rounded-lg border border-hairline bg-surface-inset px-3 py-6 text-center font-sans text-body text-muted-foreground">
           No realized activity for this symbol.
         </div>
       )}

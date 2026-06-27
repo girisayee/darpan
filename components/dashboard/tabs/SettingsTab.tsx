@@ -42,11 +42,11 @@ export function SettingsTab({
           }
         />
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-muted-foreground">
+          <span className="font-sans text-caption text-muted-foreground">
             Annual realized P&amp;L goal
           </span>
           <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
-            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">$</span>
+            <span className="font-sans text-body tabular-nums text-muted-foreground">$</span>
             <input
               type="number"
               min="0"
@@ -58,19 +58,19 @@ export function SettingsTab({
                   annualRealizedPnlGoal: Math.max(0, Number(event.target.value) || 0),
                 })
               }
-              className="h-10 w-full bg-transparent px-2 font-sans text-[13px] tabular-nums text-foreground outline-none"
+              className="h-10 w-full bg-transparent px-2 font-sans text-strong tabular-nums text-foreground outline-none"
             />
           </div>
-          <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
+          <span className="font-sans text-caption tabular-nums text-muted-foreground">
             Monthly pace: {formatCurrency(settings.annualRealizedPnlGoal / 12)}
           </span>
         </label>
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-muted-foreground">
+          <span className="font-sans text-caption text-muted-foreground">
             Max buying power
           </span>
           <div className="flex items-center rounded-md border border-hairline bg-surface px-3 focus-within:ring-2 focus-within:ring-accent/40">
-            <span className="font-sans text-[12px] tabular-nums text-muted-foreground">$</span>
+            <span className="font-sans text-body tabular-nums text-muted-foreground">$</span>
             <input
               type="number"
               min="0"
@@ -82,15 +82,15 @@ export function SettingsTab({
                   maxBuyingPower: Math.max(0, Number(event.target.value) || 0),
                 })
               }
-              className="h-10 w-full bg-transparent px-2 font-sans text-[13px] tabular-nums text-foreground outline-none"
+              className="h-10 w-full bg-transparent px-2 font-sans text-strong tabular-nums text-foreground outline-none"
             />
           </div>
-          <span className="font-sans text-[11px] tabular-nums text-muted-foreground">
+          <span className="font-sans text-caption tabular-nums text-muted-foreground">
             Used for buying-power utilization
           </span>
         </label>
         <div className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-muted-foreground">Cost basis method</span>
+          <span className="font-sans text-caption text-muted-foreground">Cost basis method</span>
           <Segmented
             value={settings.costBasisMethod}
             values={["FIFO", "LIFO", "AVERAGE"]}
@@ -102,7 +102,7 @@ export function SettingsTab({
       </SettingsPanel>
       <SettingsPanel title="Capital Calculation">
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-muted-foreground">
+          <span className="font-sans text-caption text-muted-foreground">
             Covered call denominator
           </span>
           <Select
@@ -119,7 +119,7 @@ export function SettingsTab({
           </Select>
         </label>
         <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-muted-foreground">
+          <span className="font-sans text-caption text-muted-foreground">
             Cash-secured put denominator
           </span>
           <Select
@@ -139,12 +139,12 @@ export function SettingsTab({
       <div className="lg:col-span-2">
         <SettingsPanel title="Manual entries">
           {manualTransactions.length === 0 ? (
-            <p className="font-sans text-[12px] text-muted-foreground">
+            <p className="font-sans text-body text-muted-foreground">
               No manually-added transactions yet.
             </p>
           ) : (
             <div className="space-y-2">
-              <p className="font-sans text-[11.5px] text-muted-foreground">
+              <p className="font-sans text-caption text-muted-foreground">
                 {manualTransactions.length} manually-added transaction{manualTransactions.length !== 1 ? "s" : ""}.
               </p>
               {manualTransactions.map((tx) => (
@@ -172,7 +172,7 @@ function SettingsPanel({
 }) {
   return (
     <section className="space-y-4 rounded-xl border border-hairline bg-surface p-4">
-      <h2 className="font-sans text-[13px] font-medium text-foreground">
+      <h2 className="font-sans text-strong font-medium text-foreground">
         {title}
       </h2>
       {children}
@@ -191,7 +191,7 @@ function Toggle({
 }) {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 transition-colors hover:bg-surface-inset">
-      <span className="font-sans text-[12.5px] text-foreground">
+      <span className="font-sans text-body text-foreground">
         {toggleLabel}
       </span>
       <input
@@ -224,7 +224,7 @@ function Segmented({
           type="button"
           onClick={() => onChange(item)}
           className={cn(
-            "rounded px-3 py-2 font-sans text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+            "rounded px-3 py-2 font-sans text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
             value === item
               ? "bg-accent/15 text-accent"
               : "text-muted-foreground hover:text-foreground"
@@ -250,7 +250,7 @@ function Select({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 rounded-md border border-hairline bg-surface px-3 font-sans text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      className="h-10 rounded-md border border-hairline bg-surface px-3 font-sans text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
     >
       {children}
     </select>

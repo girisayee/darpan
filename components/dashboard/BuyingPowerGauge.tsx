@@ -82,7 +82,7 @@ export function BuyingPowerGauge({
             dominantBaseline="central"
             textAnchor="middle"
             className={cn(
-              "font-sans text-[11px] font-semibold tabular-nums",
+              "font-sans text-caption font-semibold tabular-nums",
               valid ? colorClass : "text-muted-foreground"
             )}
             fill="currentColor"
@@ -94,15 +94,15 @@ export function BuyingPowerGauge({
 
       {/* Text */}
       <div className="min-w-0">
-        <div className="font-sans text-[12.5px] font-medium text-muted-foreground">
+        <div className="font-sans text-body font-medium text-muted-foreground">
           Capital deployed
         </div>
-        <div className="mt-0.5 font-sans text-[14px] font-medium tabular-nums text-foreground">
+        <div className="mt-0.5 font-sans text-strong font-medium tabular-nums text-foreground">
           {valid
             ? `${formatCurrency(deployed)} / ${formatCurrency(maxBP!)}`
             : "—"}
         </div>
-        <div className="mt-0.5 font-sans text-[11.5px] text-muted-foreground">
+        <div className="mt-0.5 font-sans text-caption text-muted-foreground">
           of configured max
         </div>
       </div>

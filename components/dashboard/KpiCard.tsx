@@ -34,7 +34,7 @@ export function KpiCard({
 
   const inner = (
     <div className="flex flex-col gap-0.5">
-      <div className="flex items-center gap-1 text-[12.5px] font-medium text-muted-foreground">
+      <div className="flex items-center gap-1 text-body font-medium text-muted-foreground">
         {label}
         <InfoTooltip text={tooltip} label={label} />
       </div>
@@ -47,7 +47,7 @@ export function KpiCard({
         )}
         {value}
       </div>
-      <div className="text-[12px] text-muted-foreground mt-0.5">{helper}</div>
+      <div className="text-body text-muted-foreground mt-0.5">{helper}</div>
     </div>
   );
 

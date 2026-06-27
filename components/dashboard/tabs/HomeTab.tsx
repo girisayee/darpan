@@ -44,19 +44,19 @@ function OpenPositions({
   return (
     <div className="rounded-[14px] border border-hairline bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[13px] font-medium text-foreground">
+        <span className="text-strong font-medium text-foreground">
           Open positions <span className="text-muted-foreground">· {open.length}</span>
         </span>
         <button
           type="button"
           onClick={onViewAll}
-          className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
+          className="text-body font-medium text-muted-foreground hover:text-foreground"
         >
           View all →
         </button>
       </div>
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-muted-foreground">No open positions.</p>
+        <p className="text-body text-muted-foreground">No open positions.</p>
       ) : (
         <div className="flex flex-col">
           {rows.map((r, i) => (
@@ -68,15 +68,15 @@ function OpenPositions({
             >
               <TickerLogo symbol={r.sym} size={24} />
               <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-medium text-foreground">
+                <div className="text-strong font-medium text-foreground">
                   {r.sym} <span className="font-normal text-muted-foreground">{r.detail}</span>
                 </div>
-                <div className="text-[12px]">
+                <div className="text-body">
                   <span className={r.warm ? "text-warn" : "text-muted-foreground"}>{r.tag}</span>
                   <span className="text-muted-foreground"> · {r.when}</span>
                 </div>
               </div>
-              <div className="text-[13px] font-medium tabular-nums">{signedMoney(r.pnl)}</div>
+              <div className="text-strong font-medium tabular-nums">{signedMoney(r.pnl)}</div>
             </button>
           ))}
         </div>
@@ -153,7 +153,7 @@ export function HomeTab({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.9fr)_minmax(280px,1fr)]">
         <div className="rounded-[14px] border border-hairline bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-foreground">Daily P&amp;L · YTD</span>
+            <span className="text-strong font-medium text-foreground">Daily P&amp;L · YTD</span>
           </div>
           <CalendarHeatmap days={days} mode="year" year={year} onSelectDay={setSelectedDay} />
           {days.length > 0 && (
@@ -172,8 +172,8 @@ export function HomeTab({
       {/* ── By-strategy strip ── */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[12.5px] font-medium text-muted-foreground">By strategy · YTD</span>
-          <span className="text-[12px] text-muted-foreground">tap to open →</span>
+          <span className="text-body font-medium text-muted-foreground">By strategy · YTD</span>
+          <span className="text-body text-muted-foreground">tap to open →</span>
         </div>
         <StrategyStrip result={result} onOpen={onOpenStrategy} />
       </div>
