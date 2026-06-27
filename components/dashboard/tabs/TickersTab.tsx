@@ -24,7 +24,7 @@ const columns: Column<SymbolRow>[] = [
     value: (r) => r.symbol,
     render: (r) => (
       <span className="inline-flex items-center gap-2">
-        <TickerLogo symbol={r.symbol} size={18} />
+        <TickerLogo symbol={r.symbol} size={20} />
         <span className="font-medium text-foreground">{r.symbol}</span>
       </span>
     ),

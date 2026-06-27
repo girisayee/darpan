@@ -7,7 +7,7 @@ import { signedMoney, signedPercent } from "@/components/dashboard/tabs/shared";
 function Row({ r }: { r: LeaderboardRow }) {
   return (
     <div className="flex items-center gap-2.5 border-b border-hairline-soft py-2 last:border-0">
-      <TickerLogo symbol={r.symbol} size={22} />
+      <TickerLogo symbol={r.symbol} size={20} />
       <div className="min-w-0 flex-1">
         <div className="text-body font-medium text-foreground">{r.symbol}</div>
         <div className="text-micro text-muted-foreground">

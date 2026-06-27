@@ -66,7 +66,7 @@ function OpenPositions({
               onClick={() => r.lifecycle && onSelect(r.lifecycle)}
               className="flex items-center gap-3 border-b border-hairline-soft py-2.5 text-left last:border-0 hover:bg-accent/[0.04]"
             >
-              <TickerLogo symbol={r.sym} size={24} />
+              <TickerLogo symbol={r.sym} size={20} />
               <div className="min-w-0 flex-1">
                 <div className="text-strong font-medium text-foreground">
                   {r.sym} <span className="font-normal text-muted-foreground">{r.detail}</span>

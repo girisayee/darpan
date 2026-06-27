@@ -243,7 +243,7 @@ export function ClosedTradesTable({
       value: (row) => row.symbol,
       render: (row) => (
         <span className="inline-flex items-center gap-2">
-          <TickerLogo symbol={row.symbol} size={18} />
+          <TickerLogo symbol={row.symbol} size={20} />
           <span className="font-medium text-foreground">{row.symbol}</span>
         </span>
       ),
@@ -430,7 +430,7 @@ export function ClosedCyclesTable({
         return (
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
-              <TickerLogo symbol={row.underlyingSymbol} size={18} />
+              <TickerLogo symbol={row.underlyingSymbol} size={20} />
               <span className="font-bold text-foreground">{row.underlyingSymbol}</span>
               {isManual && (
                 <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-sans text-micro font-medium leading-none text-accent">
