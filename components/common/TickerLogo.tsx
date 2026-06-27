@@ -3,18 +3,11 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
-/** Deterministic, readable initials color for the monogram fallback (on a white tile). */
-function monogramColor(symbol: string): string {
-  let h = 0;
-  for (let i = 0; i < symbol.length; i += 1) h = (h * 31 + symbol.charCodeAt(i)) % 360;
-  return `hsl(${h} 55% 38%)`;
-}
-
 /**
- * Ticker logo rendered as a rounded-square tile with a fail-soft initials fallback.
- * Tries a keyless logo CDN; on any load error (missing / small / foreign tickers, or
- * CDN unavailable) it shows the same-shaped tile with colored initials instead — so
- * logos and fallbacks share one consistent app-icon look without a network guarantee.
+ * Ticker logo rendered directly on the surface (no tile/background). Tries a keyless
+ * logo CDN; on any load error (missing / small / foreign tickers, or CDN unavailable)
+ * it falls back to muted initials in the same footprint — so it always renders something
+ * clean without a network guarantee.
  */
 export function TickerLogo({
   symbol,
@@ -27,14 +20,12 @@ export function TickerLogo({
 }) {
   const [failed, setFailed] = useState(false);
   const sym = (symbol ?? "").trim().toUpperCase();
-  const radius = Math.max(4, Math.round(size * 0.22));
-  const pad = Math.max(1, Math.round(size * 0.14));
 
   if (!sym) {
     return (
       <span
-        className={cn("inline-flex shrink-0 border border-hairline bg-surface-inset", className)}
-        style={{ width: size, height: size, borderRadius: radius }}
+        className={cn("inline-block shrink-0", className)}
+        style={{ width: size, height: size }}
         aria-hidden="true"
       />
     );
@@ -44,10 +35,10 @@ export function TickerLogo({
     return (
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center border border-black/10 bg-white font-sans font-semibold leading-none",
+          "inline-flex shrink-0 items-center justify-center font-sans font-semibold leading-none text-muted-foreground",
           className
         )}
-        style={{ width: size, height: size, borderRadius: radius, fontSize: size * 0.4, color: monogramColor(sym) }}
+        style={{ width: size, height: size, fontSize: size * 0.42 }}
         aria-hidden="true"
         title={sym}
       >
@@ -57,22 +48,14 @@ export function TickerLogo({
   }
 
   return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center overflow-hidden border border-black/10 bg-white",
-        className
-      )}
-      style={{ width: size, height: size, borderRadius: radius }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- external logo CDN with onError fallback; next/image isn't suitable for arbitrary unverified remote hosts */}
-      <img
-        src={`https://assets.parqet.com/logos/symbol/${encodeURIComponent(sym)}?format=png&size=64`}
-        alt=""
-        loading="lazy"
-        onError={() => setFailed(true)}
-        className="h-full w-full object-contain"
-        style={{ padding: pad }}
-      />
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element -- external logo CDN with onError fallback; next/image isn't suitable for arbitrary unverified remote hosts
+    <img
+      src={`https://assets.parqet.com/logos/symbol/${encodeURIComponent(sym)}?format=png&size=64`}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className={cn("shrink-0 rounded-[4px] object-contain", className)}
+      style={{ width: size, height: size }}
+    />
   );
 }
