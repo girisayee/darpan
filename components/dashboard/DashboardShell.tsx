@@ -185,6 +185,12 @@ export function DashboardShell({
   function deleteTransaction(id: string) {
     void saveStore({ transactions: storedTransactions.filter((t) => t.id !== id) });
   }
+  function assignAccount(transactionIds: string[], accountId: string) {
+    const idSet = new Set(transactionIds);
+    void saveStore({
+      transactions: storedTransactions.map((t) => (idSet.has(t.id) ? { ...t, accountId } : t)),
+    });
+  }
 
   const activeTab = pathToTab(pathname);
 
@@ -277,6 +283,8 @@ export function DashboardShell({
           setSelectedSymbol(null);
           setReviewFixOpen(true);
         }}
+        accounts={accountList}
+        onAssignAccount={assignAccount}
       />
 
       <ReviewFixPanel

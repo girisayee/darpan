@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
+import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
 import { peakCapitalRoi, peakConcurrentCapital } from "@/lib/selectors/symbol-capital";
 import { TickerLogo } from "@/components/common/TickerLogo";
@@ -139,6 +139,8 @@ export function DetailDrawer({
   onReviewFix,
   onSelectEvent,
   onSelectLifecycle,
+  accounts = [],
+  onAssignAccount,
 }: {
   event?: RealizedPnLEvent | null;
   lifecycle?: OptionLifecycle | null;
@@ -154,6 +156,8 @@ export function DetailDrawer({
   onReviewFix?: () => void;
   onSelectEvent?: (e: RealizedPnLEvent) => void;
   onSelectLifecycle?: (l: OptionLifecycle) => void;
+  accounts?: TradingAccount[];
+  onAssignAccount?: (transactionIds: string[], accountId: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -239,6 +243,10 @@ export function DetailDrawer({
   // A drill-in view (event/lifecycle on top of a symbol) shows a back arrow.
   const backHandler = symbol && (event || lifecycle) ? onBack : undefined;
 
+  // Account editing applies to the transactions behind the open event/lifecycle.
+  const activeTxIds = lifecycle ? lifecycle.linkedTransactionIds : event ? event.linkedTransactionIds : [];
+  const currentAccountId = transactions.find((t) => activeTxIds.includes(t.id))?.accountId ?? "";
+
   return (
     /* Backdrop scrim */
     <div
@@ -289,6 +297,23 @@ export function DetailDrawer({
               onSelectLifecycle={onSelectLifecycle}
               closeButtonRef={closeButtonRef}
             />
+          )}
+
+          {(event || lifecycle) && accounts.length > 0 && onAssignAccount && activeTxIds.length > 0 && (
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-hairline pt-4">
+              <span className="text-caption text-muted-foreground">Account</span>
+              <select
+                value={currentAccountId}
+                onChange={(e) => onAssignAccount(activeTxIds, e.target.value)}
+                className="rounded-md border border-hairline bg-surface px-2 py-1 text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
       </aside>
