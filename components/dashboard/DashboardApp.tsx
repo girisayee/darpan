@@ -6,7 +6,7 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { DetailDrawer } from "@/components/dashboard/DetailDrawer";
+import { DetailDrawer, type SymbolSummary } from "@/components/dashboard/DetailDrawer";
 import { ReviewFixPanel } from "@/components/dashboard/ReviewFixPanel";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { HomeTab } from "@/components/dashboard/tabs/HomeTab";
@@ -59,6 +59,7 @@ export function DashboardApp() {
   const [year, setYear] = useState("2026");
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
   const [selectedLifecycle, setSelectedLifecycle] = useState<OptionLifecycle | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<SymbolSummary | null>(null);
   const [reviewFixOpen, setReviewFixOpen] = useState(false);
   const [positionsInitialStrategy, setPositionsInitialStrategy] = useState<import("@/lib/selectors/strategy-analytics").StrategyKey | undefined>(undefined);
 
@@ -180,7 +181,7 @@ export function DashboardApp() {
           <PerformanceTab result={result} settings={settings} />
         )}
         {activeTab === "Tickers" && (
-          <TickersTab result={result} />
+          <TickersTab result={result} onSelectSymbol={setSelectedSymbol} />
         )}
         {activeTab === "Positions" && (
           <PositionsTab
@@ -212,16 +213,27 @@ export function DashboardApp() {
       <DetailDrawer
         event={selectedEvent}
         lifecycle={selectedLifecycle}
+        symbol={selectedSymbol}
         onClose={() => {
+          setSelectedEvent(null);
+          setSelectedLifecycle(null);
+          setSelectedSymbol(null);
+        }}
+        onBack={() => {
           setSelectedEvent(null);
           setSelectedLifecycle(null);
         }}
         transactions={result.transactions}
         events={result.realizedEvents}
+        optionLifecycles={result.optionLifecycles}
         taxLots={result.taxLots}
+        capitalUsage={result.capitalUsage}
+        onSelectEvent={setSelectedEvent}
+        onSelectLifecycle={setSelectedLifecycle}
         onReviewFix={() => {
           setSelectedEvent(null);
           setSelectedLifecycle(null);
+          setSelectedSymbol(null);
           setReviewFixOpen(true);
         }}
       />

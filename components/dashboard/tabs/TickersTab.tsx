@@ -4,11 +4,15 @@ import { LeaderboardPanels } from "@/components/dashboard/Leaderboard";
 import { Column, DataTable } from "@/components/tables/DataTable";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { leaderboard } from "@/lib/selectors/leaderboard";
+import { peakCapitalRoi } from "@/lib/selectors/symbol-capital";
 import { signedMoney, signedPercent } from "@/components/dashboard/tabs/shared";
 import { formatPercent } from "@/lib/utils/format";
 import type { CalculationResult } from "@/types/trading";
 
-type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number];
+type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number] & {
+  /** Return on the most capital this symbol tied up at once — never sums recycled collateral. */
+  returnOnCapital: number | null;
+};
 
 const columns: Column<SymbolRow>[] = [
   {
@@ -31,13 +35,18 @@ const columns: Column<SymbolRow>[] = [
     tooltip: "Total realized P&L across this symbol's closed events.",
   },
   {
-    key: "roiPercent",
-    header: "ROI %",
-    value: (r) => r.roiPercent ?? -Infinity,
+    key: "returnOnCapital",
+    header: "Return on capital",
+    value: (r) => r.returnOnCapital ?? -Infinity,
     render: (r) =>
-      r.roiPercent == null ? <span className="opacity-50">—</span> : signedPercent(r.roiPercent),
+      r.returnOnCapital == null ? (
+        <span className="opacity-50">—</span>
+      ) : (
+        signedPercent(r.returnOnCapital)
+      ),
     align: "right",
-    tooltip: "Realized P&L ÷ capital deployed for this symbol.",
+    tooltip:
+      "Realized P&L ÷ the most capital this symbol tied up at once. Recycling the same collateral across cycles doesn't inflate the denominator. Open a row to see turnover-based ROI.",
   },
   {
     key: "trades",
@@ -58,19 +67,30 @@ const columns: Column<SymbolRow>[] = [
   },
 ];
 
-export function TickersTab({ result }: { result: CalculationResult }) {
+export function TickersTab({
+  result,
+  onSelectSymbol,
+}: {
+  result: CalculationResult;
+  onSelectSymbol: (row: SymbolRow) => void;
+}) {
   const data = leaderboard(result);
+  const rows: SymbolRow[] = result.aggregates.symbolBreakdown.map((r) => ({
+    ...r,
+    returnOnCapital: peakCapitalRoi(result.capitalUsage, r.symbol, r.pnl),
+  }));
   return (
     <div className="space-y-5 py-2">
       <LeaderboardPanels data={data} />
       <DataTable
-        rows={result.aggregates.symbolBreakdown}
+        rows={rows}
         columns={columns}
         empty="No symbol data yet."
         defaultSort={{ key: "pnl", direction: "desc" }}
         searchable
         searchPlaceholder="Filter symbols…"
         pageSize={25}
+        onRowClick={onSelectSymbol}
       />
     </div>
   );

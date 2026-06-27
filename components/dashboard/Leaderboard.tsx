@@ -16,7 +16,7 @@ function Row({ r }: { r: LeaderboardRow }) {
       </div>
       <div className="text-right">
         <div className="text-[12px] font-medium tabular-nums">{signedMoney(r.pnl)}</div>
-        <div className="text-[10px] tabular-nums">{signedPercent(r.roiPercent)}</div>
+        <div className="text-[10px] tabular-nums">{signedPercent(r.peakRoiPercent)}</div>
       </div>
     </div>
   );

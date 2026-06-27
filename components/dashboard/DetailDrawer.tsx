@@ -1,12 +1,16 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
+import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
+import { peakCapitalRoi, peakConcurrentCapital } from "@/lib/selectors/symbol-capital";
 import { TickerLogo } from "@/components/common/TickerLogo";
+
+/** Summary row for a single symbol, as produced by the calculation engine. */
+export type SymbolSummary = CalculationResult["aggregates"]["symbolBreakdown"][number];
 
 // ---------- helpers ----------
 
@@ -124,26 +128,39 @@ function MetaCell({ label, value, valueClass }: { label: string; value: React.Re
 export function DetailDrawer({
   event,
   lifecycle,
+  symbol,
   onClose,
+  onBack,
   transactions,
   events = [],
+  optionLifecycles = [],
   taxLots = [],
+  capitalUsage = [],
   onReviewFix,
+  onSelectEvent,
+  onSelectLifecycle,
 }: {
   event?: RealizedPnLEvent | null;
   lifecycle?: OptionLifecycle | null;
+  symbol?: SymbolSummary | null;
   onClose: () => void;
+  /** When present, the active event/lifecycle view shows a back arrow that returns to the symbol view. */
+  onBack?: () => void;
   transactions: TradeTransaction[];
   events?: RealizedPnLEvent[];
+  optionLifecycles?: OptionLifecycle[];
   taxLots?: TaxLot[];
+  capitalUsage?: CapitalUsage[];
   onReviewFix?: () => void;
+  onSelectEvent?: (e: RealizedPnLEvent) => void;
+  onSelectLifecycle?: (l: OptionLifecycle) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
 
-  // The drawer is open when either an event (stock/swing) or a lifecycle (option) is set.
-  const open = !!event || !!lifecycle;
+  // The drawer is open when an event (stock/swing), a lifecycle (option), or a symbol is set.
+  const open = !!event || !!lifecycle || !!symbol;
 
   // Capture the element that had focus before the drawer opened
   useEffect(() => {
@@ -215,7 +232,12 @@ export function DetailDrawer({
 
   const ariaLabel = lifecycle
     ? `${lifecycle.underlyingSymbol} option cycle detail`
-    : `${event!.symbol} realized P&L detail`;
+    : event
+      ? `${event.symbol} realized P&L detail`
+      : `${symbol!.symbol} activity detail`;
+
+  // A drill-in view (event/lifecycle on top of a symbol) shows a back arrow.
+  const backHandler = symbol && (event || lifecycle) ? onBack : undefined;
 
   return (
     /* Backdrop scrim */
@@ -242,16 +264,29 @@ export function DetailDrawer({
               events={events}
               taxLots={taxLots}
               onClose={onClose}
+              onBack={backHandler}
               onReviewFix={onReviewFix}
               closeButtonRef={closeButtonRef}
             />
-          ) : (
+          ) : event ? (
             <EventDetailBody
-              event={event!}
+              event={event}
               transactions={transactions}
               events={events}
               taxLots={taxLots}
               onClose={onClose}
+              onBack={backHandler}
+              closeButtonRef={closeButtonRef}
+            />
+          ) : (
+            <SymbolDetailBody
+              summary={symbol!}
+              events={events}
+              optionLifecycles={optionLifecycles}
+              capitalUsage={capitalUsage}
+              onClose={onClose}
+              onSelectEvent={onSelectEvent}
+              onSelectLifecycle={onSelectLifecycle}
               closeButtonRef={closeButtonRef}
             />
           )}
@@ -282,6 +317,7 @@ function EventDetailBody({
   events,
   taxLots,
   onClose,
+  onBack,
   closeButtonRef,
 }: {
   event: RealizedPnLEvent;
@@ -289,6 +325,7 @@ function EventDetailBody({
   events: RealizedPnLEvent[];
   taxLots: TaxLot[];
   onClose: () => void;
+  onBack?: () => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   // Derived values — null-safe throughout
@@ -331,6 +368,16 @@ function EventDetailBody({
       <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
         <div>
           <div className="flex items-center gap-2">
+            {onBack && (
+              <button
+                type="button"
+                aria-label="Back to symbol"
+                onClick={onBack}
+                className="-ml-1 rounded-lg p-1 text-muted-foreground transition hover:bg-surface-inset hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            )}
             <TickerLogo symbol={event.symbol} size={24} />
             <span className="font-sans text-[16px] font-medium text-foreground">
               {event.symbol}
@@ -577,6 +624,7 @@ function OptionCycleBody({
   events,
   taxLots,
   onClose,
+  onBack,
   onReviewFix,
   closeButtonRef,
 }: {
@@ -585,6 +633,7 @@ function OptionCycleBody({
   events: RealizedPnLEvent[];
   taxLots: TaxLot[];
   onClose: () => void;
+  onBack?: () => void;
   onReviewFix?: () => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
 }) {
@@ -633,6 +682,16 @@ function OptionCycleBody({
       <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
+            {onBack && (
+              <button
+                type="button"
+                aria-label="Back to symbol"
+                onClick={onBack}
+                className="-ml-1 rounded-lg p-1 text-muted-foreground transition hover:bg-surface-inset hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            )}
             <TickerLogo symbol={lc.underlyingSymbol} size={24} />
             <span className="font-sans text-[16px] font-medium text-foreground">
               {lc.underlyingSymbol}
@@ -886,3 +945,244 @@ function OptionCycleBody({
     </>
   );
 }
+
+// ---------- SymbolDetailBody (per-ticker activity list) ----------
+
+/** A clickable activity row inside the symbol drawer. */
+function ActivityRow({
+  onClick,
+  title,
+  subtitle,
+  badge,
+  amount,
+  amountClass,
+}: {
+  onClick?: () => void;
+  title: string;
+  subtitle: string;
+  badge?: string;
+  amount: React.ReactNode;
+  amountClass?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        "flex w-full items-center justify-between gap-3 border-b border-hairline-soft px-1 py-2.5 text-left font-sans text-[13px] transition-colors",
+        onClick
+          ? "hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          : "cursor-default"
+      )}
+    >
+      <span className="min-w-0">
+        <span className="flex items-center gap-2">
+          <span className="truncate font-medium text-foreground">{title}</span>
+          {badge && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium leading-none text-accent">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] tabular-nums text-muted-foreground">
+          {subtitle}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1">
+        <span className={cn("tabular-nums font-medium", amountClass ?? "text-foreground")}>
+          {amount}
+        </span>
+        {onClick && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+      </span>
+    </button>
+  );
+}
+
+function SymbolDetailBody({
+  summary,
+  events,
+  optionLifecycles,
+  capitalUsage,
+  onClose,
+  onSelectEvent,
+  onSelectLifecycle,
+  closeButtonRef,
+}: {
+  summary: SymbolSummary;
+  events: RealizedPnLEvent[];
+  optionLifecycles: OptionLifecycle[];
+  capitalUsage: CapitalUsage[];
+  onClose: () => void;
+  onSelectEvent?: (e: RealizedPnLEvent) => void;
+  onSelectLifecycle?: (l: OptionLifecycle) => void;
+  closeButtonRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const symbolEvents = events
+    .filter((e) => e.symbol === summary.symbol)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  const symbolCycles = optionLifecycles
+    .filter((l) => l.underlyingSymbol === summary.symbol)
+    .sort((a, b) => {
+      const aEnd = a.closeDate ?? a.expirationDate;
+      const bEnd = b.closeDate ?? b.expirationDate;
+      return aEnd < bEnd ? 1 : -1;
+    });
+
+  // Option cycles already account for premium + assignment legs, so realized
+  // events linked to those same transactions would double-list the trade.
+  // Keep only events that aren't part of any of this symbol's cycles.
+  const cycleTxIds = new Set(symbolCycles.flatMap((l) => l.linkedTransactionIds));
+  const standaloneEvents = symbolEvents.filter(
+    (e) => !e.linkedTransactionIds.some((id) => cycleTxIds.has(id))
+  );
+
+  const avgPnl = summary.trades > 0 ? summary.pnl / summary.trades : null;
+  const peakRoi = peakCapitalRoi(capitalUsage, summary.symbol, summary.pnl);
+  const peakCapital = peakConcurrentCapital(capitalUsage, summary.symbol);
+
+  return (
+    <>
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-3 border-b border-hairline pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <TickerLogo symbol={summary.symbol} size={24} />
+            <span className="font-sans text-[16px] font-medium text-foreground">
+              {summary.symbol}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-medium leading-none text-accent">
+              {summary.trades} {summary.trades === 1 ? "trade" : "trades"}
+            </span>
+          </div>
+          <div className="mt-1 font-sans text-[11px] tabular-nums text-muted-foreground">
+            Realized activity across all strategies
+          </div>
+        </div>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="rounded-lg border border-hairline p-2 text-muted-foreground transition hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* ── Hero: Net P&L + ROI ── */}
+      <div className="flex items-baseline gap-3 mt-4 mb-2">
+        <div>
+          <div className="font-sans text-[11px] text-muted-foreground">Net P&amp;L</div>
+          <div
+            className={cn(
+              "font-sans text-[30px] font-medium tabular-nums mt-1",
+              toneClass(summary.pnl)
+            )}
+          >
+            {signedCurrency(summary.pnl)}
+          </div>
+        </div>
+        <div className="ml-auto text-right">
+          <div className="font-sans text-[11px] text-muted-foreground">Return on capital</div>
+          <div
+            className={cn(
+              "font-sans text-[18px] font-medium tabular-nums mt-1",
+              toneClass(peakRoi)
+            )}
+          >
+            {signedPercentText(peakRoi)}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Meta grid ── */}
+      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+        <MetaCell label="Trades" value={formatNumber(summary.trades)} />
+        <MetaCell
+          label="Win rate"
+          value={summary.winRate != null ? formatPercent(summary.winRate, 0) : "N/A"}
+        />
+        <MetaCell
+          label="Avg P&L / trade"
+          value={avgPnl != null ? signedCurrency(avgPnl) : "N/A"}
+          valueClass={avgPnl != null ? toneClass(avgPnl) : undefined}
+        />
+        <MetaCell
+          label="Capital deployed"
+          value={peakCapital > 0 ? formatCurrency(peakCapital) : "—"}
+        />
+        <MetaCell
+          label="Capital cycled"
+          value={summary.capital > 0 ? formatCurrency(summary.capital) : "—"}
+        />
+        <MetaCell
+          label="Turnover ROI"
+          value={signedPercentText(summary.roiPercent)}
+          valueClass={toneClass(summary.roiPercent)}
+        />
+      </div>
+
+      {/* ── Capital ROI note ── */}
+      <div className="mt-3 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
+        <div className="font-sans text-[11px] tabular-nums text-muted-foreground leading-relaxed">
+          <span className="font-medium text-foreground">Return on capital</span> is P&amp;L
+          over the most cash this symbol tied up at once
+          {peakCapital > 0 ? ` (${formatCurrency(peakCapital)})` : ""} — recycling the same
+          collateral across cycles doesn&apos;t inflate it.{" "}
+          <span className="font-medium text-foreground">Turnover ROI</span> divides by capital
+          summed across every closed cycle, so it reads lower the more you reuse collateral.
+        </div>
+      </div>
+
+      {/* ── Option cycles ── */}
+      {symbolCycles.length > 0 && (
+        <>
+          <SectionLabel>Option cycles</SectionLabel>
+          <div className="mt-1.5">
+            {symbolCycles.map((lc) => {
+              const total = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
+              return (
+                <ActivityRow
+                  key={lc.id}
+                  onClick={onSelectLifecycle ? () => onSelectLifecycle(lc) : undefined}
+                  title={lifecycleStrategyLabel(lc)}
+                  badge={outcomeLabel(lc.status)}
+                  subtitle={`${formatDisplayDate(lc.openDate)} → ${formatDisplayDate(lc.closeDate ?? lc.expirationDate)}`}
+                  amount={signedCurrency(total)}
+                  amountClass={toneClass(total)}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ── Stock trades (events not already part of an option cycle) ── */}
+      {standaloneEvents.length > 0 && (
+        <>
+          <SectionLabel>Stock trades</SectionLabel>
+          <div className="mt-1.5">
+            {standaloneEvents.map((ev) => (
+              <ActivityRow
+                key={ev.id}
+                onClick={onSelectEvent ? () => onSelectEvent(ev) : undefined}
+                title={strategyLabel(ev.strategy)}
+                subtitle={`Closed ${formatDisplayDate(ev.date)}${ev.quantity ? ` · ${formatNumber(ev.quantity)} sh` : ""}`}
+                amount={signedCurrency(ev.realizedPnl)}
+                amountClass={toneClass(ev.realizedPnl)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {symbolCycles.length === 0 && standaloneEvents.length === 0 && (
+        <div className="mt-4 rounded-lg border border-hairline bg-surface-inset px-3 py-6 text-center font-sans text-[12px] text-muted-foreground">
+          No realized activity for this symbol.
+        </div>
+      )}
+    </>
+  );
+}
+
