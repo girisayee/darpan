@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { strategyAnalytics } from "@/lib/selectors/strategy-analytics";
-import type { CalculationResult, RealizedPnLEvent } from "@/types/trading";
+import { optionsAnalytics, strategyAnalytics } from "@/lib/selectors/strategy-analytics";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 
 function ev(strategy: string, realizedPnl: number): RealizedPnLEvent {
   return {
@@ -10,8 +10,15 @@ function ev(strategy: string, realizedPnl: number): RealizedPnLEvent {
     annualizedRoiPercent: null, holdingDays: null, linkedTransactionIds: [], explanation: "", warnings: [],
   };
 }
-function res(events: RealizedPnLEvent[]): CalculationResult {
-  return { realizedEvents: events, optionLifecycles: [], taxLots: [] } as unknown as CalculationResult;
+function lc(partial: Partial<OptionLifecycle>): OptionLifecycle {
+  return {
+    strategy: "UNKNOWN", status: "closed", optionType: "call", direction: "short",
+    premiumReceived: 0, netOptionPnl: 0, capitalDeployed: null, strikePrice: 0, sharesControlled: 0,
+    ...partial,
+  } as unknown as OptionLifecycle;
+}
+function res(events: RealizedPnLEvent[], lifecycles: OptionLifecycle[] = []): CalculationResult {
+  return { realizedEvents: events, optionLifecycles: lifecycles, taxLots: [] } as unknown as CalculationResult;
 }
 
 describe("strategyAnalytics", () => {
@@ -25,5 +32,51 @@ describe("strategyAnalytics", () => {
     const out = strategyAnalytics(res([ev("CASH_SECURED_PUT", 50), ev("PUT_ASSIGNMENT", -20)]), "csp");
     expect(out.pnl).toBe(30);
     expect(out.quality.totalTrades).toBe(2);
+  });
+});
+
+describe("optionsAnalytics", () => {
+  it("aggregates realized P&L across CSP + CC + long, excluding swing", () => {
+    const result = res([
+      ev("CASH_SECURED_PUT", 150),
+      ev("COVERED_CALL", 300),
+      ev("LONG_OPTION", 200),
+      ev("SWING_TRADE", 250),
+    ]);
+    expect(optionsAnalytics(result).pnl).toBe(650);
+    expect(strategyAnalytics(result, "swing").pnl).toBe(250);
+  });
+
+  it("counts only option trades and includes assignment sub-strategies", () => {
+    const a = optionsAnalytics(res([
+      ev("CASH_SECURED_PUT", 150),
+      ev("PUT_ASSIGNMENT", -20),
+      ev("COVERED_CALL", 300),
+      ev("LONG_OPTION", 200),
+      ev("SWING_TRADE", 250),
+    ]));
+    expect(a.quality.totalTrades).toBe(4);
+  });
+
+  it("reports premium collected from short (CSP + CC) lifecycles only", () => {
+    const a = optionsAnalytics(res([], [
+      lc({ strategy: "CASH_SECURED_PUT", premiumReceived: 150 }),
+      lc({ strategy: "COVERED_CALL", premiumReceived: 300 }),
+      lc({ strategy: "UNKNOWN", direction: "long", premiumReceived: 0 }),
+    ]));
+    expect(a.premium).not.toBeNull();
+    expect(a.premium?.premiumCollected).toBe(450);
+  });
+
+  it("sums capital at risk across only OPEN option lifecycles", () => {
+    const a = optionsAnalytics(res([], [
+      lc({ status: "open", capitalDeployed: 5000 }),
+      lc({ status: "closed", capitalDeployed: 9999 }),
+    ]));
+    expect(a.capitalAtRisk).toBe(5000);
+  });
+
+  it("tags the aggregate with key 'options'", () => {
+    expect(optionsAnalytics(res([])).key).toBe("options");
   });
 });

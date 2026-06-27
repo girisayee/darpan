@@ -1,5 +1,5 @@
 "use client";
-import type { StrategyAnalytics } from "@/lib/selectors/strategy-analytics";
+import type { OptionsAggregateAnalytics, StrategyAnalytics } from "@/lib/selectors/strategy-analytics";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
@@ -27,7 +27,7 @@ const pctFrac = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100
 const sign = (v: number | null | undefined): Tone =>
   v == null ? "neutral" : v > 0 ? "pos" : v < 0 ? "neg" : "neutral";
 
-export function StrategyMetrics({ a }: { a: StrategyAnalytics }) {
+export function StrategyMetrics({ a }: { a: StrategyAnalytics | OptionsAggregateAnalytics }) {
   const q = a.quality;
   const cells: { label: string; value: string; tone?: Tone }[] = [
     { label: "Realized P&L", value: formatCurrency(a.pnl), tone: sign(a.pnl) },
@@ -38,7 +38,19 @@ export function StrategyMetrics({ a }: { a: StrategyAnalytics }) {
       tone: sign(q.expectancy),
     },
   ];
-  if (a.premium && (a.key === "csp" || a.key === "cc")) {
+  if (a.key === "options") {
+    // Aggregate "All options" view: per-strategy capture/assignment rates would be meaningless
+    // blended, so show the strategy-agnostic set instead.
+    cells.push(
+      {
+        label: "Premium collected",
+        value: a.premium ? formatCurrency(a.premium.premiumCollected) : "—",
+        tone: sign(a.premium?.premiumCollected),
+      },
+      { label: "Capital at risk", value: formatCurrency(a.capitalAtRisk) },
+      { label: "Trades", value: String(q.totalTrades) }
+    );
+  } else if (a.premium && (a.key === "csp" || a.key === "cc")) {
     const capture =
       a.key === "csp" ? a.premium.captureCashSecuredPut : a.premium.captureCoveredCall;
     cells.push(
