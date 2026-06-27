@@ -4,15 +4,15 @@ Fast-start guide for coding agents and contributors working in this repo.
 
 ## Product snapshot
 
-Darpan is a local-first Next.js dashboard for short-term retail traders. It imports
+Darpan is a hosted, multi-user Next.js dashboard for short-term retail traders. It imports
 Robinhood-style CSV activity, reconstructs realized P&L / option income / capital usage in a
 pure calculation engine, and presents it across four tabs: **Home**, **Performance**,
-**Tickers**, **Positions** (Import and Settings live behind a `⋯` overflow menu).
+**Tickers**, **Positions** (Import and Settings live behind a `⋯` overflow menu). Sign-in is
+Google SSO gated by an email allowlist; all data is isolated per user.
 
-The product, package, UI, and docs name is **Darpan**. A few storage and database keys
-retain older app-name prefixes **only** as one-time data-migration fallbacks (see
-`local-store.ts`, `database.ts`, and the no-flash theme script in `app/layout.tsx`) — never
-reintroduce old branding anywhere else.
+The product, package, UI, and docs name is **Darpan**. The no-flash theme script in
+`app/layout.tsx` keeps the older app-name `localStorage` theme key as a one-time fallback —
+never reintroduce old branding anywhere else.
 
 ## Tech stack
 
@@ -37,8 +37,12 @@ set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env
   `top-movers`, `daily-pnl`, `leaderboard`, `strategy-analytics`, `filter-result`, `analytics`
 - Robinhood CSV parser: `lib/import/robinhood.ts`
 - Benchmarks: `lib/benchmark/{compare,fetch}.ts` (capital-matched SPY/QQQ/VTI)
-- Persistence: SQLite via `lib/db/database.ts`; client bridge `lib/storage/server-store-client.ts`;
-  `lib/storage/local-store.ts` holds `defaultSettings`, backup parsing, and legacy localStorage migration
+- Persistence: Postgres via Drizzle in `lib/db/database.ts` (every helper takes `userId`);
+  schema `lib/db/schema.ts`; client `lib/db/client.ts`; client bridge `lib/storage/server-store-client.ts`;
+  `lib/storage/local-store.ts` holds `defaultSettings` and backup create/parse
+- Auth: `auth.ts` (NextAuth v5, Google provider, Drizzle adapter, JWT sessions);
+  allowlist `lib/auth/allowlist.ts` (`ALLOWED_EMAILS`); route handler `app/api/auth/[...nextauth]/route.ts`;
+  session type augmentation `types/next-auth.d.ts`
 - API routes: `app/api/store/route.ts`, `app/api/import/robinhood/route.ts`, `app/api/benchmark/route.ts`
 - Tests: `tests/**/*.test.ts`
 
@@ -61,8 +65,10 @@ typecheck/lint/build and the running dev server rather than component render tes
 
 - The calculation engine (`lib/calculations/engine.ts`) and the Robinhood importer are the
   domain core — change their math only deliberately, and update/extend tests when you do.
-- Transactions and settings persist in local SQLite through `/api/store`. Do not commit
-  `data/*.sqlite` or user CSVs — they contain personal financial data.
+- Transactions and settings persist in Postgres through `/api/store`, always scoped by
+  `session.user.id`. Every data route must call `auth()` and 401 when unauthenticated —
+  never return or write cross-user rows. Do not commit `.env.local`, `data/*.sqlite`, or user
+  CSVs — they contain secrets / personal financial data.
 - Preserve imported rows unless the user explicitly asks to dedupe; duplicate ids are
   informational warnings (they can be genuinely separate executions).
 - A stock sell with no matching opening buy yields an unresolved `SWING_TRADE` event

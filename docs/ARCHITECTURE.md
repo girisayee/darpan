@@ -1,17 +1,18 @@
 # Architecture
 
-Darpan is a Next.js App Router application with a client-rendered dashboard, local API
-routes, SQLite persistence, and a pure calculation engine. Everything runs and stores
-locally; nothing is sent off-device.
+Darpan is a Next.js App Router application with a client-rendered dashboard, session-gated
+API routes, Postgres persistence (Drizzle ORM), Auth.js Google SSO, and a pure calculation
+engine. It is hosted and multi-user: every request resolves a signed-in user, and all
+trading data is scoped to that user's id.
 
 ## High-level flow
 
 ```text
 Robinhood CSV / pasted rows
   -> lib/import/robinhood.ts            (parse + normalize to TradeTransaction[])
-  -> app/api/import/robinhood/route.ts
-  -> lib/db/database.ts                 (SQLite: data/darpan.sqlite)
-  -> app/api/store/route.ts             (GET/PUT/DELETE)
+  -> app/api/import/robinhood/route.ts  (auth() -> session.user.id)
+  -> lib/db/database.ts                 (Drizzle/Postgres, scoped by userId)
+  -> app/api/store/route.ts             (GET/PUT/DELETE, auth-gated)
   -> lib/storage/server-store-client.ts (client snapshot via useSyncExternalStore)
   -> components/dashboard/DashboardApp.tsx
   -> lib/calculations/engine.ts         (calculateDashboard -> CalculationResult)
@@ -19,33 +20,54 @@ Robinhood CSV / pasted rows
   -> tabs + charts + tables + KPIs
 ```
 
+## Authentication
+
+Auth.js v5 (`next-auth@beta`) is configured in `auth.ts`:
+
+- **Provider:** Google OAuth. `allowDangerousEmailAccountLinking` is enabled so a Google
+  account links to a pre-existing user row with the same email (e.g. one seeded by the
+  SQLite→Postgres migration) — safe for this single-provider, allowlisted, email-verified app.
+- **Adapter:** `@auth/drizzle-adapter` over the `user` / `account` / `session` /
+  `verificationToken` tables in `lib/db/schema.ts`.
+- **Sessions:** JWT strategy (not database sessions) — required for the planned Phase B
+  Credentials provider. The `jwt`/`session` callbacks thread the user id onto
+  `session.user.id` (typed via `types/next-auth.d.ts`).
+- **Allowlist:** the `signIn` callback calls `isAllowedEmail` (`lib/auth/allowlist.ts`),
+  which checks the comma-separated, case-insensitive `ALLOWED_EMAILS` env var and denies
+  everyone when it is unset.
+- **Route handler:** `app/api/auth/[...nextauth]/route.ts`. Sign-in UI: `app/signin/page.tsx`.
+  `app/page.tsx` is a server component that redirects unauthenticated visitors to `/signin`.
+
 ## Persistence
 
-SQLite is accessed in `lib/db/database.ts` via Node's built-in `node:sqlite`
-(`process.getBuiltinModule`). Tables:
+Postgres is accessed in `lib/db/database.ts` through Drizzle ORM (`lib/db/client.ts`,
+postgres-js driver). Every helper (`listDbTransactions`, `replaceDbTransactions`,
+`getDbSettings`, `saveDbSettings`, `clearDbData`) takes `userId` as its first argument and
+filters/writes only that user's rows. Schema in `lib/db/schema.ts`:
 
-- `transactions` — each normalized `TradeTransaction` as a JSON payload plus query metadata.
-- `settings` — a single `app` JSON payload.
+- `transactions` — each normalized `TradeTransaction` as a JSONB `payload` plus query
+  metadata (`userId`, `tradeDate`, `symbol`, `status`, `importBatchId`), indexed by
+  `(userId, tradeDate)`.
+- `settings` — one JSONB `value` row per `userId` (upserted via `onConflictDoUpdate`).
+- `user` / `account` / `session` / `verificationToken` — Auth.js adapter tables.
 
-The database file is `data/darpan.sqlite`. On first use, if it is absent but an
-older-named database file exists, the helper renames it forward — those legacy filenames
-exist purely for that one-time migration.
-
-`lib/storage/local-store.ts` holds `defaultSettings`, backup create/parse, and a localStorage
-migration path (the current key plus older-named legacy keys) used as a fallback. The theme
-preference (`darpan.theme`) is the one thing intentionally kept in `localStorage`, set before
-paint by the no-flash script in `app/layout.tsx`. Trading data itself lives in SQLite.
+`lib/storage/local-store.ts` holds only `defaultSettings` and backup create/parse helpers.
+The theme preference (`darpan.theme`) is the one thing kept in `localStorage`, set before
+paint by the no-flash script in `app/layout.tsx`. All trading data lives in Postgres.
 
 ## API routes
 
+Every data route calls `auth()` and returns `401` when there is no `session.user.id`.
+
 `app/api/store/route.ts`
-- `GET` — returns transactions and settings.
-- `PUT` — replaces transactions and/or settings.
-- `DELETE` — clears transactions and resets settings.
+- `GET` — returns the signed-in user's transactions and settings.
+- `PUT` — replaces the user's transactions and/or settings.
+- `DELETE` — clears the user's transactions and resets settings.
 
 `app/api/import/robinhood/route.ts`
-- `POST` — parses raw CSV text and writes rows to SQLite (`mode: "replace" | "append"`).
-  Duplicate rows are preserved; duplicate ids are returned as warning metadata.
+- `POST` — parses raw CSV text and writes rows for the signed-in user
+  (`mode: "replace" | "append"`). Duplicate rows are preserved; duplicate ids are returned as
+  warning metadata.
 
 `app/api/benchmark/route.ts`
 - Fetches benchmark closes (SPY/QQQ/VTI) for capital-matched comparison; see
@@ -100,5 +122,6 @@ searchable + paginated, per-usage column definitions), `SegmentedControl`, `Cale
 
 ## Types
 
-Domain contracts live in `types/trading.ts`. When changing a type, check the parser, DB
-save/load, the engine, selectors, the tables/charts that consume it, and the backup payload.
+Domain contracts live in `types/trading.ts` (session/user augmentation in
+`types/next-auth.d.ts`). When changing a type, check the parser, DB save/load, the engine,
+selectors, the tables/charts that consume it, and the backup payload.

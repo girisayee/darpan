@@ -2,23 +2,50 @@
 
 **The mirror for your trades.** It doesn't flatter — it reflects.
 
-Darpan is a personal, local-first dashboard for short-term traders who track their own
+Darpan is a hosted, multi-user dashboard for short-term traders who track their own
 performance. It imports your broker activity (Robinhood-style CSV), reconstructs realized
 P&L, option income, and capital usage, and shows it back to you across four focused views:
 **Home**, **Performance**, **Tickers**, and **Positions**.
 
-Darpan does not connect to any broker and sends nothing to the cloud. You import a CSV (or
-paste rows); everything is computed and stored locally.
+Access is invite-only: sign-in is Google SSO restricted to an email allowlist, and every
+trader's data is isolated per account. Darpan does not connect to any broker — you import a
+CSV (or paste rows); everything is computed server-side and stored in your own row-scoped
+Postgres records.
 
 ## Run locally
 
 ```bash
 npm install
+# 1. Start Postgres (docker-compose provisions a local instance)
+docker compose up -d
+# 2. Apply the schema
+npx drizzle-kit push
+# 3. Start the app
 npm run dev
 ```
 
 Open the local URL Next.js prints. The app ships with sample data so the dashboard is
 populated before you import anything; turn it off in Settings once you import your own.
+
+## Configuration
+
+All configuration is via environment variables (see [`.env.example`](.env.example); real
+values live in `.env.local`, which is git-ignored):
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string (postgres-js). |
+| `AUTH_SECRET` | Auth.js session/JWT signing secret. |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google OAuth client credentials. |
+| `ALLOWED_EMAILS` | Comma-separated allowlist of sign-in emails (case-insensitive). |
+| `AUTH_URL` | App origin, e.g. `http://localhost:3000`. |
+| `AUTH_TRUST_HOST` | `true` when running behind a proxy / non-localhost host. |
+
+**Google OAuth setup:** create an OAuth 2.0 Client (Web application) in the Google Cloud
+console, configure the consent screen, and add the redirect URI
+`<host>/api/auth/callback/google` (e.g. `http://localhost:3000/api/auth/callback/google`).
+Put the client id/secret in `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, and list permitted
+sign-in addresses in `ALLOWED_EMAILS`.
 
 ## What it does
 
@@ -54,9 +81,11 @@ ROI is shown as `—` when the capital base is unknown or zero. Annualized ROI i
 
 ## Data & privacy
 
-- Imported transactions and settings persist in a local SQLite file (`data/darpan.sqlite`),
-  read/written only through the app's local API routes.
-- The SQLite file and any CSVs are git-ignored — they contain personal financial data.
+- Imported transactions and settings persist in Postgres, scoped by the signed-in user's id
+  and read/written only through the app's session-gated API routes — no account ever sees
+  another's rows.
+- `.env.local` (Google OAuth secrets, DB credentials) and any CSVs are git-ignored — they
+  contain personal/financial data.
 - Export a JSON backup (transactions + settings) any time from the **⋯** menu or Settings.
 
 ## Documentation
@@ -67,7 +96,7 @@ ROI is shown as `—` when the capital base is unknown or zero. Annualized ROI i
 
 ## Known limitations
 
-- No broker API, cloud sync, or multi-user support.
+- No broker API integration — data comes from imported CSVs only.
 - No live prices, option marks, or Greeks — only realized results from your imported data.
 - No wash-sale handling or tax filing. Verify against official brokerage and tax documents.
 
