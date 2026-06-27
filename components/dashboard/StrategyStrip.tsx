@@ -1,18 +1,12 @@
 "use client";
 import type { CalculationResult } from "@/types/trading";
 import { optionsAnalytics, strategyAnalytics, STRATEGY_EVENT_ENUMS, type StrategyKey } from "@/lib/selectors/strategy-analytics";
+import { strategyReturnOnCapital } from "@/lib/selectors/return-on-capital";
 import { signedMoney } from "@/components/dashboard/tabs/shared";
 import { formatPercent } from "@/lib/utils/format";
 
 /** Where a Home tile navigates: the aggregate Options tab, or the Stock-trades tab. */
 export type StrategyTarget = StrategyKey | "options";
-
-function roiFor(result: CalculationResult, enums: string[]): number | null {
-  const rows = result.aggregates.strategyBreakdown.filter((b) => enums.includes(b.strategy));
-  const capital = rows.reduce((s, b) => s + b.capital, 0);
-  const pnl = rows.reduce((s, b) => s + b.pnl, 0);
-  return capital > 0 ? (pnl / capital) * 100 : null;
-}
 
 /** Running cumulative realized P&L (oldest → newest) for the given strategy enums. */
 function cumulativeSeries(result: CalculationResult, enums: string[]): number[] {
@@ -101,12 +95,13 @@ export function StrategyStrip({
 }) {
   const options = optionsAnalytics(result);
   const swing = strategyAnalytics(result, "swing");
+  const asOf = new Date().toISOString().slice(0, 10);
   return (
     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
       <Tile
         name="Options"
         pnl={options.pnl}
-        roi={roiFor(result, OPTION_ENUMS)}
+        roi={strategyReturnOnCapital(result.capitalUsage, OPTION_ENUMS, options.pnl, asOf).roc}
         winRate={options.quality.winRate}
         hint="CSP · Covered calls · Long"
         series={cumulativeSeries(result, OPTION_ENUMS)}
@@ -115,7 +110,7 @@ export function StrategyStrip({
       <Tile
         name="Stock trades"
         pnl={swing.pnl}
-        roi={roiFor(result, STRATEGY_EVENT_ENUMS.swing)}
+        roi={strategyReturnOnCapital(result.capitalUsage, STRATEGY_EVENT_ENUMS.swing, swing.pnl, asOf).roc}
         winRate={swing.quality.winRate}
         hint={`${swing.quality.totalTrades} trade${swing.quality.totalTrades === 1 ? "" : "s"}`}
         series={cumulativeSeries(result, STRATEGY_EVENT_ENUMS.swing)}

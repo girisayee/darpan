@@ -88,3 +88,23 @@ export function symbolReturnOnCapital(
   const periodDays = daysInclusive(start, end);
   return build(pnl, dollarDays(rows, start, end), periodDays);
 }
+
+/**
+ * RoC for a set of strategies over their combined active span — same formula and
+ * dollar-days basis as the per-symbol variant, only the filter differs. Used by
+ * the Home strategy tiles (Options aggregate, Stock trades).
+ */
+export function strategyReturnOnCapital(
+  usage: CapitalUsage[],
+  strategies: string[],
+  pnl: number,
+  asOfDate: string,
+): RocResult {
+  const rows = usage.filter((r) => strategies.includes(r.strategy) && r.amount > 0);
+  if (rows.length === 0) return build(pnl, 0, 0);
+  const start = rows.reduce((min, r) => (r.startDate < min ? r.startDate : min), rows[0].startDate);
+  const lastEnd = rows.reduce((max, r) => (r.endDate > max ? r.endDate : max), rows[0].endDate);
+  const end = lastEnd < asOfDate ? lastEnd : asOfDate;
+  const periodDays = daysInclusive(start, end);
+  return build(pnl, dollarDays(rows, start, end), periodDays);
+}
