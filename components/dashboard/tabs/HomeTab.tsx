@@ -5,7 +5,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { BuyingPowerGauge } from "@/components/dashboard/BuyingPowerGauge";
 import { CalendarHeatmap } from "@/components/dashboard/CalendarHeatmap";
 import { DayDetail } from "@/components/dashboard/DayDetail";
-import { StrategyStrip } from "@/components/dashboard/StrategyStrip";
+import { StrategyStrip, type StrategyTarget } from "@/components/dashboard/StrategyStrip";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { signedMoney, currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
 import { dailyPnl } from "@/lib/selectors/daily-pnl";
@@ -14,7 +14,6 @@ import { toAllPositionRows } from "@/components/dashboard/positions/columns";
 import { formatCurrency, formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
-import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
 
 function MetricCard(props: {
   label: string;
@@ -98,7 +97,7 @@ export function HomeTab({
   result: CalculationResult;
   settings: AppSettings;
   year?: string;
-  onOpenStrategy: (k: StrategyKey) => void;
+  onOpenStrategy: (k: StrategyTarget) => void;
   onOpenPositions: () => void;
   onSelectEvent: (e: RealizedPnLEvent) => void;
   onSelectLifecycle: (l: OptionLifecycle) => void;

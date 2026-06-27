@@ -1,74 +1,83 @@
 "use client";
 import type { CalculationResult } from "@/types/trading";
-import { strategyAnalytics, STRATEGY_EVENT_ENUMS, type StrategyKey } from "@/lib/selectors/strategy-analytics";
+import { optionsAnalytics, strategyAnalytics, STRATEGY_EVENT_ENUMS, type StrategyKey } from "@/lib/selectors/strategy-analytics";
 import { signedMoney } from "@/components/dashboard/tabs/shared";
 import { formatPercent } from "@/lib/utils/format";
 
-const LABELS: Record<StrategyKey, string> = {
-  csp: "Cash-secured puts",
-  cc: "Covered calls",
-  long: "Long options",
-  swing: "Stock trades",
-};
+/** Where a Home tile navigates: the aggregate Options tab, or the Stock-trades tab. */
+export type StrategyTarget = StrategyKey | "options";
 
-function strategyRoi(result: CalculationResult, key: StrategyKey): number | null {
-  const enums = STRATEGY_EVENT_ENUMS[key];
+function roiFor(result: CalculationResult, enums: string[]): number | null {
   const rows = result.aggregates.strategyBreakdown.filter((b) => enums.includes(b.strategy));
   const capital = rows.reduce((s, b) => s + b.capital, 0);
   const pnl = rows.reduce((s, b) => s + b.pnl, 0);
   return capital > 0 ? (pnl / capital) * 100 : null;
 }
 
-function StrategyTile({
-  result,
-  k,
-  onOpen,
+function Tile({
+  name,
+  pnl,
+  roi,
+  winRate,
+  hint,
+  onClick,
 }: {
-  result: CalculationResult;
-  k: StrategyKey;
-  onOpen: (k: StrategyKey) => void;
+  name: string;
+  pnl: number;
+  roi: number | null;
+  winRate: number | null;
+  hint: string;
+  onClick: () => void;
 }) {
-  const a = strategyAnalytics(result, k);
-  const roi = strategyRoi(result, k);
   return (
     <button
       type="button"
-      onClick={() => onOpen(k)}
-      className="rounded-[10px] border border-hairline bg-surface p-3 text-left hover:border-accent"
+      onClick={onClick}
+      className="rounded-[12px] border border-hairline bg-surface p-4 text-left hover:border-accent"
     >
-      <div className="text-[12.5px] font-medium text-muted-foreground">{LABELS[k]}</div>
-      <div className="mt-0.5 text-[19px] font-medium tabular-nums">{signedMoney(a.pnl)}</div>
+      <div className="text-[13px] font-medium text-foreground">{name}</div>
+      <div className="mt-1 text-[24px] font-semibold tabular-nums">{signedMoney(pnl)}</div>
       <div className="mt-0.5 text-[12px] text-muted-foreground">
-        ROI {formatPercent(roi)} · {a.quality.winRate != null ? `${Math.round(a.quality.winRate * 100)}%` : "—"} win
+        ROI {formatPercent(roi)} · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
       </div>
+      <div className="mt-1.5 text-[10.5px] text-dim">{hint}</div>
     </button>
   );
 }
 
-function Group({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      {children}
-    </div>
-  );
-}
+const OPTION_ENUMS = [
+  ...STRATEGY_EVENT_ENUMS.csp,
+  ...STRATEGY_EVENT_ENUMS.cc,
+  ...STRATEGY_EVENT_ENUMS.long,
+];
 
-export function StrategyStrip({ result, onOpen }: { result: CalculationResult; onOpen: (k: StrategyKey) => void }) {
+export function StrategyStrip({
+  result,
+  onOpen,
+}: {
+  result: CalculationResult;
+  onOpen: (target: StrategyTarget) => void;
+}) {
+  const options = optionsAnalytics(result);
+  const swing = strategyAnalytics(result, "swing");
   return (
-    <div className="space-y-3">
-      <Group label="Options">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          {(["csp", "cc", "long"] as StrategyKey[]).map((k) => (
-            <StrategyTile key={k} result={result} k={k} onOpen={onOpen} />
-          ))}
-        </div>
-      </Group>
-      <Group label="Stock trades">
-        <div className="grid grid-cols-1 gap-2.5">
-          <StrategyTile result={result} k="swing" onOpen={onOpen} />
-        </div>
-      </Group>
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <Tile
+        name="Options"
+        pnl={options.pnl}
+        roi={roiFor(result, OPTION_ENUMS)}
+        winRate={options.quality.winRate}
+        hint="CSP · Covered calls · Long"
+        onClick={() => onOpen("options")}
+      />
+      <Tile
+        name="Stock trades"
+        pnl={swing.pnl}
+        roi={roiFor(result, STRATEGY_EVENT_ENUMS.swing)}
+        winRate={swing.quality.winRate}
+        hint={`${swing.quality.totalTrades} trade${swing.quality.totalTrades === 1 ? "" : "s"}`}
+        onClick={() => onOpen("swing")}
+      />
     </div>
   );
 }

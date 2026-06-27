@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import { HomeTab } from "@/components/dashboard/tabs/HomeTab";
 import { useDashboard } from "@/components/dashboard/DashboardShell";
-import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
+import type { StrategyTarget } from "@/components/dashboard/StrategyStrip";
 
-function positionsHref(k: StrategyKey) {
-  return k === "swing" ? "/positions?view=swing" : `/positions?view=options&strategy=${k}`;
+function positionsHref(k: StrategyTarget) {
+  if (k === "swing") return "/positions?view=swing";
+  if (k === "options") return "/positions?view=options";
+  return `/positions?view=options&strategy=${k}`;
 }
 
 export default function HomePage() {
