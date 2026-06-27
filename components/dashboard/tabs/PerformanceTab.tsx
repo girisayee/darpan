@@ -285,16 +285,14 @@ export function PerformanceTab({
         </div>
       )}
 
-      {/* ── Equity curve ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-[13px] font-medium text-foreground">Equity curve</h2>
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
+      {/* ── Equity curve + market comparison (side by side on large screens) ── */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
+          <h2 className="font-sans text-[13px] font-medium text-foreground">Equity curve</h2>
           <EquityCurveChart result={result} annualGoal={annualGoal} />
         </div>
-      </section>
-
-      {/* ── Benchmark comparison ── */}
-      <BenchmarkComparison result={result} />
+        <BenchmarkComparison result={result} />
+      </div>
 
       {/* ── Capital deployed metrics ── */}
       <MetricGroup label="Capital deployed" cols={4}>
