@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateDashboard, calculateMonthlyReturns } from "@/lib/calculations/engine";
 import { filterResult } from "@/lib/selectors/filter-result";
+import { portfolioReturnOnCapital } from "@/lib/selectors/return-on-capital";
 import { defaultSettings } from "@/lib/storage/local-store";
 import type { CapitalUsage, RealizedPnLEvent } from "@/types/trading";
 import { optionTx, stockTx } from "./helpers";
@@ -225,25 +226,45 @@ describe("calculation engine", () => {
     expect(monthly[0].averageDeployedCapital).toBeCloseTo(4838.71, 2);
   });
 
-  it("calculates closed trade ROI", () => {
-    const result = calculateDashboard([stockTx("b1", "2025-01-02", "BUY", "AMD", 100, 10), stockTx("s1", "2025-01-20", "SELL", "AMD", 100, 12)]);
-    expect(result.monthlyReturns[0].closedTradeRoiPercent).toBe(20);
-  });
-
   it("calculates monthly ROI with partial-month capital deployment", () => {
     const result = calculateDashboard([stockTx("b1", "2025-01-01", "BUY", "AMD", 100, 100), stockTx("s1", "2025-01-15", "SELL", "AMD", 100, 101)]);
     expect(result.monthlyReturns[0].realizedRoiPercent).toBeCloseTo(2.066, 2);
   });
 
-  it("calculates YTD ROI from YTD average deployed capital instead of summing monthly averages", () => {
+  it("return on capital is one definition: Home, Performance, and aggregates agree", () => {
+    // Two overlapping symbols over different spans — exercises the time-weighted denominator.
+    const result = calculateDashboard(
+      [
+        stockTx("b1", "2026-01-05", "BUY", "AMD", 100, 50),
+        stockTx("s1", "2026-03-20", "SELL", "AMD", 100, 60),
+        stockTx("b2", "2026-02-10", "BUY", "NVDA", 50, 100),
+        stockTx("s2", "2026-05-15", "SELL", "NVDA", 50, 90),
+      ],
+      defaultSettings,
+      new Date("2026-06-30T12:00:00Z"),
+    );
+    const agg = result.aggregates;
+    // The canonical field equals P&L ÷ time-weighted avg deployed (what Home shows
+    // as "% on capital" and Performance shows as "Your return" — both read this field).
+    expect(agg.returnOnCapital).not.toBeNull();
+    expect(agg.returnOnCapital!).toBeCloseTo((agg.totalRealizedPnl / agg.averageDeployedCapital) * 100, 6);
+    // It matches the shared selector over the same monthly rows.
+    expect(agg.returnOnCapital!).toBeCloseTo(portfolioReturnOnCapital(result.monthlyReturns).roc!, 6);
+    // Annualized is exactly RoC × 365 / period days.
+    const periodDays = result.monthlyReturns.reduce((s, m) => s + m.periodDays, 0);
+    expect(agg.annualizedReturnOnCapital!).toBeCloseTo(agg.returnOnCapital! * (365 / periodDays), 6);
+  });
+
+  it("computes portfolio return on capital from time-weighted deployed capital", () => {
     const result = calculateDashboard(
       [stockTx("b1", "2026-01-01", "BUY", "AMD", 100, 10), stockTx("s1", "2026-06-30", "SELL", "AMD", 100, 10.7)],
       defaultSettings,
       new Date("2026-06-30T12:00:00Z")
     );
-    const june = result.monthlyReturns.find((row) => row.year === 2026 && row.month === 6);
-    expect(june?.realizedRoiPercent).toBeCloseTo(7, 2);
-    expect(result.aggregates.ytdRoi).toBeCloseTo(7, 2);
+    // $1000 deployed Jan 1–Jun 30, $70 realized → 7% on capital.
+    expect(result.aggregates.returnOnCapital).toBeCloseTo(7, 2);
+    // Annualized over ~181 days ≈ 7 × 365/181.
+    expect(result.aggregates.annualizedReturnOnCapital).toBeCloseTo(7 * (365 / 181), 1);
   });
 
   it("returns N/A-equivalent null ROI when capital is missing", () => {

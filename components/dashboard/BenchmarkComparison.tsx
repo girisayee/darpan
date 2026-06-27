@@ -236,8 +236,9 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   const avgDeployed = result.aggregates.averageDeployedCapital;
   const totalPnl = result.aggregates.totalRealizedPnl;
 
-  // Your return % = totalRealizedPnl ÷ averageDeployedCapital × 100
-  const yourReturnPct = avgDeployed > 0 ? (totalPnl / avgDeployed) * 100 : null;
+  // Canonical return on capital — the same field shown on Home and the
+  // Performance "Return on capital" KPI, so the three never disagree.
+  const yourReturnPct = result.aggregates.returnOnCapital;
 
   // Dollar figure for an index: what the year-to-date index return would have
   // earned on your average deployed capital (apples-to-apples with the $ shown

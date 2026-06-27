@@ -167,14 +167,6 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       tooltip: "Realized P&L ÷ average capital deployed all month.",
     },
     {
-      key: "closedTradeRoiPercent",
-      header: "Closed Trade ROI",
-      value: (row) => row.closedTradeRoiPercent ?? -999,
-      render: (row) => signedPercent(row.closedTradeRoiPercent),
-      align: "right",
-      tooltip: "Realized P&L ÷ capital in just the trades that closed that month.",
-    },
-    {
       key: "coveredCallRoiPercent",
       header: "CC ROI",
       value: (row) => row.coveredCallRoiPercent ?? -999,

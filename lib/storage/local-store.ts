@@ -9,7 +9,6 @@ export const defaultSettings: AppSettings = {
   costBasisMethod: "FIFO",
   coveredCallDenominator: "UNDERLYING_COST_BASIS",
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL",
-  monthlyRoiDenominator: "AVERAGE_DEPLOYED_CAPITAL",
   annualizedReturn: true,
   showSwingOpenPositions: false
 };

@@ -13,6 +13,7 @@ import type {
 } from "@/types/trading";
 import { compactMonth } from "@/lib/utils/format";
 import { defaultSettings } from "@/lib/storage/local-store";
+import { portfolioReturnOnCapital } from "@/lib/selectors/return-on-capital";
 
 type MutableLot = TaxLot & { remainingCostBasis: number };
 type MutableLifecycle = OptionLifecycle;
@@ -723,10 +724,10 @@ export function calculateMonthlyReturns(
       averageDeployedCapital: capital.averageDeployedCapital,
       peakDeployedCapital: capital.peakDeployedCapital,
       capitalDays: capital.capitalDays,
+      periodDays: capital.days,
       realizedPnl,
       realizedRoiPercent: capital.averageDeployedCapital > 0 ? (realizedPnl / capital.averageDeployedCapital) * 100 : null,
       closedTradeCapital,
-      closedTradeRoiPercent: closedTradeCapital > 0 ? (realizedPnl / closedTradeCapital) * 100 : null,
       optionsPremiumPnl,
       stockTradingPnl,
       assignmentPnl,
@@ -761,9 +762,7 @@ function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapital
     winRate: row.winRate
   }));
   const monthlyWithRoi = monthly.filter((row) => row.realizedRoiPercent !== null);
-  const ytdRows = monthly.filter((row) => row.year === currentYear);
-  const ytdPnl = sum(ytdRows.map((row) => row.realizedPnl));
-  const ytdAverageDeployedCapital = averageYtdDeployedCapital(ytdRows, currentYear, asOfDate);
+  const roc = portfolioReturnOnCapital(monthly);
   return {
     totalRealizedPnl,
     currentYearRealizedPnl,
@@ -780,8 +779,9 @@ function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapital
     bestStrategy: strategyBreakdown[0]?.strategy ?? null,
     worstStrategy: [...strategyBreakdown].sort((a, b) => a.pnl - b.pnl)[0]?.strategy ?? null,
     averageMonthlyRoi: monthlyWithRoi.length ? sum(monthlyWithRoi.map((row) => row.realizedRoiPercent ?? 0)) / monthlyWithRoi.length : null,
-    ytdRoi: ytdAverageDeployedCapital > 0 ? (ytdPnl / ytdAverageDeployedCapital) * 100 : null,
-    averageDeployedCapital: monthly.length ? sum(monthly.map((row) => row.averageDeployedCapital)) / monthly.length : 0,
+    returnOnCapital: roc.roc,
+    annualizedReturnOnCapital: roc.annualizedRoc,
+    averageDeployedCapital: roc.avgDeployed,
     peakDeployedCapital: Math.max(0, ...monthly.map((row) => row.peakDeployedCapital)),
     strategyBreakdown,
     symbolBreakdown,
@@ -812,13 +812,6 @@ function groupBreakdown(events: RealizedPnLEvent[], key: "strategy" | "symbol") 
       };
     })
     .sort((a, b) => b.pnl - a.pnl);
-}
-
-function averageYtdDeployedCapital(rows: MonthlyCapitalReturn[], year: number, asOfDate: string) {
-  const asOfYear = Number(asOfDate.slice(0, 4));
-  const endDate = asOfYear === year ? asOfDate : `${year}-12-31`;
-  const elapsedDays = dateDiffDays(`${year}-01-01`, endDate) + 1;
-  return elapsedDays > 0 ? sum(rows.map((row) => row.capitalDays)) / elapsedDays : 0;
 }
 
 function optionCapital(lifecycle: MutableLifecycle, settings: AppSettings) {
@@ -935,6 +928,7 @@ function capitalForMonth(usage: CapitalUsage[], year: number, month: number, asO
   return {
     endDate: `${monthKey}-${String(days || monthDays).padStart(2, "0")}`,
     capitalDays,
+    days,
     averageDeployedCapital: days > 0 ? capitalDays / days : 0,
     peakDeployedCapital
   };

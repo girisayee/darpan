@@ -153,10 +153,11 @@ export type MonthlyCapitalReturn = {
   averageDeployedCapital: number;
   peakDeployedCapital: number;
   capitalDays: number;
+  /** Days this month contributed to the period (asOf-adjusted for the current month). */
+  periodDays: number;
   realizedPnl: number;
   realizedRoiPercent: number | null;
   closedTradeCapital: number;
-  closedTradeRoiPercent: number | null;
   optionsPremiumPnl: number;
   stockTradingPnl: number;
   assignmentPnl: number;
@@ -207,7 +208,11 @@ export type DashboardAggregates = {
   bestStrategy: string | null;
   worstStrategy: string | null;
   averageMonthlyRoi: number | null;
-  ytdRoi: number | null;
+  /** Canonical period return on capital: realized P&L ÷ time-weighted avg deployed capital. */
+  returnOnCapital: number | null;
+  /** returnOnCapital annualized: × (365 ÷ period days). Labeled as annualized wherever shown. */
+  annualizedReturnOnCapital: number | null;
+  /** Time-weighted average deployed capital (dollar-days ÷ period days). */
   averageDeployedCapital: number;
   peakDeployedCapital: number;
   strategyBreakdown: Array<{ strategy: Strategy; pnl: number; capital: number; roiPercent: number | null }>;
@@ -224,7 +229,6 @@ export type AppSettings = {
   costBasisMethod: CostBasisMethod;
   coveredCallDenominator: "UNDERLYING_COST_BASIS" | "CURRENT_MARKET_VALUE" | "ASSIGNMENT_PROCEEDS";
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL" | "NET_COLLATERAL_AFTER_PREMIUM";
-  monthlyRoiDenominator: "AVERAGE_DEPLOYED_CAPITAL" | "PEAK_DEPLOYED_CAPITAL" | "CLOSED_TRADE_CAPITAL";
   annualizedReturn: boolean;
   /** Show open swing stock lots as active positions. Off by default. */
   showSwingOpenPositions: boolean;

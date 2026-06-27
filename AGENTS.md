@@ -76,6 +76,13 @@ typecheck/lint/build and the running dev server rather than component render tes
 - Same-day option open/close rows must process opens before closes.
 - Do **not** surface max drawdown, Sortino, Calmar, payoff ratio, a discipline streak, live
   option marks, or a social leaderboard — these were explicitly cut from the product.
+- **Return on capital has one definition**: realized P&L ÷ time-weighted average
+  deployed capital (dollar-days ÷ days), via `lib/selectors/return-on-capital.ts`.
+  Home, Performance ("Your return" + the RoC KPI), and `aggregates.returnOnCapital`
+  all read it; the monthly table and per-symbol RoC use the same formula. Annualized
+  is always RoC × (365 ÷ days), shown only as an explicitly-labeled secondary — never
+  the headline. Tickers' "Peak-capital ROI" (÷ peak concurrent capital) is a separate,
+  labeled metric, not a second RoC. Don't reintroduce alternative denominators.
 - `winRate` convention is inconsistent by source and easy to get wrong: `tradeQuality().winRate`
   is a **fraction (0–1)**, while `aggregates.winRate` and `symbolBreakdown[].winRate` are a
   **percent (0–100)**. `formatPercent` does not multiply — it appends `%`.

@@ -552,24 +552,6 @@ function SettingsTab({
             <option value="NET_COLLATERAL_AFTER_PREMIUM">Net collateral after premium</option>
           </Select>
         </label>
-        <label className="grid gap-1">
-          <span className="font-sans text-[11.5px] text-muted-foreground">
-            Monthly ROI denominator
-          </span>
-          <Select
-            value={settings.monthlyRoiDenominator}
-            onChange={(value) =>
-              onChange({
-                ...settings,
-                monthlyRoiDenominator: value as AppSettings["monthlyRoiDenominator"],
-              })
-            }
-          >
-            <option value="AVERAGE_DEPLOYED_CAPITAL">Average deployed capital</option>
-            <option value="PEAK_DEPLOYED_CAPITAL">Peak deployed capital</option>
-            <option value="CLOSED_TRADE_CAPITAL">Closed trade capital</option>
-          </Select>
-        </label>
       </SettingsPanel>
       <div className="lg:col-span-2">
         <SettingsPanel title="Manual entries">

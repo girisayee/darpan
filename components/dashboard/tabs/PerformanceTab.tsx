@@ -252,7 +252,9 @@ export function PerformanceTab({
   const monthIndex = result.monthlyReturns.length > 0 ? result.monthlyReturns.length - 1 : 0;
   const pace = goalPace({ annualGoal, monthlyRealized, monthIndex });
 
-  const ce = capitalEfficiency(result.realizedEvents, result.monthlyReturns);
+  const ce = capitalEfficiency(result.monthlyReturns);
+  const roc = result.aggregates.returnOnCapital;
+  const annualizedRoc = result.aggregates.annualizedReturnOnCapital;
 
   const avgDeployed = result.aggregates.averageDeployedCapital;
   const peakDeployed = result.aggregates.peakDeployedCapital;
@@ -299,8 +301,8 @@ export function PerformanceTab({
         <KpiCard
           label="Avg deployed"
           value={formatCurrency(avgDeployed)}
-          helper="Average across active months"
-          tooltip="Average capital deployed across all months with activity."
+          helper="Time-weighted"
+          tooltip="Time-weighted average capital deployed (dollar-days ÷ days in the period). The denominator behind Return on capital."
           tone="neutral"
           variant="compact"
         />
@@ -314,10 +316,10 @@ export function PerformanceTab({
         />
         <KpiCard
           label="Return on capital"
-          value={ce.annualizedRoc != null ? formatPercent(ce.annualizedRoc, 1) : "—"}
-          helper="Capital-weighted annualized"
-          tooltip="Capital-weighted mean of per-event annualized ROI."
-          tone={tone(ce.annualizedRoc ?? 0)}
+          value={roc != null ? formatPercent(roc, 1) : "—"}
+          helper={annualizedRoc != null ? `${formatPercent(annualizedRoc, 0)} annualized` : "Realized P&L ÷ avg deployed"}
+          tooltip="Realized P&L ÷ time-weighted average deployed capital over the period. The same return-on-capital shown on Home; the helper annualizes it (× 365 ÷ days)."
+          tone={tone(roc ?? 0)}
           variant="compact"
         />
         <KpiCard

@@ -114,7 +114,7 @@ export function HomeTab({
   const days = useMemo(() => dailyPnl(result.realizedEvents), [result.realizedEvents]);
 
   const ytdPnl = result.monthlyReturns.reduce((s, m) => s + m.realizedPnl, 0);
-  const ytdRoi = result.aggregates.ytdRoi;
+  const returnOnCapital = result.aggregates.returnOnCapital;
 
   return (
     <div className="space-y-5 py-2">
@@ -123,7 +123,7 @@ export function HomeTab({
         <MetricCard
           label="Net P&L · YTD"
           value={formatCurrency(ytdPnl)}
-          helper={`${ytdRoi != null ? formatPercent(ytdRoi) : "—"} on capital`}
+          helper={`${returnOnCapital != null ? formatPercent(returnOnCapital) : "—"} on capital`}
           tooltip="Calendar-year realized P&L across all closed events."
           tone={tone(ytdPnl)}
         />

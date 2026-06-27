@@ -5,13 +5,16 @@ import { Column, DataTable } from "@/components/tables/DataTable";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { leaderboard } from "@/lib/selectors/leaderboard";
 import { peakCapitalRoi } from "@/lib/selectors/symbol-capital";
+import { symbolReturnOnCapital } from "@/lib/selectors/return-on-capital";
 import { signedMoney, signedPercent } from "@/components/dashboard/tabs/shared";
 import { formatPercent } from "@/lib/utils/format";
 import type { CalculationResult } from "@/types/trading";
 
 type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number] & {
-  /** Return on the most capital this symbol tied up at once — never sums recycled collateral. */
+  /** Canonical return on capital: P&L ÷ time-weighted avg deployed over the symbol's active span. */
   returnOnCapital: number | null;
+  /** Return on the most capital this symbol tied up at once — never sums recycled collateral. */
+  peakCapitalRoi: number | null;
 };
 
 const columns: Column<SymbolRow>[] = [
@@ -46,7 +49,21 @@ const columns: Column<SymbolRow>[] = [
       ),
     align: "right",
     tooltip:
-      "Realized P&L ÷ the most capital this symbol tied up at once. Recycling the same collateral across cycles doesn't inflate the denominator. Open a row to see turnover-based ROI.",
+      "Realized P&L ÷ time-weighted average capital deployed over this symbol's active span — the same definition used on Home and Performance.",
+  },
+  {
+    key: "peakCapitalRoi",
+    header: "Peak-capital ROI",
+    value: (r) => r.peakCapitalRoi ?? -Infinity,
+    render: (r) =>
+      r.peakCapitalRoi == null ? (
+        <span className="opacity-50">—</span>
+      ) : (
+        signedPercent(r.peakCapitalRoi)
+      ),
+    align: "right",
+    tooltip:
+      "Realized P&L ÷ the most capital this symbol ever tied up at once. Recycling the same collateral across cycles doesn't inflate the denominator — a stricter view than Return on capital.",
   },
   {
     key: "trades",
@@ -75,9 +92,11 @@ export function TickersTab({
   onSelectSymbol: (row: SymbolRow) => void;
 }) {
   const data = leaderboard(result);
+  const asOf = new Date().toISOString().slice(0, 10);
   const rows: SymbolRow[] = result.aggregates.symbolBreakdown.map((r) => ({
     ...r,
-    returnOnCapital: peakCapitalRoi(result.capitalUsage, r.symbol, r.pnl),
+    returnOnCapital: symbolReturnOnCapital(result.capitalUsage, r.symbol, r.pnl, asOf).roc,
+    peakCapitalRoi: peakCapitalRoi(result.capitalUsage, r.symbol, r.pnl),
   }));
   return (
     <div className="space-y-5 py-2">
