@@ -14,12 +14,51 @@ function roiFor(result: CalculationResult, enums: string[]): number | null {
   return capital > 0 ? (pnl / capital) * 100 : null;
 }
 
+/** Running cumulative realized P&L (oldest → newest) for the given strategy enums. */
+function cumulativeSeries(result: CalculationResult, enums: string[]): number[] {
+  const events = result.realizedEvents
+    .filter((e) => enums.includes(e.strategy))
+    .slice()
+    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+  let sum = 0;
+  return events.map((e) => (sum += e.realizedPnl));
+}
+
+function Sparkline({ values, positive }: { values: number[]; positive: boolean }) {
+  if (values.length < 2) return <div className="h-7" aria-hidden="true" />;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const w = 100;
+  const h = 28;
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-7 w-full" aria-hidden="true">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={positive ? "rgb(var(--pos))" : "rgb(var(--neg))"}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 function Tile({
   name,
   pnl,
   roi,
   winRate,
   hint,
+  series,
   onClick,
 }: {
   name: string;
@@ -27,6 +66,7 @@ function Tile({
   roi: number | null;
   winRate: number | null;
   hint: string;
+  series: number[];
   onClick: () => void;
 }) {
   return (
@@ -38,9 +78,10 @@ function Tile({
       <div className="text-[13px] font-medium text-foreground">{name}</div>
       <div className="mt-1 text-[24px] font-semibold tabular-nums">{signedMoney(pnl)}</div>
       <div className="mt-0.5 text-[12px] text-muted-foreground">
-        ROI {formatPercent(roi)} · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
+        ROC {formatPercent(roi)} · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
       </div>
-      <div className="mt-1.5 text-[10.5px] text-dim">{hint}</div>
+      <Sparkline values={series} positive={pnl >= 0} />
+      <div className="text-[10.5px] text-dim">{hint}</div>
     </button>
   );
 }
@@ -68,6 +109,7 @@ export function StrategyStrip({
         roi={roiFor(result, OPTION_ENUMS)}
         winRate={options.quality.winRate}
         hint="CSP · Covered calls · Long"
+        series={cumulativeSeries(result, OPTION_ENUMS)}
         onClick={() => onOpen("options")}
       />
       <Tile
@@ -76,6 +118,7 @@ export function StrategyStrip({
         roi={roiFor(result, STRATEGY_EVENT_ENUMS.swing)}
         winRate={swing.quality.winRate}
         hint={`${swing.quality.totalTrades} trade${swing.quality.totalTrades === 1 ? "" : "s"}`}
+        series={cumulativeSeries(result, STRATEGY_EVENT_ENUMS.swing)}
         onClick={() => onOpen("swing")}
       />
     </div>
