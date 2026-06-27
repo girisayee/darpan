@@ -2,27 +2,17 @@
 
 /**
  * BenchmarkComparison — "Market comparison": index calendar-YTD (SPY / VTI / QQQ)
- * vs your realized return, shown as a horizontal bar chart beside the exact figures.
+ * vs your realized return, shown as a single set of data bars — each row carries
+ * its own inline bar plus the exact % and $ (chart and figures combined).
  *
  * Props: result: CalculationResult
  *
- * Each bar/row shows that index's calendar year-to-date return (year-open close →
+ * Each row shows that index's calendar year-to-date return (year-open close →
  * latest close) for the year in view. Fetches /api/benchmark once per session
  * (keyed in sessionStorage). Fail-soft: never fabricated numbers.
  */
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useEffect, useState } from "react";
 import { ytdReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
 import type { CalculationResult } from "@/types/trading";
@@ -35,132 +25,107 @@ type FetchStatus = "loading" | "success" | "error";
 const C_POS = "rgb(var(--pos))";
 const C_NEG = "rgb(var(--neg))";
 const C_MUTED = "rgb(var(--text-muted))";
-const C_HAIRLINE = "rgb(var(--hairline))";
-const C_SURFACE = "rgb(var(--surface))";
 
-const TICK_STYLE = { fontFamily: "var(--font-sans)", fontSize: 11, fill: C_MUTED } as const;
-const TOOLTIP_CONTENT_STYLE: React.CSSProperties = {
-  background: C_SURFACE,
-  border: `1px solid ${C_HAIRLINE}`,
-  borderRadius: 8,
-  boxShadow: "none",
-  padding: "6px 10px",
-};
-const TOOLTIP_ITEM_STYLE: React.CSSProperties = { fontFamily: "var(--font-sans)", fontSize: 12, color: C_MUTED };
-const TOOLTIP_LABEL_STYLE: React.CSSProperties = { fontFamily: "var(--font-sans)", fontSize: 11, color: C_MUTED, marginBottom: 2 };
-
-type ChartDatum = { name: string; pct: number; you: boolean };
-
-function ComparisonChart({ data }: { data: ChartDatum[] }) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false
-  );
-
-  if (!mounted) {
-    return <div className="h-[176px] animate-pulse rounded-md bg-surface-inset" />;
-  }
-
-  return (
-    <div className="h-[176px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart layout="vertical" data={data} margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
-          <CartesianGrid horizontal={false} stroke={C_HAIRLINE} opacity={1} />
-          <XAxis
-            type="number"
-            tick={TICK_STYLE}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) => `${v}%`}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            tick={TICK_STYLE}
-            axisLine={false}
-            tickLine={false}
-            width={36}
-          />
-          <ReferenceLine x={0} stroke={C_HAIRLINE} />
-          <Tooltip
-            formatter={(value: unknown) => [
-              formatPercent(typeof value === "number" ? value : Number(value), 2),
-              "YTD return",
-            ]}
-            contentStyle={TOOLTIP_CONTENT_STYLE}
-            itemStyle={TOOLTIP_ITEM_STYLE}
-            labelStyle={TOOLTIP_LABEL_STYLE}
-            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.3 }}
-          />
-          <Bar dataKey="pct" radius={[0, 3, 3, 0]} barSize={16}>
-            {data.map((d, i) => (
-              <Cell
-                key={`cell-${i}`}
-                fill={d.you ? (d.pct >= 0 ? C_POS : C_NEG) : C_MUTED}
-                fillOpacity={d.you ? 1 : 0.5}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-type MetricRowProps = {
+type RowSpec = {
   label: string;
-  returnPct: number | null;
+  pct: number | null;
   dollarPnl: number | null;
   emphasis?: boolean;
   unavailable?: boolean;
 };
 
-function MetricRow({ label, returnPct, dollarPnl, emphasis, unavailable }: MetricRowProps) {
-  const pos = returnPct !== null && returnPct > 0;
-  const neg = returnPct !== null && returnPct < 0;
+/** One data-bar row: label · inline bar · exact % and $. */
+function DataBarRow({
+  row,
+  maxAbs,
+  hasNeg,
+}: {
+  row: RowSpec;
+  maxAbs: number;
+  hasNeg: boolean;
+}) {
+  const { label, pct, dollarPnl, emphasis } = row;
+  const value = row.unavailable || pct === null ? null : pct;
+  const pos = value !== null && value > 0;
+  const neg = value !== null && value < 0;
+
+  // Bar geometry. When any return is negative we anchor a zero line at the
+  // track centre (positive → right, negative → left); otherwise bars fill
+  // from the left edge so the common all-positive case uses the full width.
+  let barLeft = "0%";
+  let barWidth = "0%";
+  if (value !== null) {
+    if (hasNeg) {
+      const half = (Math.abs(value) / maxAbs) * 50;
+      barWidth = `${half}%`;
+      barLeft = value >= 0 ? "50%" : `${50 - half}%`;
+    } else {
+      barWidth = `${(value / maxAbs) * 100}%`;
+    }
+  }
+  const fill = emphasis ? (value !== null && value < 0 ? C_NEG : C_POS) : C_MUTED;
+
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-hairline py-1.5 last:border-b-0">
-      <span className={cn("font-sans text-[12px]", emphasis ? "font-medium text-foreground" : "text-muted-foreground")}>
+    <div className="grid grid-cols-[34px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
+      <span
+        className={cn(
+          "font-sans text-[12px]",
+          emphasis ? "font-medium text-foreground" : "text-muted-foreground"
+        )}
+      >
         {label}
       </span>
-      {unavailable || returnPct === null ? (
-        <span className="font-sans text-[14px] font-medium text-muted-foreground">—</span>
-      ) : (
-        <span className="flex items-baseline gap-2">
-          <span
-            className={cn(
-              "font-sans text-[14px] font-medium tabular-nums",
-              pos && "text-pos",
-              neg && "text-neg",
-              !pos && !neg && "text-foreground"
-            )}
-          >
-            {formatPercent(returnPct, 2)}
-          </span>
-          {dollarPnl !== null && (
-            <span
+
+      <div className="relative h-3.5 rounded bg-surface-inset">
+        {hasNeg && <div className="absolute inset-y-0 w-px bg-hairline" style={{ left: "50%" }} />}
+        {value !== null && (
+          <div
+            className="absolute inset-y-0 rounded"
+            style={{ left: barLeft, width: barWidth, background: fill, opacity: emphasis ? 1 : 0.5 }}
+          />
+        )}
+      </div>
+
+      <div className="text-right leading-tight">
+        {value === null ? (
+          <span className="font-sans text-[13px] font-medium text-muted-foreground">—</span>
+        ) : (
+          <>
+            <div
               className={cn(
-                "font-sans text-[11px] tabular-nums",
-                dollarPnl > 0 && "text-pos",
-                dollarPnl < 0 && "text-neg",
-                dollarPnl === 0 && "text-muted-foreground"
+                "font-sans text-[13px] font-medium tabular-nums",
+                pos && "text-pos",
+                neg && "text-neg",
+                !pos && !neg && "text-foreground"
               )}
             >
-              {formatCurrency(dollarPnl)}
-            </span>
-          )}
-        </span>
-      )}
+              {formatPercent(value, 2)}
+            </div>
+            {dollarPnl !== null && (
+              <div
+                className={cn(
+                  "font-sans text-[11px] tabular-nums",
+                  dollarPnl > 0 && "text-pos",
+                  dollarPnl < 0 && "text-neg",
+                  dollarPnl === 0 && "text-muted-foreground"
+                )}
+              >
+                {formatCurrency(dollarPnl)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 function SkeletonRow() {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5">
-      <div className="h-3 w-16 rounded bg-surface-inset animate-pulse" />
-      <div className="h-4 w-20 rounded bg-surface-inset animate-pulse" />
+    <div className="grid grid-cols-[34px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
+      <div className="h-3 w-7 rounded bg-surface-inset animate-pulse" />
+      <div className="h-3.5 rounded bg-surface-inset animate-pulse" />
+      <div className="ml-auto h-4 w-16 rounded bg-surface-inset animate-pulse" />
     </div>
   );
 }
@@ -284,20 +249,34 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   const qqqResult = data && data.qqq.length >= 2 ? ytdReturn(data.qqq, benchYear) : null;
   const vtiResult = data && data.vti && data.vti.length >= 2 ? ytdReturn(data.vti, benchYear) : null;
 
-  const spyUnavailable = status === "success" && !spyResult;
-  const qqqUnavailable = status === "success" && !qqqResult;
-  const vtiUnavailable = status === "success" && !vtiResult;
+  const rows: RowSpec[] = [
+    { label: "You", pct: yourReturnPct, dollarPnl: totalPnl, emphasis: true },
+    {
+      label: "SPY",
+      pct: spyResult?.returnPct ?? null,
+      dollarPnl: dollarsOn(spyResult?.returnPct),
+      unavailable: status === "success" && !spyResult,
+    },
+    {
+      label: "VTI",
+      pct: vtiResult?.returnPct ?? null,
+      dollarPnl: dollarsOn(vtiResult?.returnPct),
+      unavailable: status === "success" && !vtiResult,
+    },
+    {
+      label: "QQQ",
+      pct: qqqResult?.returnPct ?? null,
+      dollarPnl: dollarsOn(qqqResult?.returnPct),
+      unavailable: status === "success" && !qqqResult,
+    },
+  ];
 
-  // Chart series — keep the You / SPY / VTI / QQQ order, drop entries with no data.
-  const chartData: ChartDatum[] = (
-    [
-      { name: "You", pct: yourReturnPct, you: true },
-      { name: "SPY", pct: spyResult?.returnPct ?? null, you: false },
-      { name: "VTI", pct: vtiResult?.returnPct ?? null, you: false },
-      { name: "QQQ", pct: qqqResult?.returnPct ?? null, you: false },
-    ] as { name: string; pct: number | null; you: boolean }[]
-  )
-    .filter((d): d is ChartDatum => d.pct !== null);
+  // Shared bar scale across all rows so lengths are comparable.
+  const activePcts = rows
+    .filter((r) => !r.unavailable && r.pct !== null)
+    .map((r) => r.pct as number);
+  const maxAbs = Math.max(1, ...activePcts.map((p) => Math.abs(p)));
+  const hasNeg = activePcts.some((p) => p < 0);
 
   return (
     <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
@@ -333,44 +312,22 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
         </div>
       )}
 
-      {/* Loading skeleton — chart placeholder beside metric rows */}
+      {/* Loading skeleton */}
       {status === "loading" && (
-        <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
-          <div className="h-[176px] animate-pulse rounded-md bg-surface-inset" />
-          <div>
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-          </div>
+        <div>
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
         </div>
       )}
 
-      {/* Success — comparison chart side by side with the exact figures */}
+      {/* Success — combined data bars (bar + exact % and $ per row) */}
       {status === "success" && (
-        <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
-          <ComparisonChart data={chartData} />
-          <div>
-            <MetricRow label="You" returnPct={yourReturnPct} dollarPnl={totalPnl} emphasis />
-            <MetricRow
-              label="SPY YTD"
-              returnPct={spyResult?.returnPct ?? null}
-              dollarPnl={dollarsOn(spyResult?.returnPct)}
-              unavailable={spyUnavailable}
-            />
-            <MetricRow
-              label="VTI YTD"
-              returnPct={vtiResult?.returnPct ?? null}
-              dollarPnl={dollarsOn(vtiResult?.returnPct)}
-              unavailable={vtiUnavailable}
-            />
-            <MetricRow
-              label="QQQ YTD"
-              returnPct={qqqResult?.returnPct ?? null}
-              dollarPnl={dollarsOn(qqqResult?.returnPct)}
-              unavailable={qqqUnavailable}
-            />
-          </div>
+        <div>
+          {rows.map((row) => (
+            <DataBarRow key={row.label} row={row} maxAbs={maxAbs} hasNeg={hasNeg} />
+          ))}
         </div>
       )}
     </div>
