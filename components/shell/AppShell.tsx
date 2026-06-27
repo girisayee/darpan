@@ -1,7 +1,9 @@
 "use client";
 
+import { Check, ChevronDown } from "lucide-react";
 import { useRef, type KeyboardEvent } from "react";
 import type { Theme } from "@/lib/theme/use-theme";
+import type { TradingAccount } from "@/types/trading";
 import { cn } from "@/lib/utils/cn";
 import { Logo } from "@/components/common/Logo";
 import { OverflowMenu } from "@/components/shell/OverflowMenu";
@@ -14,15 +16,81 @@ interface AppShellProps {
   years: string[];
   year: string;
   onYear: (year: string) => void;
-  accounts: string[];
-  account: string;
-  onAccount: (account: string) => void;
+  accounts: TradingAccount[];
+  selectedAccountIds: string[];
+  onSelectAccounts: (ids: string[]) => void;
   theme: Theme;
   onToggleTheme: () => void;
   onImport: () => void;
   onSettings: () => void;
   onExport: () => void;
   user?: { name?: string | null; email?: string | null; image?: string | null };
+}
+
+/** Always-visible multi-select account filter. Empty selection = all accounts. */
+function AccountSelect({
+  accounts,
+  selected,
+  onChange,
+}: {
+  accounts: TradingAccount[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const allMode = selected.length === 0;
+  const labelText = allMode
+    ? "All accounts"
+    : selected.length === 1
+      ? (accounts.find((a) => a.id === selected[0])?.name ?? "1 account")
+      : `${selected.length} accounts`;
+
+  function toggle(id: string) {
+    if (allMode) {
+      onChange([id]);
+      return;
+    }
+    const set = new Set(selected);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    const next = [...set];
+    onChange(next.length === accounts.length ? [] : next);
+  }
+
+  return (
+    <details className="relative">
+      <summary className="flex cursor-pointer list-none items-center gap-1 rounded-[8px] border border-hairline bg-surface px-2.5 py-[5px] text-body text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 [&::-webkit-details-marker]:hidden">
+        {labelText}
+        <ChevronDown className="h-3.5 w-3.5" />
+      </summary>
+      <div className="absolute right-0 z-50 mt-1 w-56 rounded-[10px] border border-hairline bg-surface p-1 shadow-lg">
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className={cn(
+            "flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-body hover:bg-accent/[0.06]",
+            allMode ? "text-accent" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          All accounts {allMode && <Check className="h-3.5 w-3.5" />}
+        </button>
+        {accounts.length > 0 && <div className="my-1 border-t border-hairline-soft" />}
+        {accounts.map((a) => (
+          <label
+            key={a.id}
+            className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-body text-muted-foreground hover:bg-accent/[0.06] hover:text-foreground"
+          >
+            <input
+              type="checkbox"
+              checked={!allMode && selected.includes(a.id)}
+              onChange={() => toggle(a.id)}
+              className="h-3.5 w-3.5 accent-accent"
+            />
+            <span className="truncate">{a.name}</span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
 }
 
 export function AppShell({
@@ -33,8 +101,8 @@ export function AppShell({
   year,
   onYear,
   accounts,
-  account,
-  onAccount,
+  selectedAccountIds,
+  onSelectAccounts,
   theme,
   onToggleTheme,
   onImport,
@@ -73,17 +141,15 @@ export function AppShell({
           <span aria-hidden="true" className="hidden md:block h-5 w-px bg-hairline" />
 
           {/* Nav pills — hidden on mobile, shown md+ */}
-          <nav
-            role="tablist"
-            aria-label="Main navigation"
-            className="hidden md:flex gap-1"
-          >
+          <nav role="tablist" aria-label="Main navigation" className="hidden md:flex gap-1">
             {tabs.map((tab, index) => {
               const isActive = tab === activeTab;
               return (
                 <button
                   key={tab}
-                  ref={(el) => { buttonRefs.current[index] = el; }}
+                  ref={(el) => {
+                    buttonRefs.current[index] = el;
+                  }}
                   type="button"
                   role="tab"
                   aria-selected={isActive}
@@ -106,9 +172,11 @@ export function AppShell({
           </nav>
         </div>
 
-        {/* RIGHT: year selector + overflow menu */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Year selector — hidden on very small screens */}
+        {/* RIGHT: account selector + year selector + overflow menu */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="hidden sm:block">
+            <AccountSelect accounts={accounts} selected={selectedAccountIds} onChange={onSelectAccounts} />
+          </div>
           <div className="hidden sm:block">
             <select
               value={year}
@@ -122,16 +190,15 @@ export function AppShell({
               )}
             >
               {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>
+                  {y}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Overflow menu (account switch, theme, import, export, settings) */}
+          {/* Overflow menu (theme, import, export, settings, sign out) */}
           <OverflowMenu
-            accounts={accounts}
-            account={account}
-            onAccount={onAccount}
             theme={theme}
             onToggleTheme={onToggleTheme}
             onImport={onImport}

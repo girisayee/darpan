@@ -4,7 +4,7 @@ import { defaultSettings } from "@/lib/storage/local-store";
 import { filterResult, type DashboardFilters } from "@/lib/selectors/filter-result";
 import { stockTx } from "../helpers";
 
-const ALL: DashboardFilters = { symbol: "ALL", strategy: "ALL", year: "ALL", month: "ALL", account: "ALL" };
+const ALL: DashboardFilters = { symbol: "ALL", strategy: "ALL", year: "ALL", month: "ALL", accountIds: [] };
 
 describe("filterResult", () => {
   it("forwards cost-basis settings when recomputing filtered aggregates", () => {

@@ -425,7 +425,7 @@ describe("calculation engine", () => {
 
     const filtered = filterResult(
       base,
-      { symbol: "ALL", strategy: "ALL", year: "2026", month: "ALL", account: "ALL" },
+      { symbol: "ALL", strategy: "ALL", year: "2026", month: "ALL", accountIds: [] },
       defaultSettings
     );
     const fcc = filtered.optionLifecycles.find((l) => l.strategy === "COVERED_CALL");

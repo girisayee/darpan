@@ -6,7 +6,8 @@ export type DashboardFilters = {
   strategy: string;
   year: string;
   month: string;
-  account: string;
+  /** Selected trading-account ids; empty = all accounts. */
+  accountIds: string[];
 };
 
 export function filterResult(
@@ -37,7 +38,8 @@ export function filterResult(
   }
 
   const transactionFilter = (transaction: TradeTransaction) => {
-    if (filters.account !== "ALL" && transaction.accountName !== filters.account) return false;
+    if (filters.accountIds.length > 0 && !(transaction.accountId != null && filters.accountIds.includes(transaction.accountId)))
+      return false;
     if (filters.symbol !== "ALL" && transaction.symbol !== filters.symbol) return false;
     // Always include transactions that are part of a position closing in the target period
     if (linkedIds.has(transaction.id)) return true;

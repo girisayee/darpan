@@ -88,8 +88,9 @@ export function DashboardShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { theme, toggle } = useTheme();
-  const [account, setAccount] = useState("ALL");
   const year = searchParams.get("year") ?? "2026";
+  const accountsParam = searchParams.get("accounts") ?? "";
+  const selectedAccountIds = accountsParam ? accountsParam.split(",").filter(Boolean) : [];
   const [selectedEvent, setSelectedEvent] = useState<RealizedPnLEvent | null>(null);
   const [selectedLifecycle, setSelectedLifecycle] = useState<OptionLifecycle | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolSummary | null>(null);
@@ -140,13 +141,9 @@ export function DashboardShell({
   );
 
   const result = useMemo(
-    () => filterResult(baseResult, { symbol: "ALL", strategy: "ALL", year, month: "ALL", account }, settings),
-    [baseResult, year, account, settings]
-  );
-
-  const accounts = useMemo(
-    () => ["ALL", ...new Set(allTransactions.map((t) => t.accountName).filter(Boolean).sort())],
-    [allTransactions]
+    () => filterResult(baseResult, { symbol: "ALL", strategy: "ALL", year, month: "ALL", accountIds: selectedAccountIds }, settings),
+    // accountsParam is the stable string form of selectedAccountIds
+    [baseResult, year, accountsParam, settings] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const years = useMemo(() => {
@@ -163,6 +160,13 @@ export function DashboardShell({
   function setYear(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("year", next);
+    router.replace(`${pathname}?${params.toString()}`);
+  }
+
+  function setSelectedAccounts(ids: string[]) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (ids.length) params.set("accounts", ids.join(","));
+    else params.delete("accounts");
     router.replace(`${pathname}?${params.toString()}`);
   }
 
@@ -215,9 +219,9 @@ export function DashboardShell({
         years={years}
         year={year}
         onYear={setYear}
-        accounts={accounts}
-        account={account}
-        onAccount={setAccount}
+        accounts={accountList}
+        selectedAccountIds={selectedAccountIds}
+        onSelectAccounts={setSelectedAccounts}
         theme={theme}
         onToggleTheme={toggle}
         onImport={() => router.push("/import")}

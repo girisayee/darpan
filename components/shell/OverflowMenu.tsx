@@ -3,10 +3,8 @@ import { ChevronDown, FileDown, LogOut, Moon, Settings, Sun, Upload, MoreHorizon
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 import type { Theme } from "@/lib/theme/use-theme";
-import { cn } from "@/lib/utils/cn";
 
 export function OverflowMenu(props: {
-  accounts: string[]; account: string; onAccount: (a: string) => void;
   theme: Theme; onToggleTheme: () => void;
   onImport: () => void; onExport: () => void; onSettings: () => void;
   user?: { name?: string | null; email?: string | null; image?: string | null };
@@ -29,14 +27,6 @@ export function OverflowMenu(props: {
                 <div className="my-1 border-t border-hairline-soft" />
               </>
             )}
-            <div className="px-3 py-1.5 text-micro uppercase tracking-wide text-dim">Account</div>
-            {props.accounts.map((a) => (
-              <button key={a} role="menuitemradio" aria-checked={a === props.account} className={cn(item, a === props.account && "text-foreground")}
-                onClick={() => { props.onAccount(a); setOpen(false); }}>
-                {a === "ALL" ? "All accounts" : a}
-              </button>
-            ))}
-            <div className="my-1 border-t border-hairline-soft" />
             <button className={item} onClick={() => { props.onToggleTheme(); }}>
               {props.theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {props.theme === "dark" ? "Light mode" : "Dark mode"}
