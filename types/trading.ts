@@ -30,10 +30,18 @@ export type Strategy =
 
 export type CostBasisMethod = "FIFO" | "LIFO" | "AVERAGE";
 
+export type TradingAccount = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+};
+
 export type TradeTransaction = {
   id: string;
   sourceBroker: SourceBroker;
   accountName: string;
+  /** Owning trading account (multi-account support). Mirrors transactions.accountId. */
+  accountId?: string;
   tradeDate: string;
   settlementDate?: string;
   symbol: string;

@@ -31,6 +31,7 @@ import type {
   OptionLifecycle,
   RealizedPnLEvent,
   TradeTransaction,
+  TradingAccount,
 } from "@/types/trading";
 
 const PRIMARY_TABS = ["Home", "Performance", "Tickers", "Positions"] as const;
@@ -50,6 +51,11 @@ type DashboardContextValue = {
   addTransactions: (t: TradeTransaction[]) => void;
   updateTransaction: (t: TradeTransaction) => void;
   deleteTransaction: (id: string) => void;
+  accounts: TradingAccount[];
+  defaultAccountId: string | null;
+  createAccount: (name: string) => Promise<void>;
+  renameAccount: (id: string, name: string) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
 };
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -92,6 +98,36 @@ export function DashboardShell({
   useEffect(() => {
     void loadStore();
   }, []);
+
+  const [accountList, setAccountList] = useState<TradingAccount[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/accounts", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { accounts: [] }))
+      .then((d: { accounts?: TradingAccount[] }) => {
+        if (!cancelled) setAccountList(d.accounts ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const defaultAccountId = accountList.find((a) => a.isDefault)?.id ?? accountList[0]?.id ?? null;
+
+  async function mutateAccounts(promise: Promise<Response>) {
+    const r = await promise;
+    if (r.ok) setAccountList(((await r.json()) as { accounts: TradingAccount[] }).accounts);
+  }
+  const createAccount = (name: string) =>
+    mutateAccounts(
+      fetch("/api/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+    );
+  const renameAccount = (id: string, name: string) =>
+    mutateAccounts(
+      fetch(`/api/accounts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+    );
+  const deleteAccount = (id: string) =>
+    mutateAccounts(fetch(`/api/accounts/${id}`, { method: "DELETE" }));
 
   const allTransactions = useMemo(
     () => [...(settings.showSampleData ? sampleTransactions : []), ...storedTransactions],
@@ -163,6 +199,11 @@ export function DashboardShell({
     addTransactions,
     updateTransaction,
     deleteTransaction,
+    accounts: accountList,
+    defaultAccountId,
+    createAccount,
+    renameAccount,
+    deleteAccount,
   };
 
   return (

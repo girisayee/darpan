@@ -1,9 +1,9 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { transactions, settings } from "@/lib/db/schema";
+import { transactions, tradingAccounts, settings } from "@/lib/db/schema";
 import { defaultSettings } from "@/lib/storage/local-store";
-import type { AppSettings, TradeTransaction } from "@/types/trading";
+import type { AppSettings, TradeTransaction, TradingAccount } from "@/types/trading";
 
 export async function listDbTransactions(userId: string): Promise<TradeTransaction[]> {
   const rows = await db
@@ -22,6 +22,7 @@ export async function replaceDbTransactions(userId: string, txns: TradeTransacti
         txns.map((t) => ({
           id: t.id,
           userId,
+          accountId: t.accountId ?? null,
           payload: t,
           tradeDate: t.tradeDate,
           symbol: t.symbol,
@@ -50,4 +51,70 @@ export async function saveDbSettings(userId: string, s: AppSettings): Promise<vo
 export async function clearDbData(userId: string): Promise<void> {
   await db.delete(transactions).where(eq(transactions.userId, userId));
   await saveDbSettings(userId, { ...defaultSettings, showSampleData: false });
+}
+
+// ── Trading accounts ─────────────────────────────────────────────────────────
+
+function toAccount(row: { id: string; name: string; isDefault: boolean }): TradingAccount {
+  return { id: row.id, name: row.name, isDefault: row.isDefault };
+}
+
+export async function listTradingAccounts(userId: string): Promise<TradingAccount[]> {
+  const rows = await db
+    .select({ id: tradingAccounts.id, name: tradingAccounts.name, isDefault: tradingAccounts.isDefault })
+    .from(tradingAccounts)
+    .where(eq(tradingAccounts.userId, userId))
+    .orderBy(desc(tradingAccounts.isDefault), tradingAccounts.name);
+  return rows.map(toAccount);
+}
+
+/** Guarantee the user has a default account; create "Main account" if none exist. Returns it. */
+export async function ensureDefaultAccount(userId: string): Promise<TradingAccount> {
+  const existing = await listTradingAccounts(userId);
+  const current = existing.find((a) => a.isDefault) ?? existing[0];
+  if (current) return current;
+  const [created] = await db
+    .insert(tradingAccounts)
+    .values({ userId, name: "Main account", isDefault: true })
+    .returning({ id: tradingAccounts.id, name: tradingAccounts.name, isDefault: tradingAccounts.isDefault });
+  return toAccount(created);
+}
+
+export async function createTradingAccount(userId: string, name: string): Promise<TradingAccount> {
+  const [row] = await db
+    .insert(tradingAccounts)
+    .values({ userId, name: name.trim() || "Account", isDefault: false })
+    .returning({ id: tradingAccounts.id, name: tradingAccounts.name, isDefault: tradingAccounts.isDefault });
+  return toAccount(row);
+}
+
+export async function renameTradingAccount(userId: string, id: string, name: string): Promise<void> {
+  const clean = name.trim();
+  if (!clean) return;
+  await db
+    .update(tradingAccounts)
+    .set({ name: clean })
+    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)));
+}
+
+/** Delete a non-default account, reassigning its transactions to the default. */
+export async function deleteTradingAccount(userId: string, id: string): Promise<void> {
+  const [acct] = await db
+    .select({ id: tradingAccounts.id, isDefault: tradingAccounts.isDefault })
+    .from(tradingAccounts)
+    .where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)))
+    .limit(1);
+  if (!acct) return;
+  if (acct.isDefault) throw new Error("Cannot delete the default account.");
+  const def = await ensureDefaultAccount(userId);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(transactions)
+      .set({
+        accountId: def.id,
+        payload: sql`jsonb_set(payload, '{accountId}', to_jsonb(${def.id}::text), true)`,
+      })
+      .where(and(eq(transactions.userId, userId), eq(transactions.accountId, id)));
+    await tx.delete(tradingAccounts).where(and(eq(tradingAccounts.id, id), eq(tradingAccounts.userId, userId)));
+  });
 }

@@ -12,6 +12,10 @@ export default function SettingsPage() {
       manualTransactions={d.manualTransactions}
       onUpdateTransaction={d.updateTransaction}
       onDeleteTransaction={d.deleteTransaction}
+      accounts={d.accounts}
+      onCreateAccount={d.createAccount}
+      onRenameAccount={d.renameAccount}
+      onDeleteAccount={d.deleteAccount}
     />
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { label } from "@/components/dashboard/tabs/shared";
 import { ManualEntryCard } from "@/components/dashboard/ReviewFixPanel";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import type { AppSettings, TradeTransaction } from "@/types/trading";
+import type { AppSettings, TradeTransaction, TradingAccount } from "@/types/trading";
 
 export function SettingsTab({
   settings,
@@ -12,12 +13,20 @@ export function SettingsTab({
   manualTransactions,
   onUpdateTransaction,
   onDeleteTransaction,
+  accounts,
+  onCreateAccount,
+  onRenameAccount,
+  onDeleteAccount,
 }: {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
   manualTransactions: TradeTransaction[];
   onUpdateTransaction: (updated: TradeTransaction) => void;
   onDeleteTransaction: (id: string) => void;
+  accounts: TradingAccount[];
+  onCreateAccount: (name: string) => void;
+  onRenameAccount: (id: string, name: string) => void;
+  onDeleteAccount: (id: string) => void;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -137,6 +146,14 @@ export function SettingsTab({
         </label>
       </SettingsPanel>
       <div className="lg:col-span-2">
+        <ManageAccountsPanel
+          accounts={accounts}
+          onCreate={onCreateAccount}
+          onRename={onRenameAccount}
+          onDelete={onDeleteAccount}
+        />
+      </div>
+      <div className="lg:col-span-2">
         <SettingsPanel title="Manual entries">
           {manualTransactions.length === 0 ? (
             <p className="font-sans text-body text-muted-foreground">
@@ -159,6 +176,94 @@ export function SettingsTab({
           )}
         </SettingsPanel>
       </div>
+    </div>
+  );
+}
+
+function ManageAccountsPanel({
+  accounts,
+  onCreate,
+  onRename,
+  onDelete,
+}: {
+  accounts: TradingAccount[];
+  onCreate: (name: string) => void;
+  onRename: (id: string, name: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [newName, setNewName] = useState("");
+  return (
+    <SettingsPanel title="Accounts">
+      <p className="font-sans text-[11.5px] text-muted-foreground">
+        Broker accounts your trades belong to. The default account can be renamed but not deleted; deleting another
+        account moves its trades to the default.
+      </p>
+      <div className="space-y-2">
+        {accounts.map((a) => (
+          <AccountRow key={a.id} account={a} onRename={onRename} onDelete={onDelete} />
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="New account name"
+          className="h-9 flex-1 rounded-md border border-hairline bg-surface px-3 font-sans text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        />
+        <button
+          type="button"
+          disabled={!newName.trim()}
+          onClick={() => {
+            const n = newName.trim();
+            if (n) {
+              onCreate(n);
+              setNewName("");
+            }
+          }}
+          className="h-9 rounded-md border border-hairline bg-surface px-3 font-sans text-[12px] font-medium text-foreground transition-colors hover:bg-surface-inset disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add account
+        </button>
+      </div>
+    </SettingsPanel>
+  );
+}
+
+function AccountRow({
+  account,
+  onRename,
+  onDelete,
+}: {
+  account: TradingAccount;
+  onRename: (id: string, name: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [name, setName] = useState(account.name);
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => {
+          const n = name.trim();
+          if (n && n !== account.name) onRename(account.id, n);
+          else setName(account.name);
+        }}
+        className="h-9 flex-1 rounded-md border border-hairline bg-surface px-3 font-sans text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      />
+      {account.isDefault ? (
+        <span className="rounded-full bg-accent/15 px-2.5 py-1 font-sans text-[10.5px] font-medium text-accent">
+          Default
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onDelete(account.id)}
+          className="rounded-md border border-neg/30 px-3 py-1.5 font-sans text-[12px] font-medium text-neg transition-colors hover:bg-neg/10"
+        >
+          Delete
+        </button>
+      )}
     </div>
   );
 }
