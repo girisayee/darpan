@@ -11,6 +11,7 @@ artifacts/
 data/*.sqlite
 data/*.sqlite-*
 data/*.sqlite.bak-*
+data/*.sql
 data/benchmark-cache.json
 
 # Personal trading data exports — never commit
