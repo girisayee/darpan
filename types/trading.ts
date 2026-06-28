@@ -243,6 +243,8 @@ export type AppSettings = {
   coveredCallDenominator: "UNDERLYING_COST_BASIS" | "CURRENT_MARKET_VALUE" | "ASSIGNMENT_PROCEEDS";
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL" | "NET_COLLATERAL_AFTER_PREMIUM";
   annualizedReturn: boolean;
+  /** Show the annual-goal headline + equity curve on Performance. Off (or no goal) hides both. */
+  trackAgainstGoal: boolean;
   /** Show open swing stock lots as active positions. Off by default. */
   showSwingOpenPositions: boolean;
 };

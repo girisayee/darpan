@@ -10,6 +10,7 @@ export const defaultSettings: AppSettings = {
   coveredCallDenominator: "UNDERLYING_COST_BASIS",
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL",
   annualizedReturn: true,
+  trackAgainstGoal: true,
   showSwingOpenPositions: false
 };
 

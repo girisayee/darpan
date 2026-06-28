@@ -260,10 +260,14 @@ export function PerformanceTab({
   const peakDeployed = result.aggregates.peakDeployedCapital;
   const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
 
+  // The annual-goal headline and the equity curve only make sense when the user
+  // is tracking against a goal; hide both when the toggle is off or no goal is set.
+  const showGoal = (settings.trackAgainstGoal ?? true) && annualGoal > 0;
+
   return (
     <div className="space-y-5 py-2">
       {/* ── Annual goal (headline) ── */}
-      {annualGoal > 0 && (
+      {showGoal && (
         <div className="rounded-[14px] border border-hairline bg-surface p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-body font-medium text-muted-foreground">Annual goal</span>
@@ -287,14 +291,18 @@ export function PerformanceTab({
         </div>
       )}
 
-      {/* ── Equity curve + market comparison (side by side on large screens) ── */}
-      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-        <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
-          <h2 className="font-sans text-strong font-medium text-foreground">Equity curve</h2>
-          <EquityCurveChart result={result} annualGoal={annualGoal} />
+      {/* ── Equity curve + market comparison ── */}
+      {showGoal ? (
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+          <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
+            <h2 className="font-sans text-strong font-medium text-foreground">Equity curve</h2>
+            <EquityCurveChart result={result} annualGoal={annualGoal} />
+          </div>
+          <BenchmarkComparison result={result} />
         </div>
+      ) : (
         <BenchmarkComparison result={result} />
-      </div>
+      )}
 
       {/* ── Capital deployed metrics ── */}
       <MetricGroup label="Capital deployed" cols={4}>

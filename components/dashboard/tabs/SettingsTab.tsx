@@ -43,6 +43,11 @@ export function SettingsTab({
             onChange({ ...settings, showSwingOpenPositions: checked })
           }
         />
+        <Toggle
+          label="Track against goal"
+          checked={settings.trackAgainstGoal ?? true}
+          onChange={(checked) => onChange({ ...settings, trackAgainstGoal: checked })}
+        />
         <label className="grid gap-1">
           <span className="font-sans text-caption text-muted-foreground">
             Annual realized P&amp;L goal
