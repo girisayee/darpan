@@ -1,3 +1,10 @@
+export const MASKED_AMOUNT = "$••••";
+
+export function formatMaskedCurrency(value: number | null | undefined, masked: boolean, options: Intl.NumberFormatOptions = {}): string {
+  if (masked) return MASKED_AMOUNT;
+  return formatCurrency(value, options);
+}
+
 export function formatCurrency(value: number | null | undefined, options: Intl.NumberFormatOptions = {}) {
   if (value === null || value === undefined || Number.isNaN(value)) return "N/A";
   return new Intl.NumberFormat("en-US", {

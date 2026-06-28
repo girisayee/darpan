@@ -46,6 +46,7 @@ function TabCard({
   sub,
   active,
   onClick,
+  maskAmounts = false,
 }: {
   name: string;
   count: string;
@@ -53,6 +54,7 @@ function TabCard({
   sub: string;
   active: boolean;
   onClick: () => void;
+  maskAmounts?: boolean;
 }) {
   return (
     <button
@@ -68,7 +70,7 @@ function TabCard({
         <span className="text-strong font-medium text-foreground">{name}</span>
         <span className="text-body text-muted-foreground">{count}</span>
       </div>
-      <div className="mt-0.5 text-[19px] font-medium tabular-nums">{signedMoney(pnl)}</div>
+      <div className="mt-0.5 text-[19px] font-medium tabular-nums">{signedMoney(pnl, maskAmounts)}</div>
       <div className="mt-0.5 text-body text-muted-foreground">{sub}</div>
     </button>
   );
@@ -165,6 +167,7 @@ export function PositionsTab(props: {
           pnl={cards.optionsPnl}
           sub={cards.optionsSub}
           active={tab === "options"}
+          maskAmounts={settings.maskAmounts}
           onClick={() => {
             navigate({ view: "options", strategy: optionChip });
             setStateFilter("All");
@@ -176,6 +179,7 @@ export function PositionsTab(props: {
           pnl={cards.swingPnl}
           sub={cards.swingSub}
           active={tab === "swing"}
+          maskAmounts={settings.maskAmounts}
           onClick={() => {
             navigate({ view: "swing" });
             setStateFilter("All");

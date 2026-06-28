@@ -33,7 +33,7 @@ At-a-glance, year-to-date by default:
   buying power.
 - **Open positions** — your active option plays (roll-soon first); click one for its detail
   drawer, or jump to the full Positions tab.
-- **By strategy** — a P&L / ROI / win-rate snapshot per strategy; tap to open that strategy
+- **By strategy** — a P&L / RoC / win-rate snapshot per strategy; tap to open that strategy
   in Positions.
 
 ### Performance
@@ -43,14 +43,14 @@ At-a-glance, year-to-date by default:
 - **Equity curve** — cumulative realized P&L over the year vs. goal pace.
 - **Capital deployed** — average and peak deployed, return on capital, capital utilization,
   capital turnover, income per day, and concentration (HHI).
-- **Monthly P&L** — a bar chart plus a breakdown table (P&L, ROI, average capital, and ROI by
+- **Monthly P&L** — a bar chart plus a breakdown table (P&L, RoC, average capital, and RoC by
   strategy: CSP / CC / Swing).
 
 ### Tickers
 
 - **Leaderboard** — "Money makers" and "Account killers": your symbols ranked by net P&L,
   annotated with win rate and trade count so a single lucky trade can't top the board.
-- **Full symbol table** — every symbol you've traded, sortable and searchable (net P&L, ROI,
+- **Full symbol table** — every symbol you've traded, sortable and searchable (net P&L, RoC,
   trades, win rate).
 
 ### Positions

@@ -11,7 +11,7 @@ import { signedMoney, currentDeployedCapital, tone } from "@/components/dashboar
 import { dailyPnl } from "@/lib/selectors/daily-pnl";
 import { tradeQuality } from "@/lib/selectors/trade-quality";
 import { toAllPositionRows } from "@/components/dashboard/positions/columns";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatMaskedCurrency, formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
 
@@ -33,10 +33,12 @@ function OpenPositions({
   result,
   onSelect,
   onViewAll,
+  maskAmounts = false,
 }: {
   result: CalculationResult;
   onSelect: (l: OptionLifecycle) => void;
   onViewAll: () => void;
+  maskAmounts?: boolean;
 }) {
   const open = toAllPositionRows(result, "active").filter((r) => r.lifecycle);
   const rows = [...open].sort((a, b) => (b.warm ? 1 : 0) - (a.warm ? 1 : 0)).slice(0, 6);
@@ -76,7 +78,7 @@ function OpenPositions({
                   <span className="text-muted-foreground"> · {r.when}</span>
                 </div>
               </div>
-              <div className="text-strong font-medium tabular-nums">{signedMoney(r.pnl)}</div>
+              <div className="text-strong font-medium tabular-nums">{signedMoney(r.pnl, maskAmounts)}</div>
             </button>
           ))}
         </div>
@@ -121,14 +123,14 @@ export function HomeTab({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <MetricCard
           label="Net P&L · YTD"
-          value={formatCurrency(ytdPnl)}
-          helper={`${returnOnCapital != null ? formatPercent(returnOnCapital) : "—"} on capital`}
+          value={formatMaskedCurrency(ytdPnl, settings.maskAmounts)}
+          helper={`${returnOnCapital != null ? formatPercent(returnOnCapital) : "—"} RoC`}
           tooltip="Calendar-year realized P&L across all closed events."
           tone={tone(ytdPnl)}
         />
         <MetricCard
           label="Expectancy"
-          value={quality.expectancy != null ? formatCurrency(quality.expectancy) : "—"}
+          value={quality.expectancy != null ? formatMaskedCurrency(quality.expectancy, settings.maskAmounts) : "—"}
           helper="avg per trade"
           tooltip="Mean realized P&L per closed event."
           tone={tone(quality.expectancy ?? 0)}
@@ -164,8 +166,8 @@ export function HomeTab({
         </div>
 
         <div className="flex flex-col gap-4">
-          <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} />
-          <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} />
+          <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} maskAmounts={settings.maskAmounts} />
+          <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} maskAmounts={settings.maskAmounts} />
         </div>
       </div>
 
@@ -175,7 +177,7 @@ export function HomeTab({
           <span className="text-body font-medium text-muted-foreground">By strategy · YTD</span>
           <span className="text-body text-muted-foreground">tap to open →</span>
         </div>
-        <StrategyStrip result={result} onOpen={onOpenStrategy} />
+        <StrategyStrip result={result} onOpen={onOpenStrategy} maskAmounts={settings.maskAmounts} />
       </div>
     </div>
   );

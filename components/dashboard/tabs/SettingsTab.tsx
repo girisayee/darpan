@@ -48,6 +48,11 @@ export function SettingsTab({
           checked={settings.trackAgainstGoal ?? true}
           onChange={(checked) => onChange({ ...settings, trackAgainstGoal: checked })}
         />
+        <Toggle
+          label="Mask dollar amounts"
+          checked={settings.maskAmounts ?? false}
+          onChange={(checked) => onChange({ ...settings, maskAmounts: checked })}
+        />
         <label className="grid gap-1">
           <span className="font-sans text-caption text-muted-foreground">
             Annual realized P&amp;L goal

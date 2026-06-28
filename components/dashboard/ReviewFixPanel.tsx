@@ -138,7 +138,7 @@ export function buildOrphanRows(result: CalculationResult): OrphanRow[] {
       expirationDate: null,
       qty: shares,
       reason:
-        "Covered call — underlying shares not imported. Add your original share purchase to set cost basis, capital & ROI.",
+        "Covered call — underlying shares not imported. Add your original share purchase to set cost basis, capital & RoC.",
       sourceTx: tx,
     });
   }

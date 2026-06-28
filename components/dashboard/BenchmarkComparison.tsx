@@ -70,8 +70,8 @@ function DataBarRow({
   return (
     <div className="grid grid-cols-[96px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
       <span className="font-sans leading-tight">
-        <span className={cn("text-body", emphasis ? "font-medium text-foreground" : "text-foreground")}>{label}</span>
-        {row.sub && <span className="block text-micro text-muted-foreground">{row.sub}</span>}
+        {row.sub && <span className={cn("block text-body", emphasis ? "font-medium text-foreground" : "text-foreground")}>{row.sub}</span>}
+        <span className="block text-micro text-muted-foreground">{label}</span>
       </span>
 
       <div className="relative h-3.5 rounded bg-surface-inset">
@@ -259,7 +259,7 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
     },
     {
       label: "VTI",
-      sub: "Total US market",
+      sub: "Total market",
       pct: vtiResult?.returnPct ?? null,
       dollarPnl: dollarsOn(vtiResult?.returnPct),
       unavailable: status === "success" && !vtiResult,

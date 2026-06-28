@@ -11,7 +11,8 @@ export const defaultSettings: AppSettings = {
   cashSecuredPutDenominator: "CONSERVATIVE_COLLATERAL",
   annualizedReturn: true,
   trackAgainstGoal: true,
-  showSwingOpenPositions: false
+  showSwingOpenPositions: false,
+  maskAmounts: false
 };
 
 export type BackupPayload = {

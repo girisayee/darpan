@@ -247,6 +247,8 @@ export type AppSettings = {
   trackAgainstGoal: boolean;
   /** Show open swing stock lots as active positions. Off by default. */
   showSwingOpenPositions: boolean;
+  /** Replace all dollar amounts with $•••• for screen-sharing / privacy mode. */
+  maskAmounts: boolean;
 };
 
 export type CalculationResult = {

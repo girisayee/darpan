@@ -12,7 +12,7 @@ export function Logo({ size = 24, showWordmark = true }: { size?: number; showWo
           <polyline points="3,14 9,19 13,16 21,21" stroke="#fff" strokeWidth="1.8" strokeOpacity="0.4" />
         </svg>
       </span>
-      {showWordmark && <span className="text-strong font-semibold text-foreground">Darpan</span>}
+      {showWordmark && <span className="text-[22px] font-semibold tracking-tight text-foreground">Darpan</span>}
     </span>
   );
 }

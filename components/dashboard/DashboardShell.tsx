@@ -235,6 +235,8 @@ export function DashboardShell({
         onManageEntries={() => router.push("/entries")}
         onExport={() => downloadBackup(allTransactions, settings)}
         user={user}
+        maskAmounts={settings.maskAmounts ?? false}
+        onToggleMaskAmounts={() => updateSettings({ ...settings, maskAmounts: !settings.maskAmounts })}
       />
 
       {!store.loaded && (
@@ -286,6 +288,7 @@ export function DashboardShell({
         }}
         accounts={accountList}
         onAssignAccount={assignAccount}
+        maskAmounts={settings.maskAmounts ?? false}
       />
 
       <ReviewFixPanel

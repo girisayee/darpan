@@ -21,6 +21,7 @@ function Tile({
   winRate,
   hint,
   onClick,
+  maskAmounts = false,
 }: {
   name: string;
   pnl: number;
@@ -28,6 +29,7 @@ function Tile({
   winRate: number | null;
   hint: string;
   onClick: () => void;
+  maskAmounts?: boolean;
 }) {
   return (
     <button
@@ -35,12 +37,12 @@ function Tile({
       onClick={onClick}
       className="rounded-[12px] border border-hairline bg-surface p-4 text-left hover:border-accent"
     >
-      <div className="text-[13px] font-medium text-foreground">{name}</div>
-      <div className="mt-1 text-[24px] font-semibold tabular-nums">{signedMoney(pnl)}</div>
-      <div className="mt-0.5 text-[12px] text-muted-foreground">
-        ROC {formatPercent(roc)} · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
+      <div className="text-caption text-muted-foreground">{name}</div>
+      <div className="mt-1 text-[24px] font-semibold tabular-nums leading-none">{signedMoney(pnl, maskAmounts)}</div>
+      <div className="mt-1.5 text-strong font-medium text-foreground">{hint}</div>
+      <div className="mt-0.5 text-caption text-dim">
+        {roc != null ? formatPercent(roc) : "—"} RoC · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
       </div>
-      <div className="mt-1.5 text-[10.5px] text-dim">{hint}</div>
     </button>
   );
 }
@@ -48,9 +50,11 @@ function Tile({
 export function StrategyStrip({
   result,
   onOpen,
+  maskAmounts = false,
 }: {
   result: CalculationResult;
   onOpen: (target: StrategyTarget) => void;
+  maskAmounts?: boolean;
 }) {
   const options = optionsAnalytics(result);
   const swing = strategyAnalytics(result, "swing");
@@ -64,6 +68,7 @@ export function StrategyStrip({
         winRate={options.quality.winRate}
         hint="CSP · Covered calls · Long"
         onClick={() => onOpen("options")}
+        maskAmounts={maskAmounts}
       />
       <Tile
         name="Stock trades"
@@ -72,6 +77,7 @@ export function StrategyStrip({
         winRate={swing.quality.winRate}
         hint={`${swing.quality.totalTrades} trade${swing.quality.totalTrades === 1 ? "" : "s"}`}
         onClick={() => onOpen("swing")}
+        maskAmounts={maskAmounts}
       />
     </div>
   );

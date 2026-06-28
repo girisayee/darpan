@@ -9,7 +9,7 @@ import { Column, DataTable } from "@/components/tables/DataTable";
 import { StatusChip } from "@/components/common/StatusChip";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { cn } from "@/lib/utils/cn";
-import { compactMonth, formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
+import { compactMonth, formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
   CalculationResult,
   MonthlyCapitalReturn,
@@ -39,7 +39,8 @@ export function label(value: string | null | undefined) {
 
 // ── Signed money/percent ─────────────────────────────────────────────────────
 
-export function signedMoney(value: number) {
+export function signedMoney(value: number, masked = false) {
+  if (masked) return <span className="tabular-nums text-muted-foreground">{MASKED_AMOUNT}</span>;
   return (
     <span className={cn(value > 0 && "text-pos", value < 0 && "text-neg")}>
       {formatCurrency(value)}
@@ -126,7 +127,7 @@ export function SegmentedControl<T extends string>({
 
 // ── MonthlyRoiTable ──────────────────────────────────────────────────────────
 
-export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
+export function MonthlyRoiTable({ rows, maskAmounts = false }: { rows: MonthlyCapitalReturn[]; maskAmounts?: boolean }) {
   const columns: Column<MonthlyCapitalReturn>[] = [
     {
       key: "month",
@@ -138,7 +139,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       key: "realizedPnl",
       header: "Realized P&L",
       value: (row) => row.realizedPnl,
-      render: (row) => signedMoney(row.realizedPnl),
+      render: (row) => signedMoney(row.realizedPnl, maskAmounts),
       align: "right",
       tooltip: "Net realized P&L from all events that closed during this month.",
     },
@@ -146,7 +147,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       key: "averageDeployedCapital",
       header: "Average Capital",
       value: (row) => row.averageDeployedCapital,
-      render: (row) => formatCurrency(row.averageDeployedCapital),
+      render: (row) => formatMaskedCurrency(row.averageDeployedCapital, maskAmounts),
       align: "right",
       tooltip: "Average capital deployed across the month (time-weighted by days).",
     },
@@ -154,13 +155,13 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
       key: "peakDeployedCapital",
       header: "Peak Capital",
       value: (row) => row.peakDeployedCapital,
-      render: (row) => formatCurrency(row.peakDeployedCapital),
+      render: (row) => formatMaskedCurrency(row.peakDeployedCapital, maskAmounts),
       align: "right",
       tooltip: "Highest capital deployed on any single day that month.",
     },
     {
       key: "realizedRoiPercent",
-      header: "Monthly ROI %",
+      header: "Monthly RoC",
       value: (row) => row.realizedRoiPercent ?? -999,
       render: (row) => signedPercent(row.realizedRoiPercent),
       align: "right",
@@ -168,7 +169,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
     },
     {
       key: "coveredCallRoiPercent",
-      header: "CC ROI",
+      header: "CC RoC",
       value: (row) => row.coveredCallRoiPercent ?? -999,
       render: (row) => signedPercent(row.coveredCallRoiPercent),
       align: "right",
@@ -176,7 +177,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
     },
     {
       key: "cashSecuredPutRoiPercent",
-      header: "CSP ROI",
+      header: "CSP RoC",
       value: (row) => row.cashSecuredPutRoiPercent ?? -999,
       render: (row) => signedPercent(row.cashSecuredPutRoiPercent),
       align: "right",
@@ -184,7 +185,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
     },
     {
       key: "swingTradeRoiPercent",
-      header: "Stock ROI",
+      header: "Stock RoC",
       value: (row) => row.swingTradeRoiPercent ?? -999,
       render: (row) => signedPercent(row.swingTradeRoiPercent),
       align: "right",
@@ -192,7 +193,7 @@ export function MonthlyRoiTable({ rows }: { rows: MonthlyCapitalReturn[] }) {
     },
   ];
   return (
-    <DataTable rows={rows} columns={columns} empty="No monthly ROI rows yet." />
+    <DataTable rows={rows} columns={columns} empty="No monthly RoC rows yet." />
   );
 }
 
@@ -218,10 +219,12 @@ export function ClosedTradesTable({
   rows,
   onSelectEvent,
   empty = "No closed trades yet.",
+  maskAmounts = false,
 }: {
   rows: RealizedPnLEvent[];
   onSelectEvent: (e: RealizedPnLEvent) => void;
   empty?: string;
+  maskAmounts?: boolean;
 }) {
   // Filter DATA_ISSUE; DataTable handles sort via defaultSort below
   const filtered = rows.filter((r) => r.strategy !== "DATA_ISSUE");
@@ -289,7 +292,7 @@ export function ClosedTradesTable({
       key: "optionPremium",
       header: "Premium",
       value: (row) => row.optionPremium,
-      render: (row) => signedMoney(row.optionPremium),
+      render: (row) => signedMoney(row.optionPremium, maskAmounts),
       align: "right",
       tooltip: "Net option premium received to open (credit), or paid for a long option.",
     },
@@ -297,7 +300,7 @@ export function ClosedTradesTable({
       key: "realizedPnl",
       header: "Realized P&L",
       value: (row) => row.realizedPnl,
-      render: (row) => signedMoney(row.realizedPnl),
+      render: (row) => signedMoney(row.realizedPnl, maskAmounts),
       align: "right",
       tooltip: "Sale proceeds − cost basis − fees.",
     },
@@ -316,11 +319,11 @@ export function ClosedTradesTable({
     },
     {
       key: "roiPercent",
-      header: "ROI %",
+      header: "RoC",
       value: (row) => row.roiPercent ?? -Infinity,
       render: (row) => signedPercent(row.roiPercent),
       align: "right",
-      tooltip: "Realized P&L ÷ cost basis.",
+      tooltip: "Realized P&L ÷ capital deployed (cost basis).",
     },
   ];
 
@@ -388,6 +391,7 @@ export function ClosedCyclesTable({
   empty = "No closed option cycles yet.",
   onRowClick,
   manualTxIds,
+  maskAmounts = false,
 }: {
   rows: OptionLifecycle[];
   empty?: string;
@@ -395,6 +399,7 @@ export function ClosedCyclesTable({
   onRowClick?: (lifecycle: OptionLifecycle) => void;
   /** Set of manual transaction ids (tags includes 'manual') — used to show badge. */
   manualTxIds?: Set<string>;
+  maskAmounts?: boolean;
 }) {
   const columns: Column<OptionLifecycle>[] = [
     // 1. Date (close date) — first column, default sort target
@@ -495,6 +500,7 @@ export function ClosedCyclesTable({
       tooltip: "Net option premium received to open (credit), or paid for a long option.",
       value: (row) => row.premiumReceived,
       render: (row) => {
+        if (maskAmounts) return <span className="tabular-nums text-muted-foreground">{MASKED_AMOUNT}</span>;
         if (row.direction === "long") {
           // Show the debit paid to open (negative cost).
           // For STC-closed longs: open cost is in closeCost (swapped by engine).
@@ -520,7 +526,7 @@ export function ClosedCyclesTable({
         if (row.assignmentStockPnl == null) {
           return <span className="opacity-50">—</span>;
         }
-        return signedMoney(row.assignmentStockPnl);
+        return signedMoney(row.assignmentStockPnl, maskAmounts);
       },
       align: "right",
     },
@@ -532,7 +538,7 @@ export function ClosedCyclesTable({
       value: (row) => row.netOptionPnl + (row.assignmentStockPnl ?? 0),
       render: (row) => {
         const net = row.netOptionPnl + (row.assignmentStockPnl ?? 0);
-        return signedMoney(net);
+        return signedMoney(net, maskAmounts);
       },
       align: "right",
     },
@@ -548,7 +554,7 @@ export function ClosedCyclesTable({
         const cap = row.capitalDeployed ?? 0;
         if (cap <= 0) return <span className="opacity-50">—</span>;
         return (
-          <span className="tabular-nums text-foreground">{formatCurrency(cap)}</span>
+          <span className="tabular-nums text-foreground">{formatMaskedCurrency(cap, maskAmounts)}</span>
         );
       },
       align: "right",
@@ -556,7 +562,7 @@ export function ClosedCyclesTable({
     // 11. ROI — net realized P/L ÷ capitalDeployed
     {
       key: "roi",
-      header: "ROI",
+      header: "RoC",
       tooltip: "Realized P/L ÷ capital deployed.",
       value: (row) => {
         const cap = row.capitalDeployed ?? 0;

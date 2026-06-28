@@ -3,10 +3,11 @@
 import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
 import { peakCapitalRoi, peakConcurrentCapital } from "@/lib/selectors/symbol-capital";
+import { symbolReturnOnCapital } from "@/lib/selectors/return-on-capital";
 import { TickerLogo } from "@/components/common/TickerLogo";
 
 /** Summary row for a single symbol, as produced by the calculation engine. */
@@ -14,8 +15,9 @@ export type SymbolSummary = CalculationResult["aggregates"]["symbolBreakdown"][n
 
 // ---------- helpers ----------
 
-function signedCurrency(value: number | null | undefined, opts?: Intl.NumberFormatOptions) {
+function signedCurrency(value: number | null | undefined, masked = false, opts?: Intl.NumberFormatOptions) {
   if (value === null || value === undefined || Number.isNaN(value)) return "N/A";
+  if (masked) return MASKED_AMOUNT;
   const formatted = formatCurrency(Math.abs(value), { maximumFractionDigits: 2, ...opts });
   return value >= 0 ? `+${formatted}` : `−${formatted}`;
 }
@@ -141,6 +143,7 @@ export function DetailDrawer({
   onSelectLifecycle,
   accounts = [],
   onAssignAccount,
+  maskAmounts,
 }: {
   event?: RealizedPnLEvent | null;
   lifecycle?: OptionLifecycle | null;
@@ -158,10 +161,12 @@ export function DetailDrawer({
   onSelectLifecycle?: (l: OptionLifecycle) => void;
   accounts?: TradingAccount[];
   onAssignAccount?: (transactionIds: string[], accountId: string) => void;
+  maskAmounts?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
+  const masked = maskAmounts ?? false;
 
   // The drawer is open when an event (stock/swing), a lifecycle (option), or a symbol is set.
   const open = !!event || !!lifecycle || !!symbol;
@@ -275,6 +280,7 @@ export function DetailDrawer({
               onBack={backHandler}
               onReviewFix={onReviewFix}
               closeButtonRef={closeButtonRef}
+              maskAmounts={masked}
             />
           ) : event ? (
             <EventDetailBody
@@ -285,6 +291,7 @@ export function DetailDrawer({
               onClose={onClose}
               onBack={backHandler}
               closeButtonRef={closeButtonRef}
+              maskAmounts={masked}
             />
           ) : (
             <SymbolDetailBody
@@ -296,6 +303,7 @@ export function DetailDrawer({
               onSelectEvent={onSelectEvent}
               onSelectLifecycle={onSelectLifecycle}
               closeButtonRef={closeButtonRef}
+              maskAmounts={masked}
             />
           )}
 
@@ -344,6 +352,7 @@ function EventDetailBody({
   onClose,
   onBack,
   closeButtonRef,
+  maskAmounts = false,
 }: {
   event: RealizedPnLEvent;
   transactions: TradeTransaction[];
@@ -352,6 +361,7 @@ function EventDetailBody({
   onClose: () => void;
   onBack?: () => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
+  maskAmounts?: boolean;
 }) {
   // Derived values — null-safe throughout
   const grossProceeds = event.grossProceeds ?? 0;
@@ -433,7 +443,7 @@ function EventDetailBody({
         </button>
       </div>
 
-      {/* ── Hero: Realized P&L + ROI ── */}
+      {/* ── Hero: Realized P&L + RoC ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
           <div className="font-sans text-caption text-muted-foreground">
@@ -445,11 +455,11 @@ function EventDetailBody({
               toneClass(realizedPnl)
             )}
           >
-            {signedCurrency(realizedPnl)}
+            {signedCurrency(realizedPnl, maskAmounts)}
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-caption text-muted-foreground">ROI</div>
+          <div className="font-sans text-caption text-muted-foreground">RoC</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -472,7 +482,7 @@ function EventDetailBody({
         <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
           <span className="text-dim">Gross proceeds</span>
           <span className={cn("font-sans tabular-nums font-medium", toneClass(grossProceeds))}>
-            {signedCurrency(grossProceeds)}
+            {signedCurrency(grossProceeds, maskAmounts)}
           </span>
         </div>
         {/* Cost basis */}
@@ -484,23 +494,21 @@ function EventDetailBody({
               : ""}
           </span>
           <span className="font-sans tabular-nums font-medium text-neg">
-            {costBasis !== 0 ? `−${formatCurrency(Math.abs(costBasis), { maximumFractionDigits: 2 })}` : "$0.00"}
+            {maskAmounts ? MASKED_AMOUNT : costBasis !== 0 ? `−${formatCurrency(Math.abs(costBasis), { maximumFractionDigits: 2 })}` : "$0.00"}
           </span>
         </div>
         {/* Fees */}
         <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
           <span className="text-dim">Fees</span>
           <span className="font-sans tabular-nums font-medium text-foreground">
-            {fees !== 0
-              ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}`
-              : "$0.00"}
+            {maskAmounts ? MASKED_AMOUNT : fees !== 0 ? `−${formatCurrency(Math.abs(fees), { maximumFractionDigits: 2 })}` : "$0.00"}
           </span>
         </div>
         {/* Total row */}
         <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-strong">
           <span className="text-foreground font-medium">Realized P&amp;L</span>
           <span className={cn("font-sans tabular-nums font-medium", toneClass(realizedPnl))}>
-            {signedCurrency(realizedPnl)}
+            {signedCurrency(realizedPnl, maskAmounts)}
           </span>
         </div>
       </div>
@@ -521,7 +529,7 @@ function EventDetailBody({
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Share cost basis</span>
               <span className="font-sans tabular-nums font-medium text-neg">
-                {shareDetail.costBasis != null
+                {maskAmounts ? MASKED_AMOUNT : shareDetail.costBasis != null
                   ? `−${formatCurrency(Math.abs(shareDetail.costBasis), { maximumFractionDigits: 2 })}`
                   : "N/A"}
               </span>
@@ -529,17 +537,17 @@ function EventDetailBody({
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Strike proceeds</span>
               <span className="font-sans tabular-nums font-medium text-pos">
-                {`+${formatCurrency(shareDetail.proceeds, { maximumFractionDigits: 2 })}`}
+                {maskAmounts ? MASKED_AMOUNT : `+${formatCurrency(shareDetail.proceeds, { maximumFractionDigits: 2 })}`}
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-strong">
               <span className="text-foreground font-medium">Assignment P&amp;L (shares)</span>
               <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.pnl))}>
-                {signedCurrency(shareDetail.pnl)}
+                {signedCurrency(shareDetail.pnl, maskAmounts)}
               </span>
             </div>
             <div className="flex items-center justify-between py-2.5 font-sans text-strong">
-              <span className="text-dim">Share ROI</span>
+              <span className="text-dim">Share RoC</span>
               <span className={cn("font-sans tabular-nums font-medium", toneClass(shareDetail.roiPercent))}>
                 {shareDetail.roiPercent !== null
                   ? `${shareDetail.roiPercent >= 0 ? "+" : ""}${formatPercent(shareDetail.roiPercent)}`
@@ -564,13 +572,13 @@ function EventDetailBody({
             <div className="flex items-center justify-between border-b border-hairline-soft py-2.5 font-sans text-strong">
               <span className="text-dim">Cost basis / share</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
-                {formatCurrency(shareDetail.costBasisPerShare, { maximumFractionDigits: 2 })}
+                {formatMaskedCurrency(shareDetail.costBasisPerShare, maskAmounts, { maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-hairline pt-2.5 mt-0.5 font-sans text-strong">
               <span className="text-foreground font-medium">Total cost basis</span>
               <span className="font-sans tabular-nums font-medium text-foreground">
-                {formatCurrency(shareDetail.costBasisTotal, { maximumFractionDigits: 2 })}
+                {formatMaskedCurrency(shareDetail.costBasisTotal, maskAmounts, { maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="py-2 font-sans text-caption text-muted-foreground">
@@ -589,7 +597,7 @@ function EventDetailBody({
         />
         <MetaCell
           label="Capital"
-          value={capitalDeployed !== null ? formatCurrency(capitalDeployed) : "N/A"}
+          value={capitalDeployed !== null ? formatMaskedCurrency(capitalDeployed, maskAmounts) : "N/A"}
         />
         <MetaCell
           label="Annualized"
@@ -652,6 +660,7 @@ function OptionCycleBody({
   onBack,
   onReviewFix,
   closeButtonRef,
+  maskAmounts = false,
 }: {
   lifecycle: OptionLifecycle;
   transactions: TradeTransaction[];
@@ -661,6 +670,7 @@ function OptionCycleBody({
   onBack?: () => void;
   onReviewFix?: () => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
+  maskAmounts?: boolean;
 }) {
   const lc = lifecycle;
   const share = lifecycleShareDetail(lc, events, taxLots);
@@ -748,7 +758,7 @@ function OptionCycleBody({
         </button>
       </div>
 
-      {/* ── Hero: total realized + cycle ROI ── */}
+      {/* ── Hero: total realized + cycle RoC ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
           <div className="font-sans text-caption text-muted-foreground">Total realized</div>
@@ -758,11 +768,11 @@ function OptionCycleBody({
               toneClass(total)
             )}
           >
-            {signedCurrency(total)}
+            {signedCurrency(total, maskAmounts)}
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-caption text-muted-foreground">Cycle ROI</div>
+          <div className="font-sans text-caption text-muted-foreground">Cycle RoC</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -779,13 +789,15 @@ function OptionCycleBody({
       <div className="mt-1.5">
         <Row
           label={isShort ? "Premium collected" : "Premium paid"}
-          value={signedCurrency(isShort ? lc.premiumReceived : -lc.premiumReceived)}
+          value={signedCurrency(isShort ? lc.premiumReceived : -lc.premiumReceived, maskAmounts)}
           valueClass={toneClass(isShort ? lc.premiumReceived : -lc.premiumReceived)}
         />
         <Row
           label={expiredWorthless ? "Expired worthless" : "Buy-to-close cost"}
           value={
-            expiredWorthless
+            maskAmounts
+              ? MASKED_AMOUNT
+              : expiredWorthless
               ? "$0.00"
               : `−${formatCurrency(Math.abs(lc.closeCost), { maximumFractionDigits: 2 })}`
           }
@@ -794,7 +806,9 @@ function OptionCycleBody({
         <Row
           label="Fees"
           value={
-            lc.fees !== 0
+            maskAmounts
+              ? MASKED_AMOUNT
+              : lc.fees !== 0
               ? `−${formatCurrency(Math.abs(lc.fees), { maximumFractionDigits: 2 })}`
               : "$0.00"
           }
@@ -803,14 +817,14 @@ function OptionCycleBody({
           label="Net option P&L"
           bold
           topBorder
-          value={signedCurrency(lc.netOptionPnl)}
+          value={signedCurrency(lc.netOptionPnl, maskAmounts)}
           valueClass={toneClass(lc.netOptionPnl)}
         />
         <Row
-          label="Option ROI"
+          label="Option RoC"
           helper={
             capital > 0
-              ? `on ${formatCurrency(capital)} ${isShort ? "collateral" : "cost"}`
+              ? `on ${formatMaskedCurrency(capital, maskAmounts)} ${isShort ? "collateral" : "cost"}`
               : undefined
           }
           value={signedPercentText(optionRoi)}
@@ -835,7 +849,9 @@ function OptionCycleBody({
             <Row
               label="Share cost basis"
               value={
-                share.basisMissing
+                maskAmounts
+                  ? MASKED_AMOUNT
+                  : share.basisMissing
                   ? "Not entered"
                   : `−${formatCurrency(Math.abs(share.costBasis ?? 0), { maximumFractionDigits: 2 })}`
               }
@@ -843,18 +859,18 @@ function OptionCycleBody({
             />
             <Row
               label="Sold at strike"
-              value={`+${formatCurrency(share.proceeds, { maximumFractionDigits: 2 })}`}
+              value={maskAmounts ? MASKED_AMOUNT : `+${formatCurrency(share.proceeds, { maximumFractionDigits: 2 })}`}
               valueClass="text-pos"
             />
             <Row
               label="Assignment P&L (shares)"
               bold
               topBorder
-              value={signedCurrency(share.pnl)}
+              value={signedCurrency(share.pnl, maskAmounts)}
               valueClass={toneClass(share.pnl)}
             />
             <Row
-              label="Share ROI"
+              label="Share RoC"
               value={signedPercentText(share.roiPercent)}
               valueClass={toneClass(share.roiPercent)}
             />
@@ -888,13 +904,13 @@ function OptionCycleBody({
             />
             <Row
               label="Cost basis / share"
-              value={formatCurrency(share.costBasisPerShare, { maximumFractionDigits: 2 })}
+              value={formatMaskedCurrency(share.costBasisPerShare, maskAmounts, { maximumFractionDigits: 2 })}
             />
             <Row
               label="Total cost basis"
               bold
               topBorder
-              value={formatCurrency(share.costBasisTotal, { maximumFractionDigits: 2 })}
+              value={formatMaskedCurrency(share.costBasisTotal, maskAmounts, { maximumFractionDigits: 2 })}
             />
             <div className="py-2 font-sans text-caption text-muted-foreground">
               Strike purchase net of premium received — now held as a stock lot.
@@ -910,19 +926,19 @@ function OptionCycleBody({
           <div className="mt-1.5">
             <Row
               label="Option P&L"
-              value={signedCurrency(lc.netOptionPnl)}
+              value={signedCurrency(lc.netOptionPnl, maskAmounts)}
               valueClass={toneClass(lc.netOptionPnl)}
             />
             <Row
               label="Share P&L"
-              value={signedCurrency(assignmentStockPnl)}
+              value={signedCurrency(assignmentStockPnl, maskAmounts)}
               valueClass={toneClass(assignmentStockPnl)}
             />
             <Row
               label="Total realized"
               bold
               topBorder
-              value={signedCurrency(total)}
+              value={signedCurrency(total, maskAmounts)}
               valueClass={toneClass(total)}
             />
           </div>
@@ -938,7 +954,7 @@ function OptionCycleBody({
         />
         <MetaCell
           label="Capital"
-          value={capital > 0 ? formatCurrency(capital) : "—"}
+          value={capital > 0 ? formatMaskedCurrency(capital, maskAmounts) : "—"}
         />
         <MetaCell
           label="Annualized"
@@ -1033,6 +1049,7 @@ function SymbolDetailBody({
   onSelectEvent,
   onSelectLifecycle,
   closeButtonRef,
+  maskAmounts = false,
 }: {
   summary: SymbolSummary;
   events: RealizedPnLEvent[];
@@ -1042,6 +1059,7 @@ function SymbolDetailBody({
   onSelectEvent?: (e: RealizedPnLEvent) => void;
   onSelectLifecycle?: (l: OptionLifecycle) => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
+  maskAmounts?: boolean;
 }) {
   const symbolEvents = events
     .filter((e) => e.symbol === summary.symbol)
@@ -1065,6 +1083,8 @@ function SymbolDetailBody({
   const avgPnl = summary.trades > 0 ? summary.pnl / summary.trades : null;
   const peakRoi = peakCapitalRoi(capitalUsage, summary.symbol, summary.pnl);
   const peakCapital = peakConcurrentCapital(capitalUsage, summary.symbol);
+  const asOf = new Date().toISOString().slice(0, 10);
+  const roc = symbolReturnOnCapital(capitalUsage, summary.symbol, summary.pnl, asOf).roc;
 
   return (
     <>
@@ -1095,7 +1115,7 @@ function SymbolDetailBody({
         </button>
       </div>
 
-      {/* ── Hero: Net P&L + ROI ── */}
+      {/* ── Hero: Net P&L + RoC ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
           <div className="font-sans text-caption text-muted-foreground">Net P&amp;L</div>
@@ -1105,7 +1125,7 @@ function SymbolDetailBody({
               toneClass(summary.pnl)
             )}
           >
-            {signedCurrency(summary.pnl)}
+            {signedCurrency(summary.pnl, maskAmounts)}
           </div>
         </div>
         <div className="ml-auto text-right">
@@ -1113,10 +1133,10 @@ function SymbolDetailBody({
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
-              toneClass(peakRoi)
+              toneClass(roc)
             )}
           >
-            {signedPercentText(peakRoi)}
+            {signedPercentText(roc)}
           </div>
         </div>
       </div>
@@ -1130,33 +1150,34 @@ function SymbolDetailBody({
         />
         <MetaCell
           label="Avg P&L / trade"
-          value={avgPnl != null ? signedCurrency(avgPnl) : "N/A"}
+          value={avgPnl != null ? signedCurrency(avgPnl, maskAmounts) : "N/A"}
           valueClass={avgPnl != null ? toneClass(avgPnl) : undefined}
         />
         <MetaCell
-          label="Capital deployed"
-          value={peakCapital > 0 ? formatCurrency(peakCapital) : "—"}
+          label="Peak deployed"
+          value={peakCapital > 0 ? formatMaskedCurrency(peakCapital, maskAmounts) : "—"}
         />
         <MetaCell
           label="Capital cycled"
-          value={summary.capital > 0 ? formatCurrency(summary.capital) : "—"}
+          value={summary.capital > 0 ? formatMaskedCurrency(summary.capital, maskAmounts) : "—"}
         />
         <MetaCell
-          label="Turnover ROI"
-          value={signedPercentText(summary.roiPercent)}
-          valueClass={toneClass(summary.roiPercent)}
+          label="Peak-capital RoC"
+          value={signedPercentText(peakRoi)}
+          valueClass={toneClass(peakRoi)}
         />
       </div>
 
-      {/* ── Capital ROI note ── */}
+      {/* ── Capital RoC note ── */}
       <div className="mt-3 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
         <div className="font-sans text-caption tabular-nums text-muted-foreground leading-relaxed">
-          <span className="font-medium text-foreground">Return on capital</span> is P&amp;L
-          over the most cash this symbol tied up at once
-          {peakCapital > 0 ? ` (${formatCurrency(peakCapital)})` : ""} — recycling the same
-          collateral across cycles doesn&apos;t inflate it.{" "}
-          <span className="font-medium text-foreground">Turnover ROI</span> divides by capital
-          summed across every closed cycle, so it reads lower the more you reuse collateral.
+          <span className="font-medium text-foreground">Return on capital</span> is P&amp;L over
+          this symbol&apos;s time-weighted average deployed capital — the same definition used on
+          Home, Performance, and Tickers.{" "}
+          <span className="font-medium text-foreground">Peak-capital RoC</span> divides instead
+          by the most cash this symbol ever tied up at once
+          {peakCapital > 0 ? ` (${formatMaskedCurrency(peakCapital, maskAmounts)})` : ""}, so recycling the same
+          collateral across cycles doesn&apos;t inflate it — a stricter view.
         </div>
       </div>
 
@@ -1174,7 +1195,7 @@ function SymbolDetailBody({
                   title={lifecycleStrategyLabel(lc)}
                   badge={outcomeLabel(lc.status)}
                   subtitle={`${formatDisplayDate(lc.openDate)} → ${formatDisplayDate(lc.closeDate ?? lc.expirationDate)}`}
-                  amount={signedCurrency(total)}
+                  amount={signedCurrency(total, maskAmounts)}
                   amountClass={toneClass(total)}
                 />
               );
@@ -1194,7 +1215,7 @@ function SymbolDetailBody({
                 onClick={onSelectEvent ? () => onSelectEvent(ev) : undefined}
                 title={strategyLabel(ev.strategy)}
                 subtitle={`Closed ${formatDisplayDate(ev.date)}${ev.quantity ? ` · ${formatNumber(ev.quantity)} sh` : ""}`}
-                amount={signedCurrency(ev.realizedPnl)}
+                amount={signedCurrency(ev.realizedPnl, maskAmounts)}
                 amountClass={toneClass(ev.realizedPnl)}
               />
             ))}

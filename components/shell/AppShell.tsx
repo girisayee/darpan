@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { useRef, type KeyboardEvent } from "react";
 import type { Theme } from "@/lib/theme/use-theme";
 import type { TradingAccount } from "@/types/trading";
@@ -26,6 +26,8 @@ interface AppShellProps {
   onExport: () => void;
   onManageEntries: () => void;
   user?: { name?: string | null; email?: string | null; image?: string | null };
+  maskAmounts: boolean;
+  onToggleMaskAmounts: () => void;
 }
 
 /** Always-visible multi-select account filter. Empty selection = all accounts. */
@@ -111,23 +113,26 @@ export function AppShell({
   onExport,
   onManageEntries,
   user,
+  maskAmounts,
+  onToggleMaskAmounts,
 }: AppShellProps) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const navTabs = tabs.filter(t => t !== "Home");
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next: number | null = null;
     if (e.key === "ArrowRight") {
-      next = (index + 1) % tabs.length;
+      next = (index + 1) % navTabs.length;
     } else if (e.key === "ArrowLeft") {
-      next = (index - 1 + tabs.length) % tabs.length;
+      next = (index - 1 + navTabs.length) % navTabs.length;
     } else if (e.key === "Home") {
       next = 0;
     } else if (e.key === "End") {
-      next = tabs.length - 1;
+      next = navTabs.length - 1;
     }
     if (next !== null) {
       e.preventDefault();
-      onSelectTab(tabs[next]);
+      onSelectTab(navTabs[next]);
       buttonRefs.current[next]?.focus();
     }
   }
@@ -137,14 +142,21 @@ export function AppShell({
       <header className="flex items-center justify-between border-b border-hairline bg-surface px-4 py-3">
         {/* LEFT: logo + nav pills (desktop only) */}
         <div className="flex items-center gap-3.5">
-          <Logo size={30} showWordmark />
+          <button
+            type="button"
+            onClick={() => onSelectTab("Home")}
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded-[8px]"
+            aria-label="Go to home"
+          >
+            <Logo size={40} showWordmark />
+          </button>
 
           {/* Divider */}
           <span aria-hidden="true" className="hidden md:block h-5 w-px bg-hairline" />
 
-          {/* Nav pills — hidden on mobile, shown md+ */}
+          {/* Nav pills — hidden on mobile, shown md+. Home is handled by the logo. */}
           <nav role="tablist" aria-label="Main navigation" className="hidden md:flex gap-1">
-            {tabs.map((tab, index) => {
+            {navTabs.map((tab, index) => {
               const isActive = tab === activeTab;
               return (
                 <button
@@ -198,6 +210,23 @@ export function AppShell({
               ))}
             </select>
           </div>
+
+          {/* Mask amounts toggle */}
+          <button
+            type="button"
+            onClick={onToggleMaskAmounts}
+            aria-label={maskAmounts ? "Show dollar amounts" : "Hide dollar amounts"}
+            aria-pressed={maskAmounts}
+            className={cn(
+              "rounded-[8px] border border-hairline p-[6px] transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+              maskAmounts
+                ? "bg-accent/10 text-accent border-accent/30"
+                : "bg-surface text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {maskAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
 
           {/* Overflow menu (theme, import, export, settings, sign out) */}
           <OverflowMenu

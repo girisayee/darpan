@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatMaskedCurrency, MASKED_AMOUNT } from "@/lib/utils/format";
 
 // ── Ring geometry ─────────────────────────────────────────────────────────────
 
@@ -22,11 +22,13 @@ function ringColor(util: number | null): string {
 export function BuyingPowerGauge({
   deployed,
   maxBP,
+  maskAmounts = false,
 }: {
   /** Current open capital deployed (dollars). */
   deployed: number;
   /** Max buying power setting (dollars). Zero or null → unknown. */
   maxBP: number | null | undefined;
+  maskAmounts?: boolean;
 }) {
   const valid = maxBP != null && maxBP > 0;
   const util = valid ? (deployed / maxBP!) * 100 : null;
@@ -37,7 +39,7 @@ export function BuyingPowerGauge({
 
   const ariaLabel =
     util !== null
-      ? `Capital deployed ${formatCurrency(deployed)}, ${intPct}% of ${formatCurrency(maxBP!)} max`
+      ? `Capital deployed ${maskAmounts ? MASKED_AMOUNT : formatMaskedCurrency(deployed, false)}, ${intPct}% of ${maskAmounts ? MASKED_AMOUNT : formatMaskedCurrency(maxBP!, false)} max`
       : "Capital deployed: no max configured";
 
   return (
@@ -99,7 +101,7 @@ export function BuyingPowerGauge({
         </div>
         <div className="mt-0.5 font-sans text-strong font-medium tabular-nums text-foreground">
           {valid
-            ? `${formatCurrency(deployed)} / ${formatCurrency(maxBP!)}`
+            ? `${formatMaskedCurrency(deployed, maskAmounts)} / ${formatMaskedCurrency(maxBP!, maskAmounts)}`
             : "—"}
         </div>
         <div className="mt-0.5 font-sans text-caption text-muted-foreground">
