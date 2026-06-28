@@ -288,7 +288,7 @@ export function ImportTab({
           {/* Detected columns mapping */}
           <div className="rounded-[12px] border border-hairline bg-surface p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-strong font-medium text-foreground">Detected columns</span>
+              <span className="text-caption font-medium text-foreground">Detected columns</span>
               {parsed.detectedBroker && (
                 <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-micro font-medium text-accent">
                   Detected · {parsed.detectedBroker}
