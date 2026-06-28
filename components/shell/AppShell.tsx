@@ -24,6 +24,7 @@ interface AppShellProps {
   onImport: () => void;
   onSettings: () => void;
   onExport: () => void;
+  onManageEntries: () => void;
   user?: { name?: string | null; email?: string | null; image?: string | null };
 }
 
@@ -108,6 +109,7 @@ export function AppShell({
   onImport,
   onSettings,
   onExport,
+  onManageEntries,
   user,
 }: AppShellProps) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -204,6 +206,7 @@ export function AppShell({
             onImport={onImport}
             onExport={onExport}
             onSettings={onSettings}
+            onManageEntries={onManageEntries}
             user={user}
           />
         </div>

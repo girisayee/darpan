@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { transactions, tradingAccounts, settings } from "@/lib/db/schema";
 import { defaultSettings } from "@/lib/storage/local-store";
+import { stampCreatedAt } from "@/lib/entries/entry-meta";
 import type { AppSettings, TradeTransaction, TradingAccount } from "@/types/trading";
 
 export async function listDbTransactions(userId: string): Promise<TradeTransaction[]> {
@@ -18,17 +19,25 @@ export async function replaceDbTransactions(userId: string, txns: TradeTransacti
   await db.transaction(async (tx) => {
     await tx.delete(transactions).where(eq(transactions.userId, userId));
     if (txns.length) {
+      // "Date added" must live in the payload: this rewrites all rows on every
+      // save and the DB updatedAt resets each time, so stamp createdAt once here
+      // (preserving any existing value) — the single choke point for import,
+      // manual-add, and edits.
+      const now = new Date().toISOString();
       await tx.insert(transactions).values(
-        txns.map((t) => ({
-          id: t.id,
-          userId,
-          accountId: t.accountId ?? null,
-          payload: t,
-          tradeDate: t.tradeDate,
-          symbol: t.symbol,
-          status: t.status,
-          importBatchId: t.importBatchId,
-        }))
+        txns.map((raw) => {
+          const t = stampCreatedAt(raw, now);
+          return {
+            id: t.id,
+            userId,
+            accountId: t.accountId ?? null,
+            payload: t,
+            tradeDate: t.tradeDate,
+            symbol: t.symbol,
+            status: t.status,
+            importBatchId: t.importBatchId,
+          };
+        })
       );
     }
   });

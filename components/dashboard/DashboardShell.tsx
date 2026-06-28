@@ -232,6 +232,7 @@ export function DashboardShell({
         onToggleTheme={toggle}
         onImport={() => router.push("/import")}
         onSettings={() => router.push("/settings")}
+        onManageEntries={() => router.push("/entries")}
         onExport={() => downloadBackup(allTransactions, settings)}
         user={user}
       />

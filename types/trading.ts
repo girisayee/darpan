@@ -62,6 +62,10 @@ export type TradeTransaction = {
   notes?: string;
   tags: string[];
   status: TransactionStatus;
+  /** Date the row was added to the app (ISO). Stamped once, preserved across saves. */
+  createdAt?: string;
+  /** Set when a user edits the row in the entries admin (ISO). Drives the "· edited" badge. */
+  editedAt?: string;
   /**
    * Optional manual override of the TOTAL cost basis of the shares this opener leads to
    * (e.g. a broker-adjusted basis for shares acquired via a cash-secured-put assignment).

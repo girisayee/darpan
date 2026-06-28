@@ -1,12 +1,12 @@
 "use client";
-import { ChevronDown, FileDown, LogOut, Moon, Settings, Sun, Upload, MoreHorizontal } from "lucide-react";
+import { ChevronDown, FileDown, ListChecks, LogOut, Moon, Settings, Sun, Upload, MoreHorizontal } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 import type { Theme } from "@/lib/theme/use-theme";
 
 export function OverflowMenu(props: {
   theme: Theme; onToggleTheme: () => void;
-  onImport: () => void; onExport: () => void; onSettings: () => void;
+  onImport: () => void; onExport: () => void; onSettings: () => void; onManageEntries: () => void;
   user?: { name?: string | null; email?: string | null; image?: string | null };
 }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +32,7 @@ export function OverflowMenu(props: {
               {props.theme === "dark" ? "Light mode" : "Dark mode"}
             </button>
             <button className={item} onClick={() => { props.onImport(); setOpen(false); }}><Upload className="h-4 w-4" />Import trades</button>
+            <button className={item} onClick={() => { props.onManageEntries(); setOpen(false); }}><ListChecks className="h-4 w-4" />Manage entries</button>
             <button className={item} onClick={() => { props.onExport(); setOpen(false); }}><FileDown className="h-4 w-4" />Export backup</button>
             <button className={item} onClick={() => { props.onSettings(); setOpen(false); }}><Settings className="h-4 w-4" />Settings</button>
             {props.user && (
