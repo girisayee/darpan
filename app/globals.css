@@ -56,9 +56,20 @@ input,
 select,
 textarea {
   /* Inherit the family only — NOT the shorthand `font`, which resets font-size
-     and (being unlayered) overrode Tailwind text-* utilities, forcing every
-     control to body size. Let size/weight come from utility classes. */
+     and (being unlayered) overrode Tailwind text-* utilities. */
   font-family: inherit;
+}
+
+/* Normalize native form controls to one size app-wide (14px, matching the nav
+   pills). `!important` deliberately overrides the assorted utility text-* classes
+   scattered across control elements so every dropdown / input / textarea is
+   uniform everywhere. Buttons are excluded — pills, chips, and action buttons
+   vary by context on purpose. */
+select,
+input,
+textarea {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem;
 }
 
 .table-sticky th {
