@@ -71,7 +71,12 @@ function pathToTab(pathname: string): string {
   if (pathname.startsWith("/performance")) return "Performance";
   if (pathname.startsWith("/tickers")) return "Tickers";
   if (pathname.startsWith("/positions")) return "Positions";
-  return "Home"; // /home, /import, /settings all show the Home pill
+  return "Home"; // /, /import, /settings all show the Home pill
+}
+
+function tabHref(tab: string): string {
+  if (tab === "Home") return "/";
+  return `/${tab.toLowerCase()}`;
 }
 
 export function DashboardShell({
@@ -221,7 +226,7 @@ export function DashboardShell({
       <AppShell
         tabs={PRIMARY_TABS}
         activeTab={activeTab}
-        onSelectTab={(t) => router.push(`/${t.toLowerCase()}`)}
+        onSelectTab={(t) => router.push(tabHref(t))}
         years={years}
         year={year}
         onYear={setYear}
