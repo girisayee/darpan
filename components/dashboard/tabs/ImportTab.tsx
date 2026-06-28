@@ -79,15 +79,27 @@ export function ImportTab({
   onSave,
   accounts,
   defaultAccountId,
+  onCreateAccount,
 }: {
   existing: TradeTransaction[];
   onSave: (rows: TradeTransaction[]) => void;
   accounts: TradingAccount[];
   defaultAccountId: string | null;
+  onCreateAccount: (name: string) => void | Promise<void>;
 }) {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [accountIdOverride, setAccountIdOverride] = useState<string | null>(null);
   const accountId = accountIdOverride ?? defaultAccountId ?? "";
+  const [newAccountName, setNewAccountName] = useState<string | null>(null);
+  async function submitNewAccount() {
+    const n = (newAccountName ?? "").trim();
+    if (!n) {
+      setNewAccountName(null);
+      return;
+    }
+    await onCreateAccount(n);
+    setNewAccountName(null);
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -278,7 +290,9 @@ export function ImportTab({
             <div className="mb-2 flex items-center justify-between">
               <span className="text-strong font-medium text-foreground">Detected columns</span>
               {parsed.detectedBroker && (
-                <span className="text-caption text-muted-foreground">Looks like: {parsed.detectedBroker}</span>
+                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-micro font-medium text-accent">
+                  Detected · {parsed.detectedBroker}
+                </span>
               )}
             </div>
             <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
@@ -421,7 +435,7 @@ export function ImportTab({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-hairline bg-surface px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-3">
               {accounts.length > 0 && (
                 <label className="flex items-center gap-2 text-caption text-muted-foreground">
@@ -429,7 +443,7 @@ export function ImportTab({
                   <select
                     value={accountId}
                     onChange={(e) => setAccountIdOverride(e.target.value)}
-                    className="rounded-md border border-hairline bg-surface px-2 py-1 text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                    className="rounded-md border border-hairline bg-surface px-2 py-1 text-caption text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                   >
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -439,23 +453,53 @@ export function ImportTab({
                   </select>
                 </label>
               )}
+              {newAccountName === null ? (
+                <button
+                  type="button"
+                  onClick={() => setNewAccountName("")}
+                  className="rounded-md border border-dashed border-accent/50 px-2 py-1 text-caption font-medium text-accent transition-colors hover:bg-accent/10"
+                >
+                  + New account
+                </button>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <input
+                    autoFocus
+                    value={newAccountName}
+                    onChange={(e) => setNewAccountName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void submitNewAccount();
+                      if (e.key === "Escape") setNewAccountName(null);
+                    }}
+                    placeholder="Account name"
+                    className="w-32 rounded-md border border-hairline bg-surface px-2 py-1 text-caption text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void submitNewAccount()}
+                    className="rounded-md border border-hairline bg-surface px-2 py-1 text-caption font-medium text-foreground hover:bg-surface-inset"
+                  >
+                    Add
+                  </button>
+                </span>
+              )}
               <span className="text-caption text-muted-foreground">
-                {selected.size} of {rows.length} selected · duplicates &amp; ignored excluded by default
+                {selected.size} of {rows.length} selected
               </span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={selectRecommended}
-                className="rounded-md border border-hairline bg-surface px-3 py-1.5 text-body font-medium text-foreground transition-colors hover:bg-surface-inset"
+                className="rounded-md border border-hairline bg-surface px-3 py-1.5 text-caption font-medium text-foreground transition-colors hover:bg-surface-inset"
               >
-                Select recommended
+                Recommended
               </button>
               <button
                 type="button"
                 onClick={doImport}
                 disabled={selected.size === 0}
-                className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-body font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-caption font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <FileText className="h-3.5 w-3.5" />
                 Import {selected.size} selected

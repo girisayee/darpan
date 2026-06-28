@@ -11,6 +11,7 @@ export default function ImportPage() {
       onSave={(rows) => d.replaceTransactions([...d.storedTransactions, ...rows])}
       accounts={d.accounts}
       defaultAccountId={d.defaultAccountId}
+      onCreateAccount={d.createAccount}
     />
   );
 }
