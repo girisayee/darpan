@@ -25,16 +25,21 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { capitalEfficiency } from "@/lib/selectors/capital-efficiency";
 import { goalPace } from "@/lib/selectors/goal-pace";
-import { formatCurrency, formatPercent, monthLabel, monthTick } from "@/lib/utils/format";
+import { formatCurrency, formatMaskedCurrency, formatPercent, monthLabel, monthTick } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult } from "@/types/trading";
 import { MonthlyRoiTable, tone } from "./shared";
 
-const C_POS      = "rgb(var(--pos))";
-const C_NEG      = "rgb(var(--neg))";
-const C_MUTED    = "rgb(var(--text-muted))";
-const C_HAIRLINE = "rgb(var(--hairline))";
-const C_SURFACE  = "rgb(var(--surface))";
+const C_POS       = "rgb(var(--pos))";
+const C_NEG       = "rgb(var(--neg))";
+const C_MUTED     = "rgb(var(--text-muted))";
+const C_HAIRLINE  = "rgb(var(--hairline))";
+const C_SURFACE   = "rgb(var(--surface))";
 const C_GOAL_PACE = "rgb(var(--text-muted))";
+
+// Monthly P&L stacked-bar strategy colours
+const C_PREMIUM = "#34d399"; // options premium — emerald
+const C_STOCK   = "#60a5fa"; // stock / swing — blue
+const C_ASSIGN  = "#fbbf24"; // assignment P&L — amber
 
 const TICK_STYLE = {
   fontFamily: "var(--font-sans)",
@@ -175,6 +180,64 @@ function EquityCurveChart({
   );
 }
 
+type StrategyTooltipProps = {
+  active?: boolean;
+  payload?: Array<{ value: number; dataKey: string; payload: Record<string, number> }>;
+  label?: string;
+};
+
+function StrategyTooltip({ active, payload, label }: StrategyTooltipProps) {
+  if (!active || !payload?.length || !label) return null;
+  const p = payload[0].payload;
+  const premium = p.premium ?? 0;
+  const stock   = p.stock   ?? 0;
+  const assign  = p.assign  ?? 0;
+  const total   = p.total    ?? 0;
+  const rows: [string, number, string][] = [
+    ["Premium", premium, C_PREMIUM],
+    ["Stock", stock, C_STOCK],
+    ["Assignment", assign, C_ASSIGN],
+  ];
+  return (
+    <div style={TOOLTIP_CONTENT_STYLE}>
+      <p style={TOOLTIP_LABEL_STYLE}>{monthLabel(label)}</p>
+      {rows.map(([name, val, color]) =>
+        val !== 0 ? (
+          <div key={name} className="flex items-center gap-2 py-0.5">
+            <span className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
+            <span style={TOOLTIP_ITEM_STYLE} className="flex-1">{name}</span>
+            <span
+              style={{
+                ...TOOLTIP_ITEM_STYLE,
+                color: val > 0 ? C_POS : C_NEG,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatCurrency(val)}
+            </span>
+          </div>
+        ) : null
+      )}
+      <div
+        className="mt-1 flex items-center justify-between border-t pt-1"
+        style={{ borderColor: C_HAIRLINE }}
+      >
+        <span style={{ ...TOOLTIP_ITEM_STYLE, color: C_MUTED }}>Net</span>
+        <span
+          style={{
+            ...TOOLTIP_ITEM_STYLE,
+            color: total > 0 ? C_POS : total < 0 ? C_NEG : C_MUTED,
+            fontVariantNumeric: "tabular-nums",
+            fontWeight: 600,
+          }}
+        >
+          {formatCurrency(total)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function MonthlyPnlBar({ result }: { result: CalculationResult }) {
   const mounted = useSyncExternalStore(
     () => () => undefined,
@@ -185,20 +248,23 @@ function MonthlyPnlBar({ result }: { result: CalculationResult }) {
   const data = useMemo(
     () =>
       result.monthlyReturns.map((m) => ({
-        month: `${m.year}-${String(m.month).padStart(2, "0")}`,
-        pnl: m.realizedPnl,
+        month:   `${m.year}-${String(m.month).padStart(2, "0")}`,
+        total:   m.realizedPnl,
+        premium: m.optionsPremiumPnl,
+        stock:   m.stockTradingPnl,
+        assign:  m.assignmentPnl,
       })),
     [result.monthlyReturns]
   );
 
   if (!mounted) {
-    return <div className="h-[180px] animate-pulse rounded-md bg-surface-inset" />;
+    return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
   }
 
   return (
-    <div className="h-[180px]">
+    <div className="h-[200px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }} barCategoryGap="30%">
           <CartesianGrid vertical={false} strokeDasharray="0" stroke={C_HAIRLINE} opacity={1} />
           <XAxis
             dataKey="month"
@@ -217,19 +283,12 @@ function MonthlyPnlBar({ result }: { result: CalculationResult }) {
             width={52}
           />
           <Tooltip
-            formatter={(value: unknown) => [
-              formatCurrency(typeof value === "number" ? value : Number(value)),
-              "Monthly P&L",
-            ]}
-            labelFormatter={(label) => monthLabel(String(label))}
-            contentStyle={TOOLTIP_CONTENT_STYLE}
-            itemStyle={TOOLTIP_ITEM_STYLE}
-            labelStyle={TOOLTIP_LABEL_STYLE}
-            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.3 }}
+            content={<StrategyTooltip />}
+            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.25 }}
           />
-          <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? C_POS : C_NEG} />
+          <Bar dataKey="total" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.total >= 0 ? C_POS : C_NEG} />
             ))}
           </Bar>
         </BarChart>
@@ -275,9 +334,9 @@ export function PerformanceTab({
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-[28px] font-semibold tabular-nums leading-none text-foreground">
-              {formatCurrency(pace.actual)}
+              {formatMaskedCurrency(pace.actual, settings.maskAmounts)}
             </span>
-            <span className="text-strong tabular-nums text-muted-foreground">/ {formatCurrency(annualGoal)}</span>
+            <span className="text-strong tabular-nums text-muted-foreground">/ {formatMaskedCurrency(annualGoal, settings.maskAmounts)}</span>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
             <div
@@ -286,7 +345,7 @@ export function PerformanceTab({
             />
           </div>
           <p className="mt-2 text-body text-muted-foreground">
-            Projected {formatCurrency(pace.projectedYearEnd)} · needs {formatCurrency(pace.requiredMonthly)}/mo to hit goal
+            Projected {formatMaskedCurrency(pace.projectedYearEnd, settings.maskAmounts)} · needs {formatMaskedCurrency(pace.requiredMonthly, settings.maskAmounts)}/mo to hit goal
           </p>
         </div>
       )}
@@ -308,7 +367,7 @@ export function PerformanceTab({
       <MetricGroup label="Capital deployed" cols={4}>
         <KpiCard
           label="Avg deployed"
-          value={formatCurrency(avgDeployed)}
+          value={formatMaskedCurrency(avgDeployed, settings.maskAmounts)}
           helper="Time-weighted"
           tooltip="Time-weighted average capital deployed (dollar-days ÷ days in the period). The denominator behind Return on capital."
           tone="neutral"
@@ -316,7 +375,7 @@ export function PerformanceTab({
         />
         <KpiCard
           label="Peak deployed"
-          value={formatCurrency(peakDeployed)}
+          value={formatMaskedCurrency(peakDeployed, settings.maskAmounts)}
           helper="Highest single day"
           tooltip="Highest capital deployed on any single day."
           tone="neutral"
@@ -354,7 +413,7 @@ export function PerformanceTab({
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
           <MonthlyPnlBar result={result} />
         </div>
-        <MonthlyRoiTable rows={result.monthlyReturns} />
+        <MonthlyRoiTable rows={result.monthlyReturns} maskAmounts={settings.maskAmounts} />
       </section>
     </div>
   );
