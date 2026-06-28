@@ -309,7 +309,7 @@ export function ImportTab({
                       value={mapped}
                       onChange={(e) => changeMapping(f.key, e.target.value)}
                       className={cn(
-                        "rounded-md border bg-surface px-2 py-1 text-micro text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                        "rounded-md border bg-surface px-2 py-1 text-caption text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                         missing ? "border-neg/40" : "border-hairline"
                       )}
                     >

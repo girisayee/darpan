@@ -9,9 +9,6 @@ export default function SettingsPage() {
     <SettingsTab
       settings={d.settings}
       onChange={d.updateSettings}
-      manualTransactions={d.manualTransactions}
-      onUpdateTransaction={d.updateTransaction}
-      onDeleteTransaction={d.deleteTransaction}
       accounts={d.accounts}
       onCreateAccount={d.createAccount}
       onRenameAccount={d.renameAccount}

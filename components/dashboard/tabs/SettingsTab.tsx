@@ -2,17 +2,13 @@
 
 import { useState } from "react";
 import { label } from "@/components/dashboard/tabs/shared";
-import { ManualEntryCard } from "@/components/dashboard/ReviewFixPanel";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import type { AppSettings, TradeTransaction, TradingAccount } from "@/types/trading";
+import type { AppSettings, TradingAccount } from "@/types/trading";
 
 export function SettingsTab({
   settings,
   onChange,
-  manualTransactions,
-  onUpdateTransaction,
-  onDeleteTransaction,
   accounts,
   onCreateAccount,
   onRenameAccount,
@@ -20,9 +16,6 @@ export function SettingsTab({
 }: {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
-  manualTransactions: TradeTransaction[];
-  onUpdateTransaction: (updated: TradeTransaction) => void;
-  onDeleteTransaction: (id: string) => void;
   accounts: TradingAccount[];
   onCreateAccount: (name: string) => void;
   onRenameAccount: (id: string, name: string) => void;
@@ -152,29 +145,6 @@ export function SettingsTab({
           onRename={onRenameAccount}
           onDelete={onDeleteAccount}
         />
-      </div>
-      <div className="lg:col-span-2">
-        <SettingsPanel title="Manual entries">
-          {manualTransactions.length === 0 ? (
-            <p className="font-sans text-body text-muted-foreground">
-              No manually-added transactions yet.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              <p className="font-sans text-caption text-muted-foreground">
-                {manualTransactions.length} manually-added transaction{manualTransactions.length !== 1 ? "s" : ""}.
-              </p>
-              {manualTransactions.map((tx) => (
-                <ManualEntryCard
-                  key={tx.id}
-                  tx={tx}
-                  onUpdate={onUpdateTransaction}
-                  onDelete={onDeleteTransaction}
-                />
-              ))}
-            </div>
-          )}
-        </SettingsPanel>
       </div>
     </div>
   );

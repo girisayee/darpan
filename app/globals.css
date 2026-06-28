@@ -55,7 +55,10 @@ button,
 input,
 select,
 textarea {
-  font: inherit;
+  /* Inherit the family only — NOT the shorthand `font`, which resets font-size
+     and (being unlayered) overrode Tailwind text-* utilities, forcing every
+     control to body size. Let size/weight come from utility classes. */
+  font-family: inherit;
 }
 
 .table-sticky th {
