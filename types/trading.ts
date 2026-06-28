@@ -1,4 +1,5 @@
-export type SourceBroker = "Robinhood";
+/** Broker the data came from. Detected from the CSV; free-form to stay broker-agnostic. */
+export type SourceBroker = string;
 
 export type InstrumentType = "stock" | "option" | "cash" | "other";
 

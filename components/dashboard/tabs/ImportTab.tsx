@@ -3,28 +3,41 @@
 import { FileText, Search, UploadCloud } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { label, signedMoney } from "@/components/dashboard/tabs/shared";
-import { parseRobinhoodInput } from "@/lib/import/robinhood";
+import { parseTransactionsCsv, TARGET_FIELDS } from "@/lib/import/robinhood";
 import { formatDisplayDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import type { TradeTransaction, TradingAccount } from "@/types/trading";
 
 type RowStatus = "new" | "warning" | "duplicate" | "ignored";
+type ColumnMap = Record<string, string | undefined>;
 
 type Parsed = {
   rows: TradeTransaction[];
   dupIds: Set<string>;
   warningsByRowId: Map<string, string[]>;
   fileCount: number;
+  sourceColumns: string[];
+  detectedBroker?: string;
+  columnMap: ColumnMap;
 };
 
-/** Parse one or more Robinhood CSV texts, merging results and detecting
- * duplicates both across files and against the existing data. */
-function buildParsed(texts: string[], existing: TradeTransaction[]): Parsed {
+/** Parse one or more broker CSV texts, merging results and detecting duplicates
+ * both across files and against existing data. An optional columnMap override
+ * (from the mapping UI) is applied to every file. */
+function buildParsed(texts: string[], existing: TradeTransaction[], override?: ColumnMap): Parsed {
   const rows: TradeTransaction[] = [];
   const dupIds = new Set<string>();
   const warningsByRowId = new Map<string, string[]>();
-  for (const text of texts) {
-    const preview = parseRobinhoodInput(text, [...existing, ...rows]);
+  let sourceColumns: string[] = [];
+  let detectedBroker: string | undefined;
+  let columnMap: ColumnMap = {};
+  texts.forEach((text, i) => {
+    const preview = parseTransactionsCsv(text, { existing: [...existing, ...rows], columnMap: override });
+    if (i === 0) {
+      sourceColumns = preview.sourceColumns;
+      detectedBroker = preview.detectedBroker;
+      columnMap = preview.columnMap;
+    }
     preview.duplicateIds.forEach((id) => dupIds.add(id));
     preview.issues.forEach((issue) => {
       const row = preview.rows[issue.rowIndex];
@@ -34,8 +47,8 @@ function buildParsed(texts: string[], existing: TradeTransaction[]): Parsed {
       warningsByRowId.set(row.id, list);
     });
     preview.rows.forEach((r) => rows.push(r));
-  }
-  return { rows, dupIds, warningsByRowId, fileCount: texts.length };
+  });
+  return { rows, dupIds, warningsByRowId, fileCount: texts.length, sourceColumns, detectedBroker, columnMap };
 }
 
 function statusOf(row: TradeTransaction, p: Parsed): RowStatus {
@@ -82,8 +95,10 @@ export function ImportTab({
   const [pasteText, setPasteText] = useState("");
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const [texts, setTexts] = useState<string[]>([]);
 
-  function applyParsed(p: Parsed) {
+  function runParse(nextTexts: string[], override?: ColumnMap) {
+    const p = buildParsed(nextTexts, existing, override);
     setParsed(p);
     // Pre-select New + Warning rows; leave Duplicate / Ignored off.
     const next = new Set<string>();
@@ -98,14 +113,25 @@ export function ImportTab({
   async function ingestFiles(files: File[]) {
     const csvs = files.filter((f) => /\.csv$/i.test(f.name) || f.type === "text/csv");
     if (!csvs.length) return;
-    const texts = await Promise.all(csvs.map((f) => f.text()));
-    applyParsed(buildParsed(texts, existing));
+    const t = await Promise.all(csvs.map((f) => f.text()));
+    setTexts(t);
+    runParse(t);
   }
 
   function ingestPaste(text: string) {
     setPasteText(text);
-    if (text.trim()) applyParsed(buildParsed([text], existing));
-    else setParsed(null);
+    if (text.trim()) {
+      setTexts([text]);
+      runParse([text]);
+    } else {
+      setTexts([]);
+      setParsed(null);
+    }
+  }
+
+  function changeMapping(field: string, source: string) {
+    if (!parsed) return;
+    runParse(texts, { ...parsed.columnMap, [field]: source || undefined });
   }
 
   const rows = useMemo(() => parsed?.rows ?? [], [parsed]);
@@ -129,6 +155,10 @@ export function ImportTab({
     [parsed, rows]
   );
   const allSelectableChecked = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const requiredMissing =
+    !!parsed &&
+    (["tradeDate", "action", "quantity", "amount"].some((k) => !parsed.columnMap[k]) ||
+      (!parsed.columnMap.symbol && !parsed.columnMap.description));
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -152,6 +182,7 @@ export function ImportTab({
   }
   function reset() {
     setParsed(null);
+    setTexts([]);
     setSelected(new Set());
     setSearch("");
     setPasteText("");
@@ -242,6 +273,50 @@ export function ImportTab({
       {/* Review */}
       {parsed && (
         <>
+          {/* Detected columns mapping */}
+          <div className="rounded-[12px] border border-hairline bg-surface p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-strong font-medium text-foreground">Detected columns</span>
+              {parsed.detectedBroker && (
+                <span className="text-caption text-muted-foreground">Looks like: {parsed.detectedBroker}</span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+              {TARGET_FIELDS.map((f) => {
+                const mapped = parsed.columnMap[f.key] ?? "";
+                const missing = f.required && !mapped;
+                return (
+                  <div key={f.key} className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2">
+                    <span className={cn("text-caption", missing ? "text-neg" : "text-muted-foreground")}>
+                      {f.label}
+                      {f.required && " *"}
+                    </span>
+                    <select
+                      value={mapped}
+                      onChange={(e) => changeMapping(f.key, e.target.value)}
+                      className={cn(
+                        "rounded-md border bg-surface px-2 py-1 text-caption text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                        missing ? "border-neg/40" : "border-hairline"
+                      )}
+                    >
+                      <option value="">— none —</option>
+                      {parsed.sourceColumns.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+            {requiredMissing && (
+              <div className="mt-2 text-caption text-neg">
+                Map the required fields (*) — and Symbol or Description — to import cleanly.
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <Chip dot="rgb(var(--pos))" label="new" count={counts.new} tone="text-pos" />
             <Chip dot="rgb(var(--accent))" label="duplicates" count={counts.duplicate} tone="text-accent" />

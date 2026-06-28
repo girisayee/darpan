@@ -13,49 +13,108 @@ export type ImportPreview = {
   issues: ImportIssue[];
   duplicateIds: string[];
   columnMap: Record<string, string | undefined>;
+  /** The CSV's actual header columns, for building the mapping UI. */
+  sourceColumns: string[];
+  /** Best-effort broker guess from the header signature. */
+  detectedBroker?: string;
 };
 
+export type ParseOptions = {
+  existing?: TradeTransaction[];
+  accountName?: string;
+  /** Explicit target→source column map that overrides auto-detection (from the mapping UI). */
+  columnMap?: Record<string, string | undefined>;
+};
+
+/** Target fields shown in the mapping UI, in display order. */
+export const TARGET_FIELDS = [
+  { key: "tradeDate", label: "Date", required: true },
+  { key: "action", label: "Action", required: true },
+  { key: "symbol", label: "Symbol", required: false },
+  { key: "quantity", label: "Quantity", required: true },
+  { key: "price", label: "Price", required: false },
+  { key: "amount", label: "Amount", required: true },
+  { key: "fees", label: "Fees", required: false },
+  { key: "optionType", label: "Option type", required: false },
+  { key: "strikePrice", label: "Strike", required: false },
+  { key: "expirationDate", label: "Expiration", required: false },
+  { key: "description", label: "Description", required: false },
+  { key: "settlementDate", label: "Settle date", required: false },
+] as const;
+
+// Broad cross-broker header synonyms (Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, IBKR).
 const columnCandidates: Record<string, string[]> = {
-  tradeDate: ["trade date", "date", "activity date", "process date"],
-  settlementDate: ["settlement date", "settle date", "settle date"],
-  symbol: ["symbol", "underlying symbol", "ticker", "instrument"],
-  instrument: ["instrument", "instrument type", "type"],
-  description: ["description", "raw description", "details"],
-  action: ["action", "side", "trans code", "transaction code", "activity type"],
-  quantity: ["quantity", "qty"],
-  price: ["price", "average price", "avg price"],
-  amount: ["amount", "net amount", "net", "total"],
-  fees: ["fees", "regulatory fees", "fee"],
+  tradeDate: ["trade date", "date", "activity date", "process date", "run date", "transaction date", "date acquired"],
+  settlementDate: ["settlement date", "settle date"],
+  symbol: ["symbol", "underlying symbol", "ticker", "instrument", "security"],
+  instrument: ["instrument", "instrument type", "type", "security type"],
+  description: ["description", "raw description", "details", "security description", "memo", "name"],
+  action: ["action", "side", "trans code", "transaction code", "activity type", "transaction type", "type of transaction", "buy/sell"],
+  quantity: ["quantity", "qty", "shares", "no. of shares", "amount of shares"],
+  price: ["price", "average price", "avg price", "price ($)", "trade price", "share price"],
+  amount: ["amount", "net amount", "net", "total", "amount ($)", "principal amount", "value", "proceeds"],
+  fees: ["fees", "regulatory fees", "fee", "commission", "commission ($)", "fees & comm", "commission fees", "comm/fee"],
   optionType: ["option type", "call/put", "put/call"],
   strikePrice: ["strike", "strike price"],
-  expirationDate: ["expiration", "expiration date", "expiry"]
+  expirationDate: ["expiration", "expiration date", "expiry"],
 };
 
-export function parseRobinhoodInput(raw: string, existing: TradeTransaction[] = [], accountName = "Robinhood"): ImportPreview {
+const BROKER_SIGNATURES: { broker: string; needs: string[] }[] = [
+  { broker: "Robinhood", needs: ["trans code", "activity date"] },
+  { broker: "Fidelity", needs: ["run date", "action"] },
+  { broker: "Vanguard", needs: ["transaction type", "trade date"] },
+  { broker: "Schwab", needs: ["fees & comm"] },
+];
+
+function detectBroker(fields: string[]): string | undefined {
+  const set = new Set(fields.map(normalizeHeader));
+  return BROKER_SIGNATURES.find((s) => s.needs.every((n) => set.has(n)))?.broker;
+}
+
+/** Broker-agnostic CSV parser. Auto-detects columns/broker; an explicit
+ * `opts.columnMap` (from the mapping UI) overrides detection per field. */
+export function parseTransactionsCsv(raw: string, opts: ParseOptions = {}): ImportPreview {
+  const { existing = [], accountName = "Imported", columnMap: override } = opts;
   const batchId = `import-${new Date().toISOString()}`;
-  const parsed = Papa.parse<Record<string, string>>(stripRobinhoodFooter(raw).trim(), {
+  const parsed = Papa.parse<Record<string, string>>(stripPreambleAndFooter(raw).trim(), {
     header: true,
     skipEmptyLines: true,
-    transformHeader: (header) => header.trim()
+    transformHeader: (header) => header.trim(),
   });
-  const fields = parsed.meta.fields ?? [];
-  const columnMap = detectColumns(fields);
+  const sourceColumns = parsed.meta.fields ?? [];
+  const columnMap = override ?? detectColumns(sourceColumns);
+  const detectedBroker = detectBroker(sourceColumns);
   const issues: ImportIssue[] = [];
   const rows = parsed.data
-    .map((row, index) => normalizeRow(row, index, batchId, accountName, columnMap, issues))
+    .map((row, index) => normalizeRow(row, index, batchId, accountName, detectedBroker, columnMap, issues))
     .filter((row) => row.rawDescription || row.symbol || row.tradeDate || row.action !== "OTHER");
   const duplicateIds = detectDuplicates([...existing, ...rows]).filter((id) => rows.some((row) => row.id === id));
   for (const duplicateId of duplicateIds) {
     const rowIndex = rows.findIndex((row) => row.id === duplicateId);
     issues.push({ rowIndex, severity: "warning", message: "Likely duplicate transaction." });
   }
-  return { batchId, rows, issues, duplicateIds, columnMap };
+  return { batchId, rows, issues, duplicateIds, columnMap, sourceColumns, detectedBroker };
 }
 
-function stripRobinhoodFooter(raw: string) {
-  const lines = raw.split(/\r?\n/);
-  const footerIndex = lines.findIndex((line) => /data provided is for informational purposes only/i.test(line));
-  return (footerIndex >= 0 ? lines.slice(0, footerIndex) : lines).join("\n");
+/** @deprecated Robinhood-defaulted wrapper, kept for the /api/import/robinhood route and scripts. */
+export function parseRobinhoodInput(raw: string, existing: TradeTransaction[] = [], accountName = "Robinhood"): ImportPreview {
+  return parseTransactionsCsv(raw, { existing, accountName });
+}
+
+function stripPreambleAndFooter(raw: string): string {
+  let lines = raw.split(/\r?\n/);
+  // Drop a known disclaimer footer onward.
+  const footerIndex = lines.findIndex((line) =>
+    /data provided is for informational purposes|please consult a (professional|tax)/i.test(line)
+  );
+  if (footerIndex >= 0) lines = lines.slice(0, footerIndex);
+  // Skip leading preamble lines before the real header row (first delimited line
+  // that mentions a date/symbol/action-ish column).
+  const headerIdx = lines.findIndex(
+    (line) => line.includes(",") && /\b(date|symbol|ticker|action|activity|trans|quantity|qty|shares|amount)\b/i.test(line)
+  );
+  if (headerIdx > 0) lines = lines.slice(headerIdx);
+  return lines.join("\n");
 }
 
 export function detectColumns(fields: string[]) {
@@ -72,6 +131,7 @@ function normalizeRow(
   index: number,
   batchId: string,
   accountName: string,
+  detectedBroker: string | undefined,
   columnMap: Record<string, string | undefined>,
   issues: ImportIssue[]
 ): TradeTransaction {
@@ -96,7 +156,7 @@ function normalizeRow(
     : validateRow(index, { date, symbol, action, quantity, price, amount, instrumentType, optionType, strikePrice, expirationDate }, issues);
   return {
     id: `import-${hash([date, symbol, action, quantity, price, amount, rawDescription, index].join("|"))}`,
-    sourceBroker: "Robinhood",
+    sourceBroker: detectedBroker ?? "Other",
     accountName,
     tradeDate: date,
     settlementDate: normalizeDate(get("settlementDate")) || date,
@@ -114,7 +174,7 @@ function normalizeRow(
     underlyingSymbol: instrumentType === "option" ? symbol : undefined,
     rawDescription,
     importBatchId: batchId,
-    notes: isAssignmentStockLeg ? "Robinhood assignment settlement stock leg; ignored to avoid double-counting the linked OASGN option assignment." : undefined,
+    notes: isAssignmentStockLeg ? "Assignment settlement stock leg; ignored to avoid double-counting the linked option assignment." : undefined,
     tags: [],
     status
   };
@@ -178,10 +238,13 @@ function normalizeAction(value: string, description: string): TradeAction {
   if (text.includes("sell to close")) return "SELL_TO_CLOSE";
   if (text.includes("assign")) return "ASSIGNMENT";
   if (text.includes("expir")) return "EXPIRATION";
+  // Dividend reinvestment buys shares — classify as a BUY before the dividend match.
+  if (/reinvest/.test(text)) return "BUY";
   if (text.includes("dividend")) return "DIVIDEND";
-  if (text.includes("fee")) return "FEE";
-  if (text.includes("transfer")) return "TRANSFER";
-  if (/\bbuy\b/.test(text)) return "BUY";
+  if (text.includes("interest")) return "DIVIDEND";
+  if (text.includes("fee") || text.includes("commission")) return "FEE";
+  if (text.includes("transfer") || text.includes("ach") || text.includes("wire") || text.includes("deposit") || text.includes("withdrawal")) return "TRANSFER";
+  if (/\bbuy\b|\bbought\b|purchase/.test(text)) return "BUY";
   if (/\bsell\b|\bsold\b/.test(text)) return "SELL";
   return "OTHER";
 }
