@@ -5,7 +5,9 @@ management. Everything below is computed from your imported activity.
 
 ## Core workflow
 
-1. Import Robinhood-style CSV activity (upload or paste) via the **⋯** menu → Import.
+1. Import broker CSV activity (upload or paste) via the **⋯** menu → Import. The parser is
+   broker-agnostic — Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, and IBKR exports are
+   auto-detected, and a column-mapping step handles anything it can't map on its own.
 2. Rows are normalized into stock, option, cash, fee, dividend, transfer, and unknown
    transactions; anything uninterpretable is kept as **unresolved**, not discarded.
 3. Imported transactions and settings persist in local SQLite.
@@ -84,10 +86,14 @@ Cost-basis method and the put-collateral denominator are configurable in Setting
 
 ## Import support
 
-The Robinhood parser recognizes common headers (`Activity Date`, `Process Date`, `Settle
-Date`, `Instrument`, `Description`, `Trans Code`, `Quantity`, `Price`, `Amount`) and
-transaction codes (stock buy/sell, `STO`, `BTC`, `BTO`, `STC`, `OASGN`, `OEXP`, dividends,
-fees, transfers, and unknown/misc). Unrecognized rows are preserved as unresolved.
+The parser is broker-agnostic. It auto-detects the source broker from the header signature
+(Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, IBKR) and maps common header synonyms
+(`Date`/`Activity Date`/`Run Date`/`Trade Date`, `Action`/`Trans Code`/`Side`, `Symbol`,
+`Quantity`, `Price`, `Amount`, `Fees`, option `Type`/`Strike`/`Expiration`, etc.) onto a
+canonical field set. Transaction codes for stock buy/sell, `STO`, `BTC`, `BTO`, `STC`,
+`OASGN`, `OEXP`, dividends, fees, transfers, and unknown/misc are recognized. When a column
+isn't detected automatically, a mapping step lets you assign it by hand. Unrecognized rows
+are preserved as unresolved.
 
 ## Backup
 

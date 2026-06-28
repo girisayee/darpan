@@ -20,7 +20,7 @@ export default function HomePage() {
       settings={d.settings}
       year={d.year}
       onOpenStrategy={(k) => router.push(positionsHref(k))}
-      onOpenPositions={() => router.push("/positions")}
+      onOpenPositions={() => router.push("/positions?view=options&state=active")}
       onSelectEvent={d.onSelectEvent}
       onSelectLifecycle={d.onSelectLifecycle}
     />

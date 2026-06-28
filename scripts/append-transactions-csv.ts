@@ -1,12 +1,12 @@
 /**
- * Additive Robinhood CSV importer (out-of-band, bypasses the HTTP/auth layer).
+ * Additive broker CSV importer (out-of-band, bypasses the HTTP/auth layer).
  *
- * Parses a Robinhood CSV with the app's own parser and INSERTS the rows for a
+ * Parses a broker CSV with the app's own parser and INSERTS the rows for a
  * user (find-or-create by email). Additive only — it NEVER deletes existing
  * rows, and duplicate ids are skipped (onConflictDoNothing), so it is safe to
  * re-run.
  *
- *   npx tsx scripts/append-robinhood-csv.ts <csv-path> [email]
+ *   npx tsx scripts/append-transactions-csv.ts <csv-path> [email]
  *
  * With no <csv-path> it just prints the users table + per-user transaction
  * counts (read-only inspection).
@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { users, transactions as txTable } from "../lib/db/schema";
-import { parseRobinhoodInput } from "../lib/import/robinhood";
+import { parseTransactionsCsv } from "../lib/import/transactions";
 import type { TradeTransaction } from "../types/trading";
 
 function loadEnvLocal() {
@@ -58,8 +58,8 @@ async function main() {
       return;
     }
 
-    const targetEmail = (process.argv[3] ?? (process.env.ALLOWED_EMAILS ?? "").split(",")[0] ?? "").trim();
-    if (!targetEmail) throw new Error("No target email. Pass one as the 2nd arg or set ALLOWED_EMAILS.");
+    const targetEmail = (process.argv[3] ?? "").trim();
+    if (!targetEmail) throw new Error("No target email. Pass one as the 2nd arg.");
 
     const found = allUsers.find((u) => u.email === targetEmail);
     let userId: string;
@@ -78,7 +78,7 @@ async function main() {
     console.log(`Existing for target: ${existing.length}`);
 
     const raw = readFileSync(csvPath, "utf8");
-    const preview = parseRobinhoodInput(raw, existing);
+    const preview = parseTransactionsCsv(raw, { existing });
     console.log(`Parsed ${preview.rows.length} rows (duplicates flagged: ${preview.duplicateIds.length}).`);
     for (const r of preview.rows) {
       console.log(`  + ${r.tradeDate} ${r.symbol} ${r.action} qty=${r.quantity} status=${r.status}`);

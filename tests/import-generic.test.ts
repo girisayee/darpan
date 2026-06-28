@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTransactionsCsv } from "@/lib/import/robinhood";
+import { parseTransactionsCsv } from "@/lib/import/transactions";
 
 describe("parseTransactionsCsv — broker-agnostic", () => {
   it("auto-detects Fidelity-style columns and broker", () => {

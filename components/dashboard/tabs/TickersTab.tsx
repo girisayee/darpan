@@ -104,7 +104,7 @@ export function TickersTab({
 
   return (
     <div className="space-y-5 py-2">
-      <LeaderboardPanels data={data} />
+      <LeaderboardPanels data={data} maskAmounts={maskAmounts} />
       <DataTable
         rows={rows}
         columns={columns}

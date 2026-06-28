@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRobinhoodInput } from "@/lib/import/robinhood";
+import { parseTransactionsCsv as parseRobinhoodInput } from "@/lib/import/transactions";
 
 describe("Robinhood import", () => {
   it("normalizes stock rows", () => {

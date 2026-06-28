@@ -3,7 +3,7 @@
 import { FileText, Search, UploadCloud } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { label, signedMoney } from "@/components/dashboard/tabs/shared";
-import { parseTransactionsCsv, TARGET_FIELDS } from "@/lib/import/robinhood";
+import { parseTransactionsCsv, TARGET_FIELDS } from "@/lib/import/transactions";
 import { formatDisplayDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 import type { TradeTransaction, TradingAccount } from "@/types/trading";

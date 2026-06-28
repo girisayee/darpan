@@ -1,6 +1,6 @@
 "use client";
 import type { OptionsAggregateAnalytics, StrategyAnalytics } from "@/lib/selectors/strategy-analytics";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatMaskedCurrency, formatPercent } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 type Tone = "pos" | "neg" | "neutral";
@@ -27,14 +27,21 @@ const pctFrac = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100
 const sign = (v: number | null | undefined): Tone =>
   v == null ? "neutral" : v > 0 ? "pos" : v < 0 ? "neg" : "neutral";
 
-export function StrategyMetrics({ a }: { a: StrategyAnalytics | OptionsAggregateAnalytics }) {
+export function StrategyMetrics({
+  a,
+  maskAmounts = false,
+}: {
+  a: StrategyAnalytics | OptionsAggregateAnalytics;
+  maskAmounts?: boolean;
+}) {
+  const money = (v: number | null | undefined) => formatMaskedCurrency(v, maskAmounts);
   const q = a.quality;
   const cells: { label: string; value: string; tone?: Tone }[] = [
-    { label: "Realized P&L", value: formatCurrency(a.pnl), tone: sign(a.pnl) },
+    { label: "Realized P&L", value: money(a.pnl), tone: sign(a.pnl) },
     { label: "Win rate", value: pctFrac(q.winRate) },
     {
       label: "Expectancy",
-      value: q.expectancy != null ? formatCurrency(q.expectancy) : "—",
+      value: q.expectancy != null ? money(q.expectancy) : "—",
       tone: sign(q.expectancy),
     },
   ];
@@ -44,10 +51,10 @@ export function StrategyMetrics({ a }: { a: StrategyAnalytics | OptionsAggregate
     cells.push(
       {
         label: "Premium collected",
-        value: a.premium ? formatCurrency(a.premium.premiumCollected) : "—",
+        value: a.premium ? money(a.premium.premiumCollected) : "—",
         tone: sign(a.premium?.premiumCollected),
       },
-      { label: "Capital at risk", value: formatCurrency(a.capitalAtRisk) },
+      { label: "Capital at risk", value: money(a.capitalAtRisk) },
       { label: "Trades", value: String(q.totalTrades) }
     );
   } else if (a.premium && (a.key === "csp" || a.key === "cc")) {
@@ -56,7 +63,7 @@ export function StrategyMetrics({ a }: { a: StrategyAnalytics | OptionsAggregate
     cells.push(
       {
         label: "Premium collected",
-        value: formatCurrency(a.premium.premiumCollected),
+        value: money(a.premium.premiumCollected),
         tone: sign(a.premium.premiumCollected),
       },
       { label: "Capture rate", value: formatPercent(capture != null ? capture * 100 : null) },
@@ -64,7 +71,7 @@ export function StrategyMetrics({ a }: { a: StrategyAnalytics | OptionsAggregate
         label: a.key === "csp" ? "Assignment · put" : "Assignment · call",
         value: pctFrac(a.key === "csp" ? a.premium.assignmentRatePut : a.premium.assignmentRateCall),
       },
-      { label: "Capital at risk", value: formatCurrency(a.capitalAtRisk) }
+      { label: "Capital at risk", value: money(a.capitalAtRisk) }
     );
   } else {
     cells.push(
@@ -75,12 +82,12 @@ export function StrategyMetrics({ a }: { a: StrategyAnalytics | OptionsAggregate
       },
       {
         label: "Avg win",
-        value: q.averageWin != null ? formatCurrency(q.averageWin) : "—",
+        value: q.averageWin != null ? money(q.averageWin) : "—",
         tone: q.averageWin != null ? "pos" : "neutral",
       },
       {
         label: "Avg loss",
-        value: q.averageLoss != null ? formatCurrency(q.averageLoss) : "—",
+        value: q.averageLoss != null ? money(q.averageLoss) : "—",
         tone: q.averageLoss != null ? "neg" : "neutral",
       },
       { label: "Trades", value: String(q.totalTrades) }

@@ -71,7 +71,7 @@ export type ManualOpenInput = ManualOpenOptionInput | ManualOpenStockInput;
 /**
  * Build a manual TradeTransaction for an opening leg (option or stock).
  *
- * Sign convention matches lib/import/robinhood.ts:
+ * Sign convention matches lib/import/transactions.ts:
  *   Option SELL_TO_OPEN → grossAmount positive (credit received)
  *   Option BUY_TO_OPEN  → grossAmount negative (debit paid)
  *   Stock  BUY          → grossAmount negative (debit paid)

@@ -3,7 +3,6 @@ import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db/client";
 import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
-import { isAllowedEmail } from "@/lib/auth/allowlist";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
@@ -24,9 +23,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/signin" },
   callbacks: {
-    signIn({ user }) {
-      return isAllowedEmail(user.email);
-    },
     async jwt({ token, user }) {
       if (user?.id) token.id = user.id;
       return token;

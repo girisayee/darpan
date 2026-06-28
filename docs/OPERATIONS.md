@@ -46,7 +46,7 @@ SQLite and imported CSV/backups can contain private financial data.
 Do not commit:
 
 - `data/*.sqlite`
-- downloaded Robinhood CSVs
+- downloaded broker CSVs
 - generated personal backups
 
 Use synthetic data in tests.
@@ -60,8 +60,9 @@ Calculation changes:
 
 Import changes:
 
-- Add or update `tests/import.test.ts`.
-- Cover Robinhood headers, option descriptions, footer stripping, assignment stock-leg ignoring, duplicates, and unresolved rows.
+- Add or update `tests/import.test.ts` (broker-format fixtures) and `tests/import-generic.test.ts`
+  (broker-agnostic detection + column mapping).
+- Cover broker headers, option descriptions, footer stripping, assignment stock-leg ignoring, duplicates, and unresolved rows.
 
 UI-only changes:
 

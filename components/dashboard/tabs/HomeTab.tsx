@@ -160,7 +160,7 @@ export function HomeTab({
           <CalendarHeatmap days={days} mode="year" year={year} onSelectDay={setSelectedDay} />
           {days.length > 0 && (
             <div className="mt-3 border-t border-hairline-soft pt-3">
-              <DayDetail day={selectedDay} onSelect={onSelectEvent} />
+              <DayDetail day={selectedDay} onSelect={onSelectEvent} maskAmounts={settings.maskAmounts} />
             </div>
           )}
         </div>

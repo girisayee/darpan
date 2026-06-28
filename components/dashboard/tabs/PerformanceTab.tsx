@@ -25,7 +25,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MetricGroup } from "@/components/dashboard/MetricGroup";
 import { capitalEfficiency } from "@/lib/selectors/capital-efficiency";
 import { goalPace } from "@/lib/selectors/goal-pace";
-import { formatCurrency, formatMaskedCurrency, formatPercent, monthLabel, monthTick } from "@/lib/utils/format";
+import { formatCurrency, formatMaskedCurrency, formatPercent, monthLabel, monthTick, MASKED_AMOUNT } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult } from "@/types/trading";
 import { MonthlyRoiTable, tone } from "./shared";
 
@@ -71,9 +71,11 @@ const TOOLTIP_LABEL_STYLE: React.CSSProperties = {
 function EquityCurveChart({
   result,
   annualGoal,
+  maskAmounts = false,
 }: {
   result: CalculationResult;
   annualGoal: number;
+  maskAmounts?: boolean;
 }) {
   const mounted = useSyncExternalStore(
     () => () => undefined,
@@ -136,7 +138,9 @@ function EquityCurveChart({
               axisLine={false}
               tickLine={false}
               tickFormatter={(v: number) =>
-                v >= 1000 || v <= -1000
+                maskAmounts
+                  ? ""
+                  : v >= 1000 || v <= -1000
                   ? `$${(v / 1000).toFixed(0)}k`
                   : `$${v.toFixed(0)}`
               }
@@ -144,7 +148,9 @@ function EquityCurveChart({
             />
             <Tooltip
               formatter={(value: unknown, name: string | number | undefined) => [
-                formatCurrency(typeof value === "number" ? value : Number(value)),
+                maskAmounts
+                  ? MASKED_AMOUNT
+                  : formatCurrency(typeof value === "number" ? value : Number(value)),
                 name === "goalPace" ? "Goal pace" : "Cumulative P&L",
               ]}
               labelFormatter={(label) => monthLabel(String(label))}
@@ -184,9 +190,10 @@ type StrategyTooltipProps = {
   active?: boolean;
   payload?: Array<{ value: number; dataKey: string; payload: Record<string, number> }>;
   label?: string;
+  masked?: boolean;
 };
 
-function StrategyTooltip({ active, payload, label }: StrategyTooltipProps) {
+function StrategyTooltip({ active, payload, label, masked = false }: StrategyTooltipProps) {
   if (!active || !payload?.length || !label) return null;
   const p = payload[0].payload;
   const premium = p.premium ?? 0;
@@ -213,7 +220,7 @@ function StrategyTooltip({ active, payload, label }: StrategyTooltipProps) {
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {formatCurrency(val)}
+              {formatMaskedCurrency(val, masked)}
             </span>
           </div>
         ) : null
@@ -231,14 +238,14 @@ function StrategyTooltip({ active, payload, label }: StrategyTooltipProps) {
             fontWeight: 600,
           }}
         >
-          {formatCurrency(total)}
+          {formatMaskedCurrency(total, masked)}
         </span>
       </div>
     </div>
   );
 }
 
-function MonthlyPnlBar({ result }: { result: CalculationResult }) {
+function MonthlyPnlBar({ result, maskAmounts = false }: { result: CalculationResult; maskAmounts?: boolean }) {
   const mounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -278,12 +285,12 @@ function MonthlyPnlBar({ result }: { result: CalculationResult }) {
             axisLine={false}
             tickLine={false}
             tickFormatter={(v: number) =>
-              v >= 1000 || v <= -1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`
+              maskAmounts ? "" : v >= 1000 || v <= -1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`
             }
             width={52}
           />
           <Tooltip
-            content={<StrategyTooltip />}
+            content={<StrategyTooltip masked={maskAmounts} />}
             cursor={{ fill: C_HAIRLINE, fillOpacity: 0.25 }}
           />
           <Bar dataKey="total" radius={[3, 3, 0, 0]} isAnimationActive={false}>
@@ -316,7 +323,6 @@ export function PerformanceTab({
   const annualizedRoc = result.aggregates.annualizedReturnOnCapital;
 
   const avgDeployed = result.aggregates.averageDeployedCapital;
-  const peakDeployed = result.aggregates.peakDeployedCapital;
   const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
 
   // The annual-goal headline and the equity curve only make sense when the user
@@ -355,12 +361,12 @@ export function PerformanceTab({
         <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
           <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
             <h2 className="font-sans text-strong font-medium text-foreground">Equity curve</h2>
-            <EquityCurveChart result={result} annualGoal={annualGoal} />
+            <EquityCurveChart result={result} annualGoal={annualGoal} maskAmounts={settings.maskAmounts} />
           </div>
-          <BenchmarkComparison result={result} />
+          <BenchmarkComparison result={result} maskAmounts={settings.maskAmounts} />
         </div>
       ) : (
-        <BenchmarkComparison result={result} />
+        <BenchmarkComparison result={result} maskAmounts={settings.maskAmounts} />
       )}
 
       {/* ── Capital deployed metrics ── */}
@@ -370,14 +376,6 @@ export function PerformanceTab({
           value={formatMaskedCurrency(avgDeployed, settings.maskAmounts)}
           helper="Time-weighted"
           tooltip="Time-weighted average capital deployed (dollar-days ÷ days in the period). The denominator behind Return on capital."
-          tone="neutral"
-          variant="compact"
-        />
-        <KpiCard
-          label="Peak deployed"
-          value={formatMaskedCurrency(peakDeployed, settings.maskAmounts)}
-          helper="Highest single day"
-          tooltip="Highest capital deployed on any single day."
           tone="neutral"
           variant="compact"
         />
@@ -411,7 +409,7 @@ export function PerformanceTab({
       <section className="space-y-2">
         <h2 className="font-sans text-strong font-medium text-foreground">Monthly P&amp;L</h2>
         <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <MonthlyPnlBar result={result} />
+          <MonthlyPnlBar result={result} maskAmounts={settings.maskAmounts} />
         </div>
         <MonthlyRoiTable rows={result.monthlyReturns} maskAmounts={settings.maskAmounts} />
       </section>

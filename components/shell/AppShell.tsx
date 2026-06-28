@@ -60,8 +60,8 @@ function AccountSelect({
   }
 
   return (
-    <details className="relative">
-      <summary className="flex cursor-pointer list-none items-center gap-1 rounded-[8px] border border-hairline bg-surface px-2.5 py-[5px] text-body text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 [&::-webkit-details-marker]:hidden">
+    <details className="relative flex">
+      <summary className="flex h-full cursor-pointer list-none items-center gap-1 rounded-l-[8px] px-2.5 py-[5px] text-body text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 [&::-webkit-details-marker]:hidden">
         {labelText}
         <ChevronDown className="h-3.5 w-3.5" />
       </summary>
@@ -186,21 +186,19 @@ export function AppShell({
           </nav>
         </div>
 
-        {/* RIGHT: account selector + year selector + overflow menu */}
+        {/* RIGHT: filter toolbar (account · year · mask) + overflow menu */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="hidden sm:block">
+          {/* Segmented filter toolbar — account, year and the mask toggle read as one unit */}
+          <div className="hidden items-stretch divide-x divide-hairline rounded-[8px] border border-hairline bg-surface sm:flex">
             <AccountSelect accounts={accounts} selected={selectedAccountIds} onChange={onSelectAccounts} />
-          </div>
-          <div className="hidden sm:block">
             <select
               value={year}
               onChange={(e) => onYear(e.target.value)}
               aria-label="Filter by year"
               className={cn(
-                "rounded-[8px] border border-hairline bg-surface",
-                "px-2.5 py-[5px] text-body text-muted-foreground",
-                "hover:text-foreground transition-colors cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                "cursor-pointer bg-transparent px-2.5 py-[5px] text-body text-muted-foreground",
+                "hover:text-foreground transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
               )}
             >
               {years.map((y) => (
@@ -209,16 +207,31 @@ export function AppShell({
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={onToggleMaskAmounts}
+              aria-label={maskAmounts ? "Show dollar amounts" : "Hide dollar amounts"}
+              aria-pressed={maskAmounts}
+              className={cn(
+                "rounded-r-[8px] px-2.5 transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40",
+                maskAmounts
+                  ? "bg-accent/10 text-accent"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {maskAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
 
-          {/* Mask amounts toggle */}
+          {/* Mobile mask toggle — filters are hidden on small screens, so the eye stands alone */}
           <button
             type="button"
             onClick={onToggleMaskAmounts}
             aria-label={maskAmounts ? "Show dollar amounts" : "Hide dollar amounts"}
             aria-pressed={maskAmounts}
             className={cn(
-              "rounded-[8px] border border-hairline p-[6px] transition-colors",
+              "rounded-[8px] border border-hairline p-[6px] transition-colors sm:hidden",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
               maskAmounts
                 ? "bg-accent/10 text-accent border-accent/30"

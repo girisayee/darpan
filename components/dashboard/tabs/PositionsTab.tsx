@@ -95,7 +95,12 @@ export function PositionsTab(props: {
   const strategyParam = searchParams.get("strategy");
   const optionChip: OptionChip =
     strategyParam === "csp" || strategyParam === "cc" || strategyParam === "long" ? strategyParam : "all";
-  const [stateFilter, setStateFilter] = useState<StateFilter>("All");
+  // Seed the All/Active/Closed filter from the URL (deep-linkable, e.g. from
+  // Home's "View all open positions"), then keep it as local state.
+  const stateParam = searchParams.get("state");
+  const initialStateFilter: StateFilter =
+    stateParam === "active" ? "Active" : stateParam === "closed" ? "Closed" : "All";
+  const [stateFilter, setStateFilter] = useState<StateFilter>(initialStateFilter);
 
   function navigate(next: { view: TabKey; strategy?: OptionChip }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -132,27 +137,27 @@ export function PositionsTab(props: {
   const stateKey = stateFilter.toLowerCase() as "all" | "active" | "closed";
 
   let rows: ReturnType<typeof toPositionRows>;
-  let columns: typeof allColumns;
+  let columns: ReturnType<typeof columnsFor>;
   let metrics: ReactNode;
   let emptyLabel: string;
 
   if (tab === "options") {
     if (optionChip === "all") {
       rows = toAllPositionRows(result, stateKey);
-      columns = allColumns;
-      metrics = <StrategyMetrics a={optionsAnalytics(result)} />;
+      columns = allColumns(settings.maskAmounts, stateKey);
+      metrics = <StrategyMetrics a={optionsAnalytics(result)} maskAmounts={settings.maskAmounts} />;
       emptyLabel = `No ${stateFilter.toLowerCase()} option positions.`;
     } else {
       rows = toPositionRows(result, optionChip, stateKey);
-      columns = columnsFor(optionChip);
-      metrics = <StrategyMetrics a={strategyAnalytics(result, optionChip)} />;
+      columns = columnsFor(optionChip, settings.maskAmounts, stateKey);
+      metrics = <StrategyMetrics a={strategyAnalytics(result, optionChip)} maskAmounts={settings.maskAmounts} />;
       emptyLabel = `No ${stateFilter.toLowerCase()} ${OPTION_CHIP_LABELS[optionChip].toLowerCase()} positions.`;
     }
   } else {
     // Open swing lots appear only when the user enables "show open swing positions".
     rows = toPositionRows(result, "swing", stateKey, showSwingOpen);
-    columns = columnsFor("swing");
-    metrics = <StrategyMetrics a={strategyAnalytics(result, "swing")} />;
+    columns = columnsFor("swing", settings.maskAmounts, stateKey);
+    metrics = <StrategyMetrics a={strategyAnalytics(result, "swing")} maskAmounts={settings.maskAmounts} />;
     emptyLabel = `No ${stateFilter.toLowerCase()} stock positions.`;
   }
 

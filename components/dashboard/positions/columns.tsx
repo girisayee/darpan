@@ -3,7 +3,8 @@ import type { CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/typ
 import type { StrategyKey } from "@/lib/selectors/strategy-analytics";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { signedMoney } from "@/components/dashboard/tabs/shared";
-import { formatCurrency, formatDisplayDate } from "@/lib/utils/format";
+import { formatMaskedCurrency, formatDisplayDate, formatPercent } from "@/lib/utils/format";
+import { cn } from "@/lib/utils/cn";
 
 export interface PositionRow {
   sym: string;
@@ -20,6 +21,10 @@ export interface PositionRow {
   costBasis?: string;
   openDate?: string;
   closeDate?: string;
+  expirationDate?: string;
+  dte?: number;
+  daysHeld?: number;
+  roc?: number;
   strategyLabel?: string;
   lifecycle?: OptionLifecycle;
   event?: RealizedPnLEvent;
@@ -41,7 +46,7 @@ const position = (): Column<PositionRow> => ({
           />
           {r.sym}
         </span>
-        <span className="block text-caption text-muted-foreground">{r.detail}</span>
+        <span className="block text-body text-muted-foreground">{r.detail}</span>
       </span>
     </span>
   ),
@@ -82,22 +87,83 @@ const closed = (): Column<PositionRow> => ({
     ),
 });
 
-const pnl = (): Column<PositionRow> => ({
+const daysHeld = (): Column<PositionRow> => ({
+  key: "daysHeld",
+  header: "Days",
+  align: "right",
+  value: (r) => r.daysHeld ?? null,
+  render: (r) =>
+    r.daysHeld != null ? (
+      <span className="tabular-nums text-muted-foreground">{r.daysHeld}d</span>
+    ) : (
+      <span className="opacity-50">—</span>
+    ),
+});
+
+const expiry = (): Column<PositionRow> => ({
+  key: "expirationDate",
+  header: "Expiry",
+  align: "right",
+  value: (r) => r.expirationDate ?? "",
+  render: (r) =>
+    r.expirationDate ? (
+      <span className="tabular-nums text-muted-foreground">{formatDisplayDate(r.expirationDate)}</span>
+    ) : (
+      <span className="opacity-50">—</span>
+    ),
+});
+
+const dte = (): Column<PositionRow> => ({
+  key: "dte",
+  header: "DTE",
+  align: "right",
+  value: (r) => r.dte ?? null,
+  render: (r) =>
+    r.dte != null ? (
+      <span className={cn("tabular-nums", r.dte <= 7 ? "text-warn" : "text-muted-foreground")}>
+        {r.dte}d
+      </span>
+    ) : (
+      <span className="opacity-50">—</span>
+    ),
+});
+
+const roc = (): Column<PositionRow> => ({
+  key: "roc",
+  header: "RoC",
+  align: "right",
+  value: (r) => r.roc ?? null,
+  render: (r) =>
+    r.roc != null ? (
+      <span
+        className={cn(
+          "tabular-nums",
+          r.roc > 0 ? "text-pos" : r.roc < 0 ? "text-neg" : "text-muted-foreground"
+        )}
+      >
+        {formatPercent(r.roc, 1)}
+      </span>
+    ) : (
+      <span className="opacity-50">—</span>
+    ),
+});
+
+const pnl = (maskAmounts = false): Column<PositionRow> => ({
   key: "pnl",
   header: "P&L",
   align: "right",
   value: (r) => r.pnl,
-  render: (r) => signedMoney(r.pnl),
+  render: (r) => signedMoney(r.pnl, maskAmounts),
 });
 
-const money = (key: keyof PositionRow, header: string): Column<PositionRow> => ({
+const money = (key: keyof PositionRow, header: string, maskAmounts = false): Column<PositionRow> => ({
   key,
   header,
   align: "right",
   value: (r) => (r[key] as number | undefined) ?? null,
   render: (r) =>
     r[key] != null ? (
-      formatCurrency(r[key] as number)
+      formatMaskedCurrency(r[key] as number, maskAmounts)
     ) : (
       <span className="opacity-50">—</span>
     ),
@@ -110,21 +176,25 @@ const text = (key: keyof PositionRow, header: string): Column<PositionRow> => ({
   value: (r) => (r[key] as string | undefined) ?? "",
 });
 
-export const allColumns: Column<PositionRow>[] = [
-  position(),
-  {
-    key: "strategyLabel",
-    header: "Strategy",
-    value: (r) => r.strategyLabel ?? "",
-    render: (r) => (
-      <span className="text-caption text-muted-foreground">{r.strategyLabel ?? "—"}</span>
-    ),
-  },
-  stage(),
-  opened(),
-  closed(),
-  pnl(),
-];
+export function allColumns(maskAmounts = false, state: "all" | "active" | "closed" = "all"): Column<PositionRow>[] {
+  return [
+    position(),
+    {
+      key: "strategyLabel",
+      header: "Strategy",
+      value: (r) => r.strategyLabel ?? "",
+      render: (r) => (
+        <span className="text-caption text-muted-foreground">{r.strategyLabel ?? "—"}</span>
+      ),
+    },
+    stage(),
+    opened(),
+    ...(state === "active" ? [expiry(), dte()] : []),
+    closed(),
+    ...(state === "closed" ? [daysHeld(), roc()] : []),
+    ...(state === "active" ? [] : [pnl(maskAmounts)]),
+  ];
+}
 
 export function toAllPositionRows(
   result: CalculationResult,
@@ -145,19 +215,28 @@ export function toAllPositionRows(
   );
 }
 
-export function columnsFor(key: StrategyKey): Column<PositionRow>[] {
+export function columnsFor(
+  key: StrategyKey,
+  maskAmounts = false,
+  state: "all" | "active" | "closed" = "all"
+): Column<PositionRow>[] {
+  const closedCols = state === "closed" ? [daysHeld(), roc()] : [];
+  const activeCols = state === "active" ? [expiry(), dte()] : [];
+  const pnlCol = state === "active" ? [] : [pnl(maskAmounts)];
   if (key === "csp" || key === "cc")
     return [
       position(),
       stage(),
-      money("premium", "Premium"),
-      money("capital", "Capital"),
+      money("premium", "Premium", maskAmounts),
+      money("capital", "Capital", maskAmounts),
       opened(),
+      ...activeCols,
       closed(),
-      pnl(),
+      ...closedCols,
+      ...pnlCol,
     ];
   if (key === "long")
-    return [position(), stage(), money("cost", "Cost"), opened(), closed(), pnl()];
+    return [position(), stage(), money("cost", "Cost", maskAmounts), opened(), ...activeCols, closed(), ...closedCols, ...pnlCol];
   return [
     position(),
     stage(),
@@ -165,7 +244,8 @@ export function columnsFor(key: StrategyKey): Column<PositionRow>[] {
     text("costBasis", "Cost basis"),
     opened(),
     closed(),
-    pnl(),
+    ...closedCols,
+    ...pnlCol,
   ];
 }
 
@@ -206,6 +286,8 @@ export function toPositionRows(
             premium: lc.premiumReceived,
             capital: lc.capitalDeployed ?? undefined,
             openDate: lc.openDate,
+            expirationDate: lc.expirationDate,
+            dte: daysToExpiry,
             lifecycle: lc,
           };
         }
@@ -219,6 +301,8 @@ export function toPositionRows(
         );
         const statusStr = lc.status;
         const tag = statusStr.charAt(0).toUpperCase() + statusStr.slice(1);
+        const closedPnl = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
+        const capital = lc.capitalDeployed ?? undefined;
         return {
           sym: lc.underlyingSymbol,
           detail,
@@ -226,11 +310,13 @@ export function toPositionRows(
           tag,
           warm: lc.status === "assigned",
           when: `${daysHeld}d`,
-          pnl: lc.netOptionPnl + (lc.assignmentStockPnl ?? 0),
+          pnl: closedPnl,
           premium: lc.premiumReceived,
-          capital: lc.capitalDeployed ?? undefined,
+          capital,
           openDate: lc.openDate,
           closeDate: endDate,
+          daysHeld,
+          roc: capital && capital > 0 ? (closedPnl / capital) * 100 : undefined,
           lifecycle: lc,
         };
       });
@@ -263,6 +349,8 @@ export function toPositionRows(
             pnl: lc.netOptionPnl,
             cost: lc.premiumReceived,
             openDate: lc.openDate,
+            expirationDate: lc.expirationDate,
+            dte: daysToExpiry,
             lifecycle: lc,
           };
         }
@@ -275,6 +363,8 @@ export function toPositionRows(
         );
         const statusStr = lc.status;
         const tag = statusStr.charAt(0).toUpperCase() + statusStr.slice(1);
+        const closedPnl = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
+        const cost = lc.premiumReceived;
         return {
           sym: lc.underlyingSymbol,
           detail,
@@ -282,10 +372,12 @@ export function toPositionRows(
           tag,
           warm: false,
           when: `${daysHeld}d`,
-          pnl: lc.netOptionPnl + (lc.assignmentStockPnl ?? 0),
-          cost: lc.premiumReceived,
+          pnl: closedPnl,
+          cost,
           openDate: lc.openDate,
           closeDate: endDate,
+          daysHeld,
+          roc: cost && cost > 0 ? (closedPnl / cost) * 100 : undefined,
           lifecycle: lc,
         };
       });
@@ -343,6 +435,11 @@ export function toPositionRows(
           e.costBasis != null ? `$${(e.costBasis / e.quantity).toFixed(2)}` : "—",
         openDate,
         closeDate: e.date,
+        daysHeld: e.holdingDays ?? undefined,
+        roc:
+          e.costBasis != null && e.costBasis > 0
+            ? (e.realizedPnl / e.costBasis) * 100
+            : undefined,
         event: e,
       };
     });

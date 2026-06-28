@@ -3,14 +3,16 @@
 **The mirror for your trades.** It doesn't flatter — it reflects.
 
 Darpan is a hosted, multi-user dashboard for short-term traders who track their own
-performance. It imports your broker activity (Robinhood-style CSV), reconstructs realized
+performance. It imports your broker activity — Robinhood, Fidelity, Schwab, E*TRADE,
+Vanguard, and IBKR CSV exports are auto-detected — reconstructs realized
 P&L, option income, and capital usage, and shows it back to you across four focused views:
 **Home**, **Performance**, **Tickers**, and **Positions**.
 
-Access is invite-only: sign-in is Google SSO restricted to an email allowlist, and every
-trader's data is isolated per account. Darpan does not connect to any broker — you import a
-CSV (or paste rows); everything is computed server-side and stored in your own row-scoped
-Postgres records.
+Sign-in is Google SSO, and every trader's data is isolated per account. Who can sign in is
+governed entirely by your Google OAuth configuration (while the OAuth app is in "Testing",
+that's the test users you add in Google Cloud Console). Darpan does not connect to any
+broker — you import a CSV (or paste rows); everything is computed server-side and stored in
+your own row-scoped Postgres records.
 
 ## Run locally
 
@@ -37,15 +39,15 @@ values live in `.env.local`, which is git-ignored):
 | `DATABASE_URL` | Postgres connection string (postgres-js). |
 | `AUTH_SECRET` | Auth.js session/JWT signing secret. |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Google OAuth client credentials. |
-| `ALLOWED_EMAILS` | Comma-separated allowlist of sign-in emails (case-insensitive). |
 | `AUTH_URL` | App origin, e.g. `http://localhost:3000`. |
 | `AUTH_TRUST_HOST` | `true` when running behind a proxy / non-localhost host. |
 
 **Google OAuth setup:** create an OAuth 2.0 Client (Web application) in the Google Cloud
 console, configure the consent screen, and add the redirect URI
 `<host>/api/auth/callback/google` (e.g. `http://localhost:3000/api/auth/callback/google`).
-Put the client id/secret in `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, and list permitted
-sign-in addresses in `ALLOWED_EMAILS`.
+Put the client id/secret in `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`. Control who may sign in
+from the OAuth consent screen (add test users while the app is in "Testing", or publish it
+to open sign-in to any Google account).
 
 ## What it does
 

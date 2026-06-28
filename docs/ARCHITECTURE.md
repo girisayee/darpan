@@ -8,9 +8,9 @@ trading data is scoped to that user's id.
 ## High-level flow
 
 ```text
-Robinhood CSV / pasted rows
-  -> lib/import/robinhood.ts            (parse + normalize to TradeTransaction[])
-  -> app/api/import/robinhood/route.ts  (auth() -> session.user.id)
+Broker CSV / pasted rows
+  -> lib/import/transactions.ts            (parse + normalize to TradeTransaction[])
+  -> app/api/import/transactions/route.ts  (auth() -> session.user.id)
   -> lib/db/database.ts                 (Drizzle/Postgres, scoped by userId)
   -> app/api/store/route.ts             (GET/PUT/DELETE, auth-gated)
   -> lib/storage/server-store-client.ts (client snapshot via useSyncExternalStore)
@@ -26,15 +26,15 @@ Auth.js v5 (`next-auth@beta`) is configured in `auth.ts`:
 
 - **Provider:** Google OAuth. `allowDangerousEmailAccountLinking` is enabled so a Google
   account links to a pre-existing user row with the same email (e.g. one seeded by the
-  SQLite→Postgres migration) — safe for this single-provider, allowlisted, email-verified app.
+  SQLite→Postgres migration) — safe for this single-provider, email-verified app.
 - **Adapter:** `@auth/drizzle-adapter` over the `user` / `account` / `session` /
   `verificationToken` tables in `lib/db/schema.ts`.
 - **Sessions:** JWT strategy (not database sessions) — required for the planned Phase B
   Credentials provider. The `jwt`/`session` callbacks thread the user id onto
   `session.user.id` (typed via `types/next-auth.d.ts`).
-- **Allowlist:** the `signIn` callback calls `isAllowedEmail` (`lib/auth/allowlist.ts`),
-  which checks the comma-separated, case-insensitive `ALLOWED_EMAILS` env var and denies
-  everyone when it is unset.
+- **Access control:** there is no app-level email allowlist. Any Google account that
+  satisfies Google's own OAuth consent configuration may sign in (while the OAuth app is
+  in "Testing", that means the test users you list in Google Cloud Console).
 - **Route handler:** `app/api/auth/[...nextauth]/route.ts`. Sign-in UI: `app/signin/page.tsx`.
   `app/page.tsx` is a server component that redirects unauthenticated visitors to `/signin`.
 
@@ -64,7 +64,7 @@ Every data route calls `auth()` and returns `401` when there is no `session.user
 - `PUT` — replaces the user's transactions and/or settings.
 - `DELETE` — clears the user's transactions and resets settings.
 
-`app/api/import/robinhood/route.ts`
+`app/api/import/transactions/route.ts`
 - `POST` — parses raw CSV text and writes rows for the signed-in user
   (`mode: "replace" | "append"`). Duplicate rows are preserved; duplicate ids are returned as
   warning metadata.

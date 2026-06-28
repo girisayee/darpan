@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { ytdReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
 import type { CalculationResult } from "@/types/trading";
-import { formatCurrency, formatPercent } from "@/lib/utils/format";
+import { formatMaskedCurrency, formatPercent } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 type BenchmarkData = { spy: ClosePoint[]; qqq: ClosePoint[]; vti: ClosePoint[] };
@@ -41,10 +41,12 @@ function DataBarRow({
   row,
   maxAbs,
   hasNeg,
+  maskAmounts,
 }: {
   row: RowSpec;
   maxAbs: number;
   hasNeg: boolean;
+  maskAmounts: boolean;
 }) {
   const { label, pct, dollarPnl, emphasis } = row;
   const value = row.unavailable || pct === null ? null : pct;
@@ -86,12 +88,12 @@ function DataBarRow({
 
       <div className="text-right leading-tight">
         {value === null ? (
-          <span className="font-sans text-strong font-medium text-muted-foreground">—</span>
+          <span className="font-sans text-body font-medium text-muted-foreground">—</span>
         ) : (
           <>
             <div
               className={cn(
-                "font-sans text-strong font-medium tabular-nums",
+                "font-sans text-body font-semibold tabular-nums",
                 pos && "text-pos",
                 neg && "text-neg",
                 !pos && !neg && "text-foreground"
@@ -100,15 +102,8 @@ function DataBarRow({
               {formatPercent(value, 2)}
             </div>
             {dollarPnl !== null && (
-              <div
-                className={cn(
-                  "font-sans text-caption tabular-nums",
-                  dollarPnl > 0 && "text-pos",
-                  dollarPnl < 0 && "text-neg",
-                  dollarPnl === 0 && "text-muted-foreground"
-                )}
-              >
-                {formatCurrency(dollarPnl)}
+              <div className="font-sans text-caption tabular-nums text-muted-foreground">
+                {formatMaskedCurrency(dollarPnl, maskAmounts)}
               </div>
             )}
           </>
@@ -156,7 +151,13 @@ function deleteCache(key: string | null): void {
   }
 }
 
-export function BenchmarkComparison({ result }: { result: CalculationResult }) {
+export function BenchmarkComparison({
+  result,
+  maskAmounts = false,
+}: {
+  result: CalculationResult;
+  maskAmounts?: boolean;
+}) {
   // The year in view drives YTD: each index's calendar return is measured from
   // its year-open close (first close on/after Jan 1) to the latest close.
   const months = result.monthlyReturns;
@@ -292,7 +293,7 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       <p className="font-sans text-caption text-muted-foreground">
         Index $ shown on your avg deployed capital{" "}
         {avgDeployed > 0 ? (
-          <span className="font-medium text-foreground">{formatCurrency(avgDeployed)}</span>
+          <span className="font-medium text-foreground">{formatMaskedCurrency(avgDeployed, maskAmounts)}</span>
         ) : (
           "—"
         )}
@@ -328,7 +329,7 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       {status === "success" && (
         <div>
           {rows.map((row) => (
-            <DataBarRow key={row.label} row={row} maxAbs={maxAbs} hasNeg={hasNeg} />
+            <DataBarRow key={row.label} row={row} maxAbs={maxAbs} hasNeg={hasNeg} maskAmounts={maskAmounts} />
           ))}
         </div>
       )}

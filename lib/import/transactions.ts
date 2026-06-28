@@ -96,11 +96,6 @@ export function parseTransactionsCsv(raw: string, opts: ParseOptions = {}): Impo
   return { batchId, rows, issues, duplicateIds, columnMap, sourceColumns, detectedBroker };
 }
 
-/** @deprecated Robinhood-defaulted wrapper, kept for the /api/import/robinhood route and scripts. */
-export function parseRobinhoodInput(raw: string, existing: TradeTransaction[] = [], accountName = "Robinhood"): ImportPreview {
-  return parseTransactionsCsv(raw, { existing, accountName });
-}
-
 function stripPreambleAndFooter(raw: string): string {
   let lines = raw.split(/\r?\n/);
   // Drop a known disclaimer footer onward.

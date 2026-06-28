@@ -5,10 +5,11 @@ Fast-start guide for coding agents and contributors working in this repo.
 ## Product snapshot
 
 Darpan is a hosted, multi-user Next.js dashboard for short-term retail traders. It imports
-Robinhood-style CSV activity, reconstructs realized P&L / option income / capital usage in a
-pure calculation engine, and presents it across four tabs: **Home**, **Performance**,
-**Tickers**, **Positions** (Import and Settings live behind a `⋯` overflow menu). Sign-in is
-Google SSO gated by an email allowlist; all data is isolated per user.
+broker CSV activity (Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, IBKR — auto-detected),
+reconstructs realized P&L / option income / capital usage in a pure calculation engine, and
+presents it across four tabs: **Home**, **Performance**, **Tickers**, **Positions** (Import
+and Settings live behind a `⋯` overflow menu). Sign-in is Google SSO; access is governed by
+Google's OAuth config (no app-level allowlist), and all data is isolated per user.
 
 The product, package, UI, and docs name is **Darpan**. The no-flash theme script in
 `app/layout.tsx` keeps the older app-name `localStorage` theme key as a one-time fallback —
@@ -35,15 +36,15 @@ set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env
 - Selectors (pure, derive view data from a `CalculationResult`): `lib/selectors/*`
   — `trade-quality`, `premium-capture`, `allocation`, `capital-efficiency`, `goal-pace`,
   `top-movers`, `daily-pnl`, `leaderboard`, `strategy-analytics`, `filter-result`, `analytics`
-- Robinhood CSV parser: `lib/import/robinhood.ts`
+- Broker-agnostic CSV parser: `lib/import/transactions.ts` (`parseTransactionsCsv`; auto-detects broker + columns)
 - Benchmarks: `lib/benchmark/{compare,fetch}.ts` (capital-matched SPY/QQQ/VTI)
 - Persistence: Postgres via Drizzle in `lib/db/database.ts` (every helper takes `userId`);
   schema `lib/db/schema.ts`; client `lib/db/client.ts`; client bridge `lib/storage/server-store-client.ts`;
   `lib/storage/local-store.ts` holds `defaultSettings` and backup create/parse
 - Auth: `auth.ts` (NextAuth v5, Google provider, Drizzle adapter, JWT sessions);
-  allowlist `lib/auth/allowlist.ts` (`ALLOWED_EMAILS`); route handler `app/api/auth/[...nextauth]/route.ts`;
+  route handler `app/api/auth/[...nextauth]/route.ts`;
   session type augmentation `types/next-auth.d.ts`
-- API routes: `app/api/store/route.ts`, `app/api/import/robinhood/route.ts`, `app/api/benchmark/route.ts`
+- API routes: `app/api/store/route.ts`, `app/api/import/transactions/route.ts`, `app/api/benchmark/route.ts`
 - Tests: `tests/**/*.test.ts`
 
 Read `docs/ARCHITECTURE.md` and `docs/FEATURES.md` before broad changes.
@@ -63,7 +64,7 @@ typecheck/lint/build and the running dev server rather than component render tes
 
 ## Important invariants
 
-- The calculation engine (`lib/calculations/engine.ts`) and the Robinhood importer are the
+- The calculation engine (`lib/calculations/engine.ts`) and the CSV importer are the
   domain core — change their math only deliberately, and update/extend tests when you do.
 - Transactions and settings persist in Postgres through `/api/store`, always scoped by
   `session.user.id`. Every data route must call `auth()` and 401 when unauthenticated —

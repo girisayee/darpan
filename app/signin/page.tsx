@@ -25,7 +25,7 @@ export default async function SignIn() {
           Continue with Google
         </button>
       </form>
-      <p className="text-caption text-muted-foreground">Access is invite-only.</p>
+      <p className="text-caption text-muted-foreground">Sign in with your Google account.</p>
     </main>
   );
 }

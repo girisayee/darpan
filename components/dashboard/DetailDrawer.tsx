@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ChevronRight, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
@@ -57,6 +57,7 @@ function outcomeLabel(status: OptionLifecycle["status"]) {
   if (status === "assigned") return "Assigned";
   if (status === "expired") return "Expired";
   if (status === "closed") return "Closed";
+  if (status === "open") return "Open";
   return status;
 }
 
@@ -676,6 +677,7 @@ function OptionCycleBody({
   const share = lifecycleShareDetail(lc, events, taxLots);
 
   // ── Numbers ────────────────────────────────────────────────────────────────
+  const isOpen = lc.status === "open";
   const capital = lc.capitalDeployed ?? 0;
   const assignmentStockPnl = lc.assignmentStockPnl ?? 0;
   const total = lc.netOptionPnl + (share ? assignmentStockPnl : 0);
@@ -692,6 +694,20 @@ function OptionCycleBody({
             (24 * 60 * 60 * 1000)
         )
       : null;
+
+  // Days to expiry for an open position (today → expiration). Read "now" once on
+  // mount so the render stays pure.
+  const [nowMs] = useState(() => Date.now());
+  const dte = useMemo(
+    () =>
+      isOpen
+        ? Math.round(
+            (new Date(lc.expirationDate + "T00:00:00").getTime() - nowMs) /
+              (24 * 60 * 60 * 1000)
+          )
+        : null,
+    [isOpen, lc.expirationDate, nowMs]
+  );
 
   // Annualized from option ROI when we have ROI and a positive holding period.
   const annualized =
@@ -758,10 +774,12 @@ function OptionCycleBody({
         </button>
       </div>
 
-      {/* ── Hero: total realized + cycle RoC ── */}
+      {/* ── Hero: total realized + cycle RoC (or open premium + DTE) ── */}
       <div className="flex items-baseline gap-3 mt-4 mb-2">
         <div>
-          <div className="font-sans text-caption text-muted-foreground">Total realized</div>
+          <div className="font-sans text-caption text-muted-foreground">
+            {isOpen ? (isShort ? "Premium collected" : "Net debit") : "Total realized"}
+          </div>
           <div
             className={cn(
               "font-sans text-[30px] font-medium tabular-nums mt-1",
@@ -770,17 +788,38 @@ function OptionCycleBody({
           >
             {signedCurrency(total, maskAmounts)}
           </div>
+          {isOpen && (
+            <div className="font-sans text-caption text-muted-foreground mt-0.5">
+              Open · not yet realized
+            </div>
+          )}
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-caption text-muted-foreground">Cycle RoC</div>
-          <div
-            className={cn(
-              "font-sans text-[18px] font-medium tabular-nums mt-1",
-              toneClass(cycleRoi)
-            )}
-          >
-            {signedPercentText(cycleRoi)}
-          </div>
+          {isOpen ? (
+            <>
+              <div className="font-sans text-caption text-muted-foreground">Days to expiry</div>
+              <div
+                className={cn(
+                  "font-sans text-[18px] font-medium tabular-nums mt-1",
+                  dte != null && dte <= 7 ? "text-warn" : "text-foreground"
+                )}
+              >
+                {dte != null ? `${dte}d` : "—"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="font-sans text-caption text-muted-foreground">Cycle RoC</div>
+              <div
+                className={cn(
+                  "font-sans text-[18px] font-medium tabular-nums mt-1",
+                  toneClass(cycleRoi)
+                )}
+              >
+                {signedPercentText(cycleRoi)}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -792,17 +831,19 @@ function OptionCycleBody({
           value={signedCurrency(isShort ? lc.premiumReceived : -lc.premiumReceived, maskAmounts)}
           valueClass={toneClass(isShort ? lc.premiumReceived : -lc.premiumReceived)}
         />
-        <Row
-          label={expiredWorthless ? "Expired worthless" : "Buy-to-close cost"}
-          value={
-            maskAmounts
-              ? MASKED_AMOUNT
-              : expiredWorthless
-              ? "$0.00"
-              : `−${formatCurrency(Math.abs(lc.closeCost), { maximumFractionDigits: 2 })}`
-          }
-          valueClass="text-neg"
-        />
+        {!isOpen && (
+          <Row
+            label={expiredWorthless ? "Expired worthless" : "Buy-to-close cost"}
+            value={
+              maskAmounts
+                ? MASKED_AMOUNT
+                : expiredWorthless
+                ? "$0.00"
+                : `−${formatCurrency(Math.abs(lc.closeCost), { maximumFractionDigits: 2 })}`
+            }
+            valueClass="text-neg"
+          />
+        )}
         <Row
           label="Fees"
           value={
@@ -814,26 +855,31 @@ function OptionCycleBody({
           }
         />
         <Row
-          label="Net option P&L"
+          label={isOpen ? (isShort ? "Net premium" : "Net debit") : "Net option P&L"}
+          helper={isOpen && isShort ? "max if held to expiry" : undefined}
           bold
           topBorder
           value={signedCurrency(lc.netOptionPnl, maskAmounts)}
           valueClass={toneClass(lc.netOptionPnl)}
         />
+        {!(isOpen && !isShort) && (
+          <Row
+            label={isOpen ? "Max RoC" : "Option RoC"}
+            helper={
+              capital > 0
+                ? `${isOpen ? "if worthless · " : ""}on ${formatMaskedCurrency(capital, maskAmounts)} ${isShort ? "collateral" : "cost"}`
+                : undefined
+            }
+            value={signedPercentText(optionRoi)}
+            valueClass={toneClass(optionRoi)}
+          />
+        )}
         <Row
-          label="Option RoC"
-          helper={
-            capital > 0
-              ? `on ${formatMaskedCurrency(capital, maskAmounts)} ${isShort ? "collateral" : "cost"}`
-              : undefined
-          }
-          value={signedPercentText(optionRoi)}
-          valueClass={toneClass(optionRoi)}
-        />
-        <Row
-          label="Held"
+          label={isOpen ? "Opened" : "Held"}
           value={
-            heldDays != null
+            isOpen
+              ? `${formatDisplayDate(lc.openDate)} · exp ${formatDisplayDate(lc.expirationDate)}`
+              : heldDays != null
               ? `${formatDisplayDate(lc.openDate)} → ${formatDisplayDate(endDate)} · ${formatNumber(heldDays)} days`
               : "—"
           }
