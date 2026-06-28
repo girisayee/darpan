@@ -301,7 +301,7 @@ export function ImportTab({
                 const missing = f.required && !mapped;
                 return (
                   <div key={f.key} className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2">
-                    <span className={cn("text-caption", missing ? "text-neg" : "text-muted-foreground")}>
+                    <span className={cn("text-micro", missing ? "text-neg" : "text-muted-foreground")}>
                       {f.label}
                       {f.required && " *"}
                     </span>
@@ -309,7 +309,7 @@ export function ImportTab({
                       value={mapped}
                       onChange={(e) => changeMapping(f.key, e.target.value)}
                       className={cn(
-                        "rounded-md border bg-surface px-2 py-1 text-caption text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                        "rounded-md border bg-surface px-2 py-1 text-micro text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                         missing ? "border-neg/40" : "border-hairline"
                       )}
                     >
