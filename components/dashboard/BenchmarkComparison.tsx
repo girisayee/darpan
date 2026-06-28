@@ -28,6 +28,8 @@ const C_MUTED = "rgb(var(--text-muted))";
 
 type RowSpec = {
   label: string;
+  /** What the ticker tracks, shown under the label (e.g. "S&P 500"). */
+  sub?: string;
   pct: number | null;
   dollarPnl: number | null;
   emphasis?: boolean;
@@ -66,14 +68,10 @@ function DataBarRow({
   const fill = emphasis ? (value !== null && value < 0 ? C_NEG : C_POS) : C_MUTED;
 
   return (
-    <div className="grid grid-cols-[34px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
-      <span
-        className={cn(
-          "font-sans text-body",
-          emphasis ? "font-medium text-foreground" : "text-muted-foreground"
-        )}
-      >
-        {label}
+    <div className="grid grid-cols-[96px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
+      <span className="font-sans leading-tight">
+        <span className={cn("text-body", emphasis ? "font-medium text-foreground" : "text-foreground")}>{label}</span>
+        {row.sub && <span className="block text-micro text-muted-foreground">{row.sub}</span>}
       </span>
 
       <div className="relative h-3.5 rounded bg-surface-inset">
@@ -122,7 +120,7 @@ function DataBarRow({
 
 function SkeletonRow() {
   return (
-    <div className="grid grid-cols-[34px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
+    <div className="grid grid-cols-[96px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
       <div className="h-3 w-7 rounded bg-surface-inset animate-pulse" />
       <div className="h-3.5 rounded bg-surface-inset animate-pulse" />
       <div className="ml-auto h-4 w-16 rounded bg-surface-inset animate-pulse" />
@@ -251,21 +249,24 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
   const vtiResult = data && data.vti && data.vti.length >= 2 ? ytdReturn(data.vti, benchYear) : null;
 
   const rows: RowSpec[] = [
-    { label: "You", pct: yourReturnPct, dollarPnl: totalPnl, emphasis: true },
+    { label: "You", sub: "Your return", pct: yourReturnPct, dollarPnl: totalPnl, emphasis: true },
     {
       label: "SPY",
+      sub: "S&P 500",
       pct: spyResult?.returnPct ?? null,
       dollarPnl: dollarsOn(spyResult?.returnPct),
       unavailable: status === "success" && !spyResult,
     },
     {
       label: "VTI",
+      sub: "Total US market",
       pct: vtiResult?.returnPct ?? null,
       dollarPnl: dollarsOn(vtiResult?.returnPct),
       unavailable: status === "success" && !vtiResult,
     },
     {
       label: "QQQ",
+      sub: "Nasdaq 100",
       pct: qqqResult?.returnPct ?? null,
       dollarPnl: dollarsOn(qqqResult?.returnPct),
       unavailable: status === "success" && !qqqResult,
@@ -284,7 +285,7 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-sans text-strong font-medium text-foreground">Market comparison</h2>
-        <span className="font-sans text-caption text-muted-foreground">YTD {benchYear} · SPY / VTI / QQQ</span>
+        <span className="font-sans text-caption text-muted-foreground">YTD {benchYear}</span>
       </div>
 
       {/* Helper: deployed capital basis */}
