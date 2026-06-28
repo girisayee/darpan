@@ -276,7 +276,7 @@ export function ImportTab({
           <span className="text-strong text-pos">
             Imported {importedCount} transaction{importedCount === 1 ? "" : "s"}.
           </span>
-          <button type="button" onClick={reset} className="text-body font-medium text-foreground underline">
+          <button type="button" onClick={reset} className="text-caption font-medium text-foreground underline">
             Import more
           </button>
         </div>
@@ -342,14 +342,14 @@ export function ImportTab({
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <span className="text-body text-muted-foreground">Review &amp; select rows to import</span>
+            <span className="text-caption text-muted-foreground">Review &amp; select rows to import</span>
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search rows…"
-                className="w-48 rounded-md border border-hairline bg-surface py-1.5 pl-8 pr-2 text-body text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="w-48 rounded-md border border-hairline bg-surface py-1.5 pl-8 pr-2 text-caption text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               />
             </div>
           </div>
@@ -425,7 +425,7 @@ export function ImportTab({
                   })}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-6 text-center text-body text-muted-foreground">
+                      <td colSpan={7} className="px-3 py-6 text-center text-caption text-muted-foreground">
                         No rows match “{search}”.
                       </td>
                     </tr>
