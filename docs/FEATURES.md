@@ -1,0 +1,109 @@
+# Features
+
+Darpan is built around realized trading analytics for short-term traders, not live portfolio
+management. Everything below is computed from your imported activity.
+
+## Core workflow
+
+1. Import broker CSV activity (upload or paste) via the **⋯** menu → Import. The parser is
+   broker-agnostic — Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, and IBKR exports are
+   auto-detected, and a column-mapping step handles anything it can't map on its own.
+2. Rows are normalized into stock, option, cash, fee, dividend, transfer, and unknown
+   transactions; anything uninterpretable is kept as **unresolved**, not discarded.
+3. Imported transactions and settings persist in local SQLite.
+4. The dashboard reconstructs realized P&L, option lifecycles, tax lots, capital usage, and
+   monthly returns, and presents them across four tabs.
+5. Resolve gaps (e.g. a sale missing its opening buy) through **Review & fix**.
+
+Sample data is on by default so the dashboard is populated before you import; disable it in
+Settings.
+
+## Navigation
+
+Four primary tabs. On desktop they sit in the top bar; on a phone they become a fixed bottom
+tab bar. Import, Settings, account switch, theme toggle, and backup export live behind the
+**⋯** overflow menu.
+
+### Home
+
+At-a-glance, year-to-date by default:
+- **Verdict KPIs:** Net P&L · YTD (with return on capital), Expectancy, Profit factor,
+  Win rate.
+- **Daily P&L calendar** — a heatmap of daily realized P&L, toggling between a full year and
+  a single month; click any day to see that day's trades.
+- **Capital deployed** — a gauge of current deployed capital against your configured max
+  buying power.
+- **Open positions** — your active option plays (roll-soon first); click one for its detail
+  drawer, or jump to the full Positions tab.
+- **By strategy** — a P&L / RoC / win-rate snapshot per strategy; tap to open that strategy
+  in Positions.
+
+### Performance
+
+- **You vs. the market** — capital-matched return against SPY / QQQ / VTI.
+- **Annual goal** — progress, pacing, projection, and required monthly run-rate.
+- **Equity curve** — cumulative realized P&L over the year vs. goal pace.
+- **Capital deployed** — average and peak deployed, return on capital, capital utilization,
+  capital turnover, income per day, and concentration (HHI).
+- **Monthly P&L** — a bar chart plus a breakdown table (P&L, RoC, average capital, and RoC by
+  strategy: CSP / CC / Swing).
+
+### Tickers
+
+- **Leaderboard** — "Money makers" and "Account killers": your symbols ranked by net P&L,
+  annotated with win rate and trade count so a single lucky trade can't top the board.
+- **Full symbol table** — every symbol you've traded, sortable and searchable (net P&L, RoC,
+  trades, win rate).
+
+### Positions
+
+Your book organized **by strategy**: All strategies, Cash-secured puts, Covered calls, Long
+options, Swing.
+- The **All strategies** board lists option plays (CSP/CC/Long) with an Active / Closed / All
+  filter (default All) and a per-strategy summary tile row.
+- Each **strategy drill-down** shows its own metric set — e.g. premium collected, capture
+  rate, and assignment rate for options; profit factor and avg win/loss for swing — plus an
+  Active / Closed / All table.
+- Tables carry strategy-appropriate columns (Premium + Capital for CSP/CC, Cost for long
+  options, Qty + Cost basis for swing) along with **Opened** and **Closed** dates.
+- **Swing** shows closed positions only (open share lots aren't tracked as positions).
+- Click any position for a full P&L breakdown drawer.
+
+## Goal tracking
+
+The annual realized P&L goal (`annualRealizedPnlGoal`, default `$40,000`) drives the
+Performance goal card and the equity-curve goal-pace line.
+
+## Capital & collateral
+
+- **Covered calls** use linked stock cost basis when known, falling back to strike exposure
+  for open cycles with missing basis.
+- **Cash-secured puts** use conservative collateral (strike × shares) by default, or net
+  collateral after premium when configured.
+- **Swing trades** use cost basis while open.
+
+Cost-basis method and the put-collateral denominator are configurable in Settings.
+
+## Import support
+
+The parser is broker-agnostic. It auto-detects the source broker from the header signature
+(Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, IBKR) and maps common header synonyms
+(`Date`/`Activity Date`/`Run Date`/`Trade Date`, `Action`/`Trans Code`/`Side`, `Symbol`,
+`Quantity`, `Price`, `Amount`, `Fees`, option `Type`/`Strike`/`Expiration`, etc.) onto a
+canonical field set. Transaction codes for stock buy/sell, `STO`, `BTC`, `BTO`, `STC`,
+`OASGN`, `OEXP`, dividends, fees, transfers, and unknown/misc are recognized. When a column
+isn't detected automatically, a mapping step lets you assign it by hand. Unrecognized rows
+are preserved as unresolved.
+
+## Backup
+
+Export a JSON backup (transactions + settings) from the **⋯** menu or Settings. Sample data
+is generated by the app and is not part of the backup.
+
+## Product boundaries
+
+- No broker API, cloud sync, or multi-user support.
+- No live prices, option marks, or Greeks.
+- No max-drawdown / Sortino / Calmar / payoff-ratio surfacing, no discipline streak, and no
+  social leaderboard — deliberately out of scope.
+- No wash-sale handling or tax filing. Verify against official brokerage and tax documents.

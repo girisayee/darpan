@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Light theme (default) ─────────────────────────────────────── */
+:root {
+  --bg:              251 252 253;
+  --surface:         255 255 255;
+  --surface-inset:   244 246 250;
+  --hairline:        236 238 242;
+  --hairline-soft:   242 244 247;
+  --border-strong:   220 224 230;
+  --text:            11 18 32;
+  --text-muted:      90 100 114;
+  --text-dim:        107 114 126;
+  --accent:          79 70 229;
+  --accent-2:        124 92 255;
+  --pos:             11 122 85;
+  --neg:             214 69 61;
+  --warn:            180 83 9;
+  --spotlight:       13 16 22;
+}
+
+/* ── Dark theme ────────────────────────────────────────────────── */
+.dark {
+  --bg:              13 16 22;
+  --surface:         20 26 35;
+  --surface-inset:   17 22 30;
+  --hairline:        34 43 57;
+  --hairline-soft:   26 31 40;
+  --border-strong:   44 54 71;
+  --text:            244 246 250;
+  --text-muted:      170 178 192;
+  --text-dim:        154 163 178;
+  --accent:          110 139 255;
+  --accent-2:        124 92 255;
+  --pos:             52 211 153;
+  --neg:             251 113 133;
+  --warn:            227 168 87;
+  --spotlight:       13 16 22;
+}
+
+* {
+  border-color: rgb(var(--hairline));
+}
+
+body {
+  min-height: 100vh;
+  background: rgb(var(--bg));
+  color: rgb(var(--text));
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  /* Inherit the family only — NOT the shorthand `font`, which resets font-size
+     and (being unlayered) overrode Tailwind text-* utilities. */
+  font-family: inherit;
+}
+
+/* Normalize native form controls to one size app-wide (14px, matching the nav
+   pills). `!important` deliberately overrides the assorted utility text-* classes
+   scattered across control elements so every dropdown / input / textarea is
+   uniform everywhere. Buttons are excluded — pills, chips, and action buttons
+   vary by context on purpose. */
+select,
+input,
+textarea {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem;
+}
+
+.table-sticky th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgb(var(--surface));
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(var(--hairline));
+  border-radius: 999px;
+}
