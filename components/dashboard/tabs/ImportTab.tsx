@@ -288,7 +288,7 @@ export function ImportTab({
           {/* Detected columns mapping */}
           <div className="rounded-[12px] border border-hairline bg-surface p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-caption font-medium text-foreground">Detected columns</span>
+              <span className="text-body font-medium text-foreground">Detected columns</span>
               {parsed.detectedBroker && (
                 <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-micro font-medium text-accent">
                   Detected · {parsed.detectedBroker}
@@ -301,7 +301,7 @@ export function ImportTab({
                 const missing = f.required && !mapped;
                 return (
                   <div key={f.key} className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2">
-                    <span className={cn("text-micro", missing ? "text-neg" : "text-muted-foreground")}>
+                    <span className={cn("text-caption", missing ? "text-neg" : "text-muted-foreground")}>
                       {f.label}
                       {f.required && " *"}
                     </span>
@@ -354,12 +354,12 @@ export function ImportTab({
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[12px] border border-hairline">
-            <div className="max-h-[420px] overflow-auto">
-              <table className="w-full border-collapse">
-                <thead className="sticky top-0 bg-surface">
-                  <tr className="border-b border-hairline text-micro uppercase tracking-wide text-muted-foreground">
-                    <th className="w-9 px-3 py-2 text-left">
+          <div className="overflow-hidden rounded-lg border border-hairline bg-surface">
+            <div className="scrollbar-thin max-h-[420px] overflow-auto">
+              <table className="table-sticky min-w-full border-separate border-spacing-0 text-sm">
+                <thead>
+                  <tr>
+                    <th className="w-9 border-b border-hairline-soft px-3 py-2.5 text-left">
                       <input
                         type="checkbox"
                         className="h-3.5 w-3.5 accent-accent"
@@ -368,12 +368,20 @@ export function ImportTab({
                         aria-label="Select all importable rows"
                       />
                     </th>
-                    <th className="px-2 py-2 text-left">Status</th>
-                    <th className="px-2 py-2 text-left">Date</th>
-                    <th className="px-2 py-2 text-left">Symbol</th>
-                    <th className="px-2 py-2 text-left">Action</th>
-                    <th className="px-2 py-2 text-right">Qty</th>
-                    <th className="px-2 py-2 text-right">Net</th>
+                    {(["Status", "Date", "Symbol", "Action"] as const).map((h) => (
+                      <th
+                        key={h}
+                        className="border-b border-hairline-soft px-3 py-2.5 text-left text-caption font-normal text-muted-foreground"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                    <th className="border-b border-hairline-soft px-3 py-2.5 text-right text-caption font-normal text-muted-foreground">
+                      Qty
+                    </th>
+                    <th className="border-b border-hairline-soft px-3 py-2.5 text-right text-caption font-normal text-muted-foreground">
+                      Net
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -383,14 +391,8 @@ export function ImportTab({
                     const warnings = parsed.warningsByRowId.get(r.id);
                     const selectable = status !== "ignored";
                     return (
-                      <tr
-                        key={r.id}
-                        className={cn(
-                          "border-b border-hairline text-caption last:border-b-0",
-                          status === "warning" && "bg-warn/[0.04]"
-                        )}
-                      >
-                        <td className="px-3 py-2">
+                      <tr key={r.id} className="border-b border-hairline-soft last:border-0">
+                        <td className="px-3 py-2.5 align-top">
                           <input
                             type="checkbox"
                             className="h-3.5 w-3.5 accent-accent disabled:opacity-40"
@@ -400,20 +402,22 @@ export function ImportTab({
                             aria-label={`Select ${r.symbol} ${r.tradeDate}`}
                           />
                         </td>
-                        <td className="px-2 py-2">
-                          <span className={cn("rounded px-1.5 py-0.5 text-micro font-semibold", badge.cls)}>
+                        <td className="px-3 py-2.5 align-top">
+                          <span className={cn("rounded px-1.5 py-0.5 text-micro font-medium", badge.cls)}>
                             {badge.label}
                           </span>
                         </td>
-                        <td className="px-2 py-2 tabular-nums text-muted-foreground">
+                        <td className="px-3 py-2.5 align-top tabular-nums text-muted-foreground">
                           {r.tradeDate ? formatDisplayDate(r.tradeDate) : "—"}
                         </td>
-                        <td className="px-2 py-2 font-medium text-foreground">{r.symbol || "—"}</td>
-                        <td className="px-2 py-2 text-muted-foreground">{label(r.action)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-foreground">{r.quantity || "—"}</td>
-                        <td className="px-2 py-2 text-right">
+                        <td className="px-3 py-2.5 align-top font-medium text-foreground">{r.symbol || "—"}</td>
+                        <td className="px-3 py-2.5 align-top text-muted-foreground">{label(r.action)}</td>
+                        <td className="px-3 py-2.5 align-top text-right tabular-nums text-foreground">
+                          {r.quantity || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 align-top text-right">
                           {warnings?.length ? (
-                            <span className="text-micro text-warn" title={warnings.join("; ")}>
+                            <span className="text-caption text-warn" title={warnings.join("; ")}>
                               {warnings[0]}
                             </span>
                           ) : (
