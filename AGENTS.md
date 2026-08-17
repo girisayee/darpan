@@ -37,7 +37,7 @@ set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env
   — `trade-quality`, `premium-capture`, `allocation`, `capital-efficiency`, `goal-pace`,
   `top-movers`, `daily-pnl`, `leaderboard`, `strategy-analytics`, `filter-result`, `analytics`
 - Broker-agnostic CSV parser: `lib/import/transactions.ts` (`parseTransactionsCsv`; auto-detects broker + columns)
-- Benchmarks: `lib/benchmark/{compare,fetch}.ts` (capital-matched SPY/QQQ/VTI)
+- Market context: `lib/benchmark/{compare,fetch}.ts` (adjusted YTD SPY/QQQ/VTI returns)
 - Persistence: Postgres via Drizzle in `lib/db/database.ts` (every helper takes `userId`);
   schema `lib/db/schema.ts`; client `lib/db/client.ts`; client bridge `lib/storage/server-store-client.ts`;
   `lib/storage/local-store.ts` holds `defaultSettings` and backup create/parse
@@ -84,13 +84,17 @@ typecheck/lint/build and the running dev server rather than component render tes
   stock lots already cover the assigned shares.
 - Do **not** surface max drawdown, Sortino, Calmar, payoff ratio, a discipline streak, live
   option marks, or a social leaderboard — these were explicitly cut from the product.
-- **Return on capital has one definition**: realized P&L ÷ time-weighted average
-  deployed capital (dollar-days ÷ days), via `lib/selectors/return-on-capital.ts`.
-  Home, Performance ("Your return" + the RoC KPI), and `aggregates.returnOnCapital`
-  all read it; the monthly table and per-symbol RoC use the same formula. Annualized
-  is always RoC × (365 ÷ days), shown only as an explicitly-labeled secondary — never
-  the headline. Tickers' "Peak-capital ROI" (÷ peak concurrent capital) is a separate,
-  labeled metric, not a second RoC. Don't reintroduce alternative denominators.
+- **Realized RoC has one headline definition**: realized P&L ÷ peak concurrent capital behind
+  positions realized in the period. Sequential trades reuse capital; genuinely overlapping
+  positions add. Inferred open positions remain exposure only because there is no authoritative
+  holdings/equity snapshot. Covered-call stock basis is portfolio capital only once when the
+  supplied realized rows also contain its underlying stock/assignment interval.
+  Home, Performance, monthly, strategy, ticker, symbol, and `aggregates.returnOnCapital` use
+  this definition. Portfolio/monthly denominators are capped at configured max buying power,
+  which is authoritative when notional trade intervals imply leverage. It is explicitly not
+  a standard portfolio return or Modified Dietz. Time-weighted average realized capital uses
+  the same realized rows and cap. The secondary
+  capital-weighted trade ROI may sum closed-trade capital but must not replace headline RoC.
 - `winRate` convention is inconsistent by source and easy to get wrong: `tradeQuality().winRate`
   is a **fraction (0–1)**, while `aggregates.winRate` and `symbolBreakdown[].winRate` are a
   **percent (0–100)**. `formatPercent` does not multiply — it appends `%`.

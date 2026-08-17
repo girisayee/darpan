@@ -4,10 +4,8 @@ import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
-import { peakCapitalRoi, peakConcurrentCapital } from "@/lib/selectors/symbol-capital";
-import { symbolReturnOnCapital } from "@/lib/selectors/return-on-capital";
 import { TickerLogo } from "@/components/common/TickerLogo";
 
 /** Summary row for a single symbol, as produced by the calculation engine. */
@@ -138,7 +136,6 @@ export function DetailDrawer({
   events = [],
   optionLifecycles = [],
   taxLots = [],
-  capitalUsage = [],
   onReviewFix,
   onSelectEvent,
   onSelectLifecycle,
@@ -156,7 +153,6 @@ export function DetailDrawer({
   events?: RealizedPnLEvent[];
   optionLifecycles?: OptionLifecycle[];
   taxLots?: TaxLot[];
-  capitalUsage?: CapitalUsage[];
   onReviewFix?: () => void;
   onSelectEvent?: (e: RealizedPnLEvent) => void;
   onSelectLifecycle?: (l: OptionLifecycle) => void;
@@ -299,7 +295,6 @@ export function DetailDrawer({
               summary={symbol!}
               events={events}
               optionLifecycles={optionLifecycles}
-              capitalUsage={capitalUsage}
               onClose={onClose}
               onSelectEvent={onSelectEvent}
               onSelectLifecycle={onSelectLifecycle}
@@ -678,11 +673,12 @@ function OptionCycleBody({
 
   // ── Numbers ────────────────────────────────────────────────────────────────
   const isOpen = lc.status === "open";
+  const isDeferredPutAssignment = lc.status === "assigned" && lc.optionType === "put";
   const capital = lc.capitalDeployed ?? 0;
   const assignmentStockPnl = lc.assignmentStockPnl ?? 0;
-  const total = lc.netOptionPnl + (share ? assignmentStockPnl : 0);
-  const cycleRoi = capital > 0 ? (total / capital) * 100 : null;
-  const optionRoi = capital > 0 ? (lc.netOptionPnl / capital) * 100 : null;
+  const total = isDeferredPutAssignment ? 0 : lc.netOptionPnl + (share ? assignmentStockPnl : 0);
+  const cycleRoi = !isDeferredPutAssignment && capital > 0 ? (total / capital) * 100 : null;
+  const optionRoi = !isDeferredPutAssignment && capital > 0 ? (lc.netOptionPnl / capital) * 100 : null;
 
   const isShort = lc.direction === "short";
   const endDate = lc.closeDate ?? lc.expirationDate;
@@ -793,6 +789,11 @@ function OptionCycleBody({
               Open · not yet realized
             </div>
           )}
+          {isDeferredPutAssignment && (
+            <div className="font-sans text-caption text-muted-foreground mt-0.5">
+              Premium deferred into assigned-share basis
+            </div>
+          )}
         </div>
         <div className="ml-auto text-right">
           {isOpen ? (
@@ -855,14 +856,14 @@ function OptionCycleBody({
           }
         />
         <Row
-          label={isOpen ? (isShort ? "Net premium" : "Net debit") : "Net option P&L"}
+          label={isDeferredPutAssignment ? "Premium applied to basis" : isOpen ? (isShort ? "Net premium" : "Net debit") : "Net option P&L"}
           helper={isOpen && isShort ? "max if held to expiry" : undefined}
           bold
           topBorder
           value={signedCurrency(lc.netOptionPnl, maskAmounts)}
-          valueClass={toneClass(lc.netOptionPnl)}
+          valueClass={isDeferredPutAssignment ? "text-foreground" : toneClass(lc.netOptionPnl)}
         />
-        {!(isOpen && !isShort) && (
+        {!isDeferredPutAssignment && !(isOpen && !isShort) && (
           <Row
             label={isOpen ? "Max RoC" : "Option RoC"}
             helper={
@@ -1090,7 +1091,6 @@ function SymbolDetailBody({
   summary,
   events,
   optionLifecycles,
-  capitalUsage,
   onClose,
   onSelectEvent,
   onSelectLifecycle,
@@ -1100,7 +1100,6 @@ function SymbolDetailBody({
   summary: SymbolSummary;
   events: RealizedPnLEvent[];
   optionLifecycles: OptionLifecycle[];
-  capitalUsage: CapitalUsage[];
   onClose: () => void;
   onSelectEvent?: (e: RealizedPnLEvent) => void;
   onSelectLifecycle?: (l: OptionLifecycle) => void;
@@ -1111,7 +1110,7 @@ function SymbolDetailBody({
     .filter((e) => e.symbol === summary.symbol)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const symbolCycles = optionLifecycles
-    .filter((l) => l.underlyingSymbol === summary.symbol)
+    .filter((l) => l.underlyingSymbol === summary.symbol && l.status !== "open")
     .sort((a, b) => {
       const aEnd = a.closeDate ?? a.expirationDate;
       const bEnd = b.closeDate ?? b.expirationDate;
@@ -1127,10 +1126,7 @@ function SymbolDetailBody({
   );
 
   const avgPnl = summary.trades > 0 ? summary.pnl / summary.trades : null;
-  const peakRoi = peakCapitalRoi(capitalUsage, summary.symbol, summary.pnl);
-  const peakCapital = peakConcurrentCapital(capitalUsage, summary.symbol);
-  const asOf = new Date().toISOString().slice(0, 10);
-  const roc = symbolReturnOnCapital(capitalUsage, summary.symbol, summary.pnl, asOf).roc;
+  const roc = summary.roiPercent;
 
   return (
     <>
@@ -1175,7 +1171,7 @@ function SymbolDetailBody({
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-caption text-muted-foreground">Return on capital</div>
+          <div className="font-sans text-caption text-muted-foreground">Realized RoC</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -1188,7 +1184,7 @@ function SymbolDetailBody({
       </div>
 
       {/* ── Meta grid ── */}
-      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+      <div className="mt-4 grid grid-cols-2 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
         <MetaCell label="Trades" value={formatNumber(summary.trades)} />
         <MetaCell
           label="Win rate"
@@ -1200,30 +1196,17 @@ function SymbolDetailBody({
           valueClass={avgPnl != null ? toneClass(avgPnl) : undefined}
         />
         <MetaCell
-          label="Peak deployed"
-          value={peakCapital > 0 ? formatMaskedCurrency(peakCapital, maskAmounts) : "—"}
-        />
-        <MetaCell
-          label="Capital cycled"
+          label="Peak realized capital"
           value={summary.capital > 0 ? formatMaskedCurrency(summary.capital, maskAmounts) : "—"}
-        />
-        <MetaCell
-          label="Peak-capital RoC"
-          value={signedPercentText(peakRoi)}
-          valueClass={toneClass(peakRoi)}
         />
       </div>
 
       {/* ── Capital RoC note ── */}
       <div className="mt-3 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
         <div className="font-sans text-caption tabular-nums text-muted-foreground leading-relaxed">
-          <span className="font-medium text-foreground">Return on capital</span> is P&amp;L over
-          this symbol&apos;s time-weighted average deployed capital — the same definition used on
-          Home, Performance, and Tickers.{" "}
-          <span className="font-medium text-foreground">Peak-capital RoC</span> divides instead
-          by the most cash this symbol ever tied up at once
-          {peakCapital > 0 ? ` (${formatMaskedCurrency(peakCapital, maskAmounts)})` : ""}, so recycling the same
-          collateral across cycles doesn&apos;t inflate it — a stricter view.
+          <span className="font-medium text-foreground">Realized RoC</span> is P&amp;L over
+          this symbol&apos;s peak concurrent capital behind realized positions. Open positions remain
+          exposure only, and covered-call shares are de-duplicated when the underlying also realizes.
         </div>
       </div>
 
@@ -1233,7 +1216,9 @@ function SymbolDetailBody({
           <SectionLabel>Option cycles</SectionLabel>
           <div className="mt-1.5">
             {symbolCycles.map((lc) => {
-              const total = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
+              const total = lc.status === "assigned" && lc.optionType === "put"
+                ? 0
+                : lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
               return (
                 <ActivityRow
                   key={lc.id}

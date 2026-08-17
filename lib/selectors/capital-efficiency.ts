@@ -7,9 +7,8 @@ export interface CapitalEfficiency {
 }
 
 /**
- * Capital-efficiency stats that share the canonical time-weighted deployed
- * capital (so turnover's denominator matches the RoC denominator shown
- * elsewhere). Return on capital itself lives on `aggregates.returnOnCapital`.
+ * Efficiency stats use time-weighted capital behind monthly realized positions.
+ * Realized RoC separately uses their peak concurrent capital.
  */
 export function capitalEfficiency(monthly: MonthlyCapitalReturn[]): CapitalEfficiency {
   const { avgDeployed } = portfolioReturnOnCapital(monthly);

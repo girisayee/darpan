@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * PerformanceTab — benchmark comparison + capital-deployed metrics + equity curve
+ * PerformanceTab — market comparison + capital-deployed metrics + equity curve
  * + monthly breakdown.
  *
  * Excluded per spec: max drawdown, Sortino, Calmar, payoff ratio.
@@ -320,7 +320,7 @@ export function PerformanceTab({
 
   const ce = capitalEfficiency(result.monthlyReturns);
   const roc = result.aggregates.returnOnCapital;
-  const annualizedRoc = result.aggregates.annualizedReturnOnCapital;
+  const returnCapital = result.aggregates.returnCapital;
 
   const avgDeployed = result.aggregates.averageDeployedCapital;
   const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
@@ -363,35 +363,43 @@ export function PerformanceTab({
             <h2 className="font-sans text-strong font-medium text-foreground">Equity curve</h2>
             <EquityCurveChart result={result} annualGoal={annualGoal} maskAmounts={settings.maskAmounts} />
           </div>
-          <BenchmarkComparison result={result} maskAmounts={settings.maskAmounts} />
+          <BenchmarkComparison result={result} />
         </div>
       ) : (
-        <BenchmarkComparison result={result} maskAmounts={settings.maskAmounts} />
+        <BenchmarkComparison result={result} />
       )}
 
       {/* ── Capital deployed metrics ── */}
       <MetricGroup label="Capital deployed" cols={4}>
         <KpiCard
-          label="Avg deployed"
+          label="Avg realized capital"
           value={formatMaskedCurrency(avgDeployed, settings.maskAmounts)}
           helper="Time-weighted"
-          tooltip="Time-weighted average capital deployed (dollar-days ÷ days in the period). The denominator behind Return on capital."
+          tooltip="Time-weighted average capital behind positions realized in each month, capped at configured max buying power. Inferred open holdings are excluded."
           tone="neutral"
           variant="compact"
         />
         <KpiCard
-          label="Return on capital"
+          label="Realized RoC"
           value={roc != null ? formatPercent(roc, 1) : "—"}
-          helper={annualizedRoc != null ? `${formatPercent(annualizedRoc, 0)} annualized` : "Realized P&L ÷ avg deployed"}
-          tooltip="Realized P&L ÷ time-weighted average deployed capital over the period. The same return-on-capital shown on Home; the helper annualizes it (× 365 ÷ days)."
+          helper={returnCapital > 0 ? `P&L ÷ ${formatMaskedCurrency(returnCapital, settings.maskAmounts)} peak` : "P&L ÷ peak realized capital"}
+          tooltip="Realized P&L ÷ peak concurrent capital behind positions realized during the period, capped at configured max buying power. This is not a standard portfolio return."
           tone={tone(roc ?? 0)}
           variant="compact"
         />
         <KpiCard
-          label="Capital utilization"
+          label="Trade ROI"
+          value={result.aggregates.capitalWeightedTradeRoi != null ? formatPercent(result.aggregates.capitalWeightedTradeRoi, 1) : "—"}
+          helper="P&L ÷ capital cycled"
+          tooltip="Capital-weighted closed-trade ROI: total realized P&L ÷ the sum of capital across closed trades. Reused capital is counted again for each closed trade, so this is secondary to Realized RoC."
+          tone={tone(result.aggregates.capitalWeightedTradeRoi ?? 0)}
+          variant="compact"
+        />
+        <KpiCard
+          label="Realized utilization"
           value={bpUsed != null ? formatPercent(bpUsed, 0) : "—"}
           helper="Avg deployed ÷ configured max"
-          tooltip="Average deployed capital as a share of your configured max buying power."
+          tooltip="Average realized-position capital as a share of your configured max buying power."
           tone="neutral"
           variant="compact"
         />

@@ -24,3 +24,5 @@ data/benchmark-cache.json
 .plugins/
 plugins/
 **/plugins/
+.vercel
+.env*

@@ -282,7 +282,6 @@ export function DashboardShell({
         events={result.realizedEvents}
         optionLifecycles={result.optionLifecycles}
         taxLots={result.taxLots}
-        capitalUsage={result.capitalUsage}
         onSelectEvent={setSelectedEvent}
         onSelectLifecycle={setSelectedLifecycle}
         onReviewFix={() => {

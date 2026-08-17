@@ -133,10 +133,11 @@ describe("Robinhood import", () => {
       '"Activity Date","Process Date","Settle Date","Instrument","Description","Trans Code","Quantity","Price","Amount"',
       '"5/4/2026","5/4/2026","5/4/2026","","Aggregated Margin Rate","MINT","","","($59.00)"',
       '"5/1/2026","5/1/2026","5/1/2026","","Brokerage-held Cash Interest Payment","INT","","","$8.13"',
+      '"5/1/2026","5/1/2026","5/1/2026","","Gold Plan Credit","GMPC","","","$7.67"',
       '"5/1/2026","5/1/2026","5/1/2026","","ACH Deposit","ACH","","","$30,000.00"'
     ].join("\n");
     const preview = parseRobinhoodInput(csv);
-    expect(preview.rows.map((row) => row.action)).toEqual(["FEE", "DIVIDEND", "TRANSFER"]);
+    expect(preview.rows.map((row) => row.action)).toEqual(["FEE", "DIVIDEND", "DIVIDEND", "TRANSFER"]);
     expect(preview.rows.every((row) => row.instrumentType === "cash")).toBe(true);
     expect(preview.rows.every((row) => row.status === "normalized")).toBe(true);
   });

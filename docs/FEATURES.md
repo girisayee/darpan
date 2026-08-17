@@ -40,13 +40,15 @@ At-a-glance, year-to-date by default:
 
 ### Performance
 
-- **You vs. the market** — capital-matched return against SPY / QQQ / VTI.
+- **Market comparison** — Realized RoC shown beside adjusted YTD total returns for
+  SPY / QQQ / VTI, explicitly labeled as directional because methodologies differ.
 - **Annual goal** — progress, pacing, projection, and required monthly run-rate.
 - **Equity curve** — cumulative realized P&L over the year vs. goal pace.
-- **Capital deployed** — average and peak deployed, return on capital, capital utilization,
+- **Capital deployed** — average deployed, Realized RoC, capital-weighted trade ROI, utilization,
   capital turnover, income per day, and concentration (HHI).
-- **Monthly P&L** — a bar chart plus a breakdown table (P&L, RoC, average capital, and RoC by
-  strategy: CSP / CC / Swing).
+- **Monthly P&L** — a bar chart plus a breakdown table (P&L, average exposure, and peak-capital
+  RoC overall and by strategy: CSP / CC / Swing). Return capital is shown beside the monthly
+  percentage so the denominator is auditable.
 
 ### Tickers
 
@@ -83,6 +85,17 @@ Performance goal card and the equity-curve goal-pace line.
 - **Swing trades** use cost basis while open.
 
 Cost-basis method and the put-collateral denominator are configurable in Settings.
+
+Realized RoC uses realized P&L divided by peak concurrent capital behind positions realized in
+the selected period. Sequential rolls and trades reuse the same capital; genuinely overlapping
+positions add. Inferred open positions stay in exposure metrics only because no authoritative
+holdings/equity snapshot is available. Covered-call stock basis is de-duplicated when its
+underlying stock or assignment interval also realizes in scope. Portfolio and monthly capital
+are capped at configured max buying power when notional intervals imply leverage. Time-weighted
+average realized capital uses those scoped realized rows and the same cap. Capital-weighted
+trade ROI is shown separately and sums capital on closed
+trades. Because the app lacks portfolio equity and complete external cash flows, neither metric
+is presented as Modified Dietz or a standard portfolio return.
 
 ## Import support
 

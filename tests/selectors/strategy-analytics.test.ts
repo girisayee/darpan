@@ -68,6 +68,16 @@ describe("optionsAnalytics", () => {
     expect(a.premium?.premiumCollected).toBe(450);
   });
 
+  it("excludes open option premium from realized premium metrics", () => {
+    const a = optionsAnalytics(res([], [
+      lc({ strategy: "CASH_SECURED_PUT", status: "closed", premiumReceived: 150, netOptionPnl: 100 }),
+      lc({ strategy: "COVERED_CALL", status: "open", premiumReceived: 900, netOptionPnl: 900 }),
+    ]));
+    expect(a.premium?.premiumCollected).toBe(150);
+    expect(a.premium?.netOptionPnl).toBe(100);
+    expect(a.premium?.counts.total).toBe(1);
+  });
+
   it("sums capital at risk across only OPEN option lifecycles", () => {
     const a = optionsAnalytics(res([], [
       lc({ status: "open", capitalDeployed: 5000 }),

@@ -1,15 +1,14 @@
 /**
  * lib/benchmark/fetch.ts — SERVER ONLY
  *
- * Fetches weekly close prices for an index/ETF symbol from Alpha Vantage
- * (TIME_SERIES_WEEKLY) and caches the full series locally so we hit the API at
+ * Fetches weekly adjusted close prices for an index/ETF symbol from Alpha Vantage
+ * (TIME_SERIES_WEEKLY_ADJUSTED) and caches the full series locally so we hit the API at
  * most once per symbol per CACHE_TTL_MS (4 hours).
  *
- * Why WEEKLY: on the free tier, TIME_SERIES_DAILY only returns the last ~100
+ * Why WEEKLY ADJUSTED: on the free tier, TIME_SERIES_DAILY only returns the last ~100
  * points (outputsize=full is premium), which can't cover a benchmark window that
- * starts when the user began trading. TIME_SERIES_WEEKLY returns full history for
- * free, and weekly closes are ample granularity for a buy-and-hold comparison
- * over months.
+ * starts when the user began trading. Weekly adjusted prices also account for
+ * splits and distributions, which is the appropriate market-context series.
  *
  * Why a durable cache: Alpha Vantage's free tier is rate-limited (≈25 req/day),
  * and benchmark data only moves once a day at the close — there is no reason to
@@ -51,7 +50,7 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response | nul
 }
 
 /**
- * Parse an Alpha Vantage TIME_SERIES_WEEKLY response into ascending ClosePoints.
+ * Parse an Alpha Vantage TIME_SERIES_WEEKLY_ADJUSTED response into ascending ClosePoints.
  * Returns null (NOT []) on a rate-limit / error / unparseable response so the
  * caller can distinguish "API said no" from "symbol genuinely has no data" and
  * fall back to a stale cache.
@@ -63,12 +62,12 @@ function parseAlphaVantage(json: unknown): ClosePoint[] | null {
   // Rate-limit / informational / error envelopes — never contain price data.
   if (obj["Note"] || obj["Information"] || obj["Error Message"]) return null;
 
-  const series = obj["Weekly Time Series"];
+  const series = obj["Weekly Adjusted Time Series"];
   if (!series || typeof series !== "object") return null;
 
   const points: ClosePoint[] = [];
   for (const [date, bar] of Object.entries(series as Record<string, unknown>)) {
-    const close = Number((bar as Record<string, string>)?.["4. close"]);
+    const close = Number((bar as Record<string, string>)?.["5. adjusted close"]);
     if (!Number.isFinite(close) || close <= 0) continue;
     points.push({ date, close });
   }
@@ -98,7 +97,7 @@ async function fetchFromAlphaVantage(symbol: string): Promise<ClosePoint[] | nul
   if (!key) return null;
   await nextSlot();
   const url =
-    `https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY` +
+    `https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY_ADJUSTED` +
     `&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(key)}`;
   const resp = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
   if (!resp?.ok) return null;
@@ -114,27 +113,28 @@ async function fetchFromAlphaVantage(symbol: string): Promise<ClosePoint[] | nul
  * the cache is missing or older than CACHE_TTL_MS. Fail-soft: stale-on-error.
  */
 async function getSeries(symbol: string): Promise<ClosePoint[]> {
-  const entry = await readEntry(symbol);
+  const cacheSymbol = `weekly-adjusted:${symbol}`;
+  const entry = await readEntry(cacheSymbol);
   const fresh = entry && Date.now() - entry.fetchedAt < CACHE_TTL_MS;
   if (fresh) return entry.points;
 
   // Coalesce concurrent refreshes for the same symbol.
-  const existing = inFlight.get(symbol);
+  const existing = inFlight.get(cacheSymbol);
   if (existing) return existing;
 
   const task = (async (): Promise<ClosePoint[]> => {
     const fetched = await fetchFromAlphaVantage(symbol);
     if (fetched) {
-      await writeEntry(symbol, fetched);
+      await writeEntry(cacheSymbol, fetched);
       return fetched;
     }
     // Fetch failed (rate-limit / network) — serve stale cached data if we have
     // any, else empty. Durable Postgres cache means this fallback survives
     // restarts and redeploys.
     return entry?.points ?? [];
-  })().finally(() => inFlight.delete(symbol));
+  })().finally(() => inFlight.delete(cacheSymbol));
 
-  inFlight.set(symbol, task);
+  inFlight.set(cacheSymbol, task);
   return task;
 }
 

@@ -230,8 +230,8 @@ export function PositionsTab(props: {
         rows={rows}
         columns={columns}
         empty={emptyLabel}
-        defaultSort={{ key: "closeDate", direction: "desc" }}
-        tiebreak={{ key: "openDate", direction: "desc" }}
+        defaultSort={{ key: "openDate", direction: "desc" }}
+        tiebreak={{ key: "closeDate", direction: "desc" }}
         searchable
         pageSize={8}
         onRowClick={(row) => {

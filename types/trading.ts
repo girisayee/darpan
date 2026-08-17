@@ -164,13 +164,16 @@ export type MonthlyCapitalReturn = {
   startingCapitalDeployed: number;
   endingCapitalDeployed: number;
   averageDeployedCapital: number;
-  peakDeployedCapital: number;
+  /** Peak concurrent capital behind positions realized in this month. */
+  returnCapital: number;
   capitalDays: number;
   /** Days this month contributed to the period (asOf-adjusted for the current month). */
   periodDays: number;
   realizedPnl: number;
   realizedRoiPercent: number | null;
   closedTradeCapital: number;
+  /** Realized P&L divided by the sum of capital on trades closed this month. */
+  capitalWeightedTradeRoiPercent: number | null;
   optionsPremiumPnl: number;
   stockTradingPnl: number;
   assignmentPnl: number;
@@ -178,10 +181,6 @@ export type MonthlyCapitalReturn = {
   cashSecuredPutCollateral: number;
   swingTradeCapital: number;
   assignmentCapital: number;
-  peakCoveredCallCapital: number;
-  peakCashSecuredPutCollateral: number;
-  peakSwingTradeCapital: number;
-  peakAssignmentCapital: number;
   coveredCallRoiPercent: number | null;
   cashSecuredPutRoiPercent: number | null;
   swingTradeRoiPercent: number | null;
@@ -221,13 +220,14 @@ export type DashboardAggregates = {
   bestStrategy: string | null;
   worstStrategy: string | null;
   averageMonthlyRoi: number | null;
-  /** Canonical period return on capital: realized P&L ÷ time-weighted avg deployed capital. */
+  /** Realized P&L ÷ peak concurrent capital behind realized positions. */
   returnOnCapital: number | null;
-  /** returnOnCapital annualized: × (365 ÷ period days). Labeled as annualized wherever shown. */
-  annualizedReturnOnCapital: number | null;
-  /** Time-weighted average deployed capital (dollar-days ÷ period days). */
+  /** Peak concurrent capital used as the returnOnCapital denominator. */
+  returnCapital: number;
+  /** Realized P&L ÷ sum of capital across closed trades (capital reuse repeats). */
+  capitalWeightedTradeRoi: number | null;
+  /** Time-weighted average capital behind realized positions, capped by max buying power. */
   averageDeployedCapital: number;
-  peakDeployedCapital: number;
   strategyBreakdown: Array<{ strategy: Strategy; pnl: number; capital: number; roiPercent: number | null }>;
   symbolBreakdown: Array<{ symbol: string; pnl: number; capital: number; roiPercent: number | null; trades: number; winRate: number | null }>;
   warnings: string[];

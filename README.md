@@ -56,8 +56,9 @@ A short-term trader's "game tape." The four tabs:
 - **Home** — year-to-date verdict at a glance: Net P&L, Expectancy, Profit factor, Win
   rate, a daily-P&L calendar heatmap (year or month), your capital deployed vs. your
   configured max, your open option positions, and a by-strategy snapshot.
-- **Performance** — equity curve, capital-matched benchmark vs. SPY / QQQ / VTI, annual
-  goal pacing, capital-deployed metrics (return on capital, utilization, turnover,
+- **Performance** — equity curve, directional comparison with adjusted YTD SPY / QQQ / VTI
+  returns, annual
+  goal pacing, capital-deployed metrics (Realized RoC, trade ROI, utilization, turnover,
   income/day, concentration), and a monthly P&L breakdown (chart + by-strategy ROI table).
 - **Tickers** — a per-symbol leaderboard ("Money makers" / "Account killers") plus a full
   sortable, searchable table of every symbol you've traded.
@@ -80,6 +81,14 @@ become a bottom tab bar.
 
 ROI is shown as `—` when the capital base is unknown or zero. Annualized ROI is the simple
 `ROI × (365 / holding days)`.
+
+Portfolio equity and complete external cash flows are not available, so the app does not
+claim to calculate Modified Dietz or a standard portfolio return. Its headline **Realized
+RoC** is realized P&L divided by peak concurrent capital behind realized positions. Inferred
+open positions remain exposure only. Covered-call basis is de-duplicated when the underlying
+shares also realize, and the portfolio denominator is capped at configured max buying power.
+A separate capital-weighted
+trade ROI divides P&L by summed capital across closed trades.
 
 ## Data & privacy
 

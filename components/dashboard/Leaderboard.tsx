@@ -2,7 +2,7 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import type { Leaderboard, LeaderboardRow } from "@/lib/selectors/leaderboard";
 import { TickerLogo } from "@/components/common/TickerLogo";
-import { signedMoney, signedPercent } from "@/components/dashboard/tabs/shared";
+import { signedMoney } from "@/components/dashboard/tabs/shared";
 
 function Row({ r, maskAmounts }: { r: LeaderboardRow; maskAmounts: boolean }) {
   return (
@@ -16,7 +16,6 @@ function Row({ r, maskAmounts }: { r: LeaderboardRow; maskAmounts: boolean }) {
       </div>
       <div className="text-right">
         <div className="text-body font-medium tabular-nums">{signedMoney(r.pnl, maskAmounts)}</div>
-        <div className="text-caption tabular-nums">{signedPercent(r.peakRoiPercent)}</div>
       </div>
     </div>
   );

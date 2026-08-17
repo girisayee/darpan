@@ -301,7 +301,10 @@ export function toPositionRows(
         );
         const statusStr = lc.status;
         const tag = statusStr.charAt(0).toUpperCase() + statusStr.slice(1);
-        const closedPnl = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
+        // Put-assignment premium is deferred into the assigned shares' basis;
+        // it becomes realized only when those shares close.
+        const deferredPutAssignment = lc.status === "assigned" && lc.optionType === "put";
+        const closedPnl = deferredPutAssignment ? 0 : lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
         const capital = lc.capitalDeployed ?? undefined;
         return {
           sym: lc.underlyingSymbol,
@@ -316,7 +319,7 @@ export function toPositionRows(
           openDate: lc.openDate,
           closeDate: endDate,
           daysHeld,
-          roc: capital && capital > 0 ? (closedPnl / capital) * 100 : undefined,
+          roc: !deferredPutAssignment && capital && capital > 0 ? (closedPnl / capital) * 100 : undefined,
           lifecycle: lc,
         };
       });

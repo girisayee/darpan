@@ -1,36 +1,62 @@
 /**
- * lib/selectors/return-on-capital.ts — PURE.
+ * The single source of truth for return on capital across the app.
  *
- * The single source of truth for "return on capital" across the app. Every RoC
- * the UI shows derives from the same primitive — deployed **dollar-days** over a
- * window — so Home, Performance, the monthly table, and per-symbol all agree.
- *
- * RoC = realized P&L ÷ time-weighted average deployed capital, where
- *   average deployed capital = dollar-days ÷ days-in-window.
- * Annualized RoC = RoC × (365 ÷ days-in-window). Annualization is never the
- * headline — callers label it explicitly.
+ * Realized RoC = realized P&L / peak concurrent capital behind positions
+ * realized in the period.
+ * Reusing the same collateral across sequential trades does not add to the
+ * denominator. Inferred open tax lots stay out of return math because the app
+ * has no authoritative holdings/equity snapshot; they remain available to the
+ * separate exposure/utilization measures.
  */
 
 import type { CapitalUsage, MonthlyCapitalReturn } from "@/types/trading";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function activeAt(row: CapitalUsage, date: string): boolean {
+  return row.startDate <= date && (
+    row.endDate > date ||
+    (row.id.endsWith("-open") && row.endDate === date)
+  );
+}
+
+/** Exclude synthetic rows that represent positions which are still open. */
+export function closedCapitalUsage(usage: CapitalUsage[]): CapitalUsage[] {
+  return usage.filter((row) => !row.id.endsWith("-open"));
+}
+
+/**
+ * De-duplicate covered-call attribution when the supplied rows also contain a
+ * stock/assignment interval that fully backs the same shares. Callers should
+ * scope the rows first: a realized call still retains its stock-basis row when
+ * the underlying shares themselves are open and therefore outside that scope.
+ */
+export function portfolioCapitalUsage(usage: CapitalUsage[]): CapitalUsage[] {
+  return usage.filter((row) => {
+    if (row.strategy !== "COVERED_CALL" || row.capitalType !== "STOCK_CAPITAL") return true;
+    const backingRows = usage.filter((candidate) =>
+      candidate.symbol === row.symbol &&
+      candidate.strategy !== "COVERED_CALL" &&
+      (candidate.capitalType === "SWING_TRADE_CAPITAL" || candidate.capitalType === "ASSIGNMENT_COLLATERAL") &&
+      candidate.startDate <= row.startDate &&
+      candidate.endDate >= row.endDate
+    );
+    const backingQuantity = backingRows.reduce((sum, candidate) => sum + candidate.quantity, 0);
+    const backingAmount = backingRows.reduce((sum, candidate) => sum + candidate.amount, 0);
+    return backingQuantity < row.quantity && backingAmount < row.amount * 0.995;
+  });
+}
+
 function parseDate(date: string): number {
   return new Date(`${date}T00:00:00.000Z`).getTime();
 }
 
-/** Inclusive day count between two ISO dates (1 for a single-day span, 0 if end < start). */
 export function daysInclusive(start: string, end: string): number {
   if (end < start) return 0;
   return Math.round((parseDate(end) - parseDate(start)) / DAY_MS) + 1;
 }
 
-/**
- * Deployed dollar-days over `[start, end]` (inclusive). For each capital-usage
- * row, its amount times the number of days its own span overlaps the window.
- * Summing row-first is algebraically identical to summing point-in-time deployed
- * capital over each day, so this matches the engine's per-month `capitalDays`.
- */
+/** Dollar-days remain an exposure primitive; they are not an RoC denominator. */
 export function dollarDays(usage: CapitalUsage[], start: string, end: string): number {
   let total = 0;
   for (const row of usage) {
@@ -44,67 +70,120 @@ export function dollarDays(usage: CapitalUsage[], start: string, end: string): n
 
 export type RocResult = {
   pnl: number;
+  capital: number;
   avgDeployed: number;
   periodDays: number;
   roc: number | null;
-  annualizedRoc: number | null;
 };
 
-function build(pnl: number, dollarDayTotal: number, periodDays: number): RocResult {
-  const avgDeployed = periodDays > 0 ? dollarDayTotal / periodDays : 0;
-  const roc = avgDeployed > 0 ? (pnl / avgDeployed) * 100 : null;
-  const annualizedRoc = roc !== null && periodDays > 0 ? roc * (365 / periodDays) : null;
-  return { pnl, avgDeployed, periodDays, roc, annualizedRoc };
-}
+export type CapitalScope = {
+  startDate?: string;
+  endDate?: string;
+  symbol?: string;
+  strategies?: readonly string[];
+};
 
 /**
- * Portfolio / period RoC, derived from the monthly rows so it stays mutually
- * consistent with the monthly ROI table (which uses the same per-month
- * capital-days ÷ period-days basis). Home and Performance both read this.
+ * Most capital simultaneously committed within a scope. End dates are treated
+ * as release dates, so closing and reopening a position on the same date does
+ * not double-count recycled capital. A standalone same-day trade still counts
+ * via the max-single fallback rather than being added to its replacement.
  */
-export function portfolioReturnOnCapital(monthly: MonthlyCapitalReturn[]): RocResult {
-  const pnl = monthly.reduce((s, m) => s + m.realizedPnl, 0);
-  const dollarDayTotal = monthly.reduce((s, m) => s + m.capitalDays, 0);
-  const periodDays = monthly.reduce((s, m) => s + m.periodDays, 0);
-  return build(pnl, dollarDayTotal, periodDays);
+export function peakConcurrentCapital(usage: CapitalUsage[], scope: CapitalScope = {}): number {
+  const rows = usage.filter((row) => {
+    if (row.amount <= 0) return false;
+    if (scope.symbol && row.symbol !== scope.symbol) return false;
+    if (scope.strategies && !scope.strategies.includes(row.strategy)) return false;
+    if (scope.startDate && row.endDate < scope.startDate) return false;
+    if (scope.endDate && row.startDate > scope.endDate) return false;
+    return true;
+  });
+  if (rows.length === 0) return 0;
+
+  const candidates = new Set<string>();
+  if (scope.startDate) candidates.add(scope.startDate);
+  for (const row of rows) {
+    candidates.add(scope.startDate && row.startDate < scope.startDate ? scope.startDate : row.startDate);
+  }
+
+  let peak = 0;
+  for (const date of candidates) {
+    if (scope.endDate && date > scope.endDate) continue;
+    const deployed = rows
+      .filter((row) => activeAt(row, date))
+      .reduce((sum, row) => sum + row.amount, 0);
+    peak = Math.max(peak, deployed);
+  }
+
+  const maxSingle = rows.reduce((max, row) => Math.max(max, row.amount), 0);
+  return Math.max(peak, maxSingle);
 }
 
-/**
- * Per-symbol RoC over the symbol's active span (first deployment → min(asOf,
- * last close)), so a symbol traded for one month isn't diluted by the rest of
- * the year. Same formula as the portfolio — only the window and filter differ.
- */
+export function scopedReturnOnCapital(
+  usage: CapitalUsage[],
+  pnl: number,
+  scope: CapitalScope = {},
+): { capital: number; roc: number | null } {
+  const closed = closedCapitalUsage(usage);
+  const capitalRows = scope.strategies ? closed : portfolioCapitalUsage(closed);
+  const capital = peakConcurrentCapital(capitalRows, scope);
+  return { capital, roc: capital > 0 ? (pnl / capital) * 100 : null };
+}
+
+export function portfolioReturnOnCapital(
+  monthly: MonthlyCapitalReturn[],
+  usage?: CapitalUsage[],
+  maxCapital?: number,
+): RocResult {
+  const pnl = monthly.reduce((sum, row) => sum + row.realizedPnl, 0);
+  const derivedCapital = usage
+    ? peakConcurrentCapital(portfolioCapitalUsage(closedCapitalUsage(usage)))
+    : Math.max(0, ...monthly.map((row) => row.returnCapital ?? 0));
+  const capital = maxCapital && maxCapital > 0
+    ? Math.min(derivedCapital, maxCapital)
+    : derivedCapital;
+  const dollarDayTotal = monthly.reduce((sum, row) => sum + row.capitalDays, 0);
+  const periodDays = monthly.reduce((sum, row) => sum + row.periodDays, 0);
+  return {
+    pnl,
+    capital,
+    avgDeployed: periodDays > 0 ? dollarDayTotal / periodDays : 0,
+    periodDays,
+    roc: capital > 0 ? (pnl / capital) * 100 : null,
+  };
+}
+
 export function symbolReturnOnCapital(
   usage: CapitalUsage[],
   symbol: string,
   pnl: number,
-  asOfDate: string,
-): RocResult {
-  const rows = usage.filter((r) => r.symbol === symbol && r.amount > 0);
-  if (rows.length === 0) return build(pnl, 0, 0);
-  const start = rows.reduce((min, r) => (r.startDate < min ? r.startDate : min), rows[0].startDate);
-  const lastEnd = rows.reduce((max, r) => (r.endDate > max ? r.endDate : max), rows[0].endDate);
-  const end = lastEnd < asOfDate ? lastEnd : asOfDate;
-  const periodDays = daysInclusive(start, end);
-  return build(pnl, dollarDays(rows, start, end), periodDays);
+): { capital: number; roc: number | null } {
+  return scopedReturnOnCapital(usage, pnl, { symbol });
 }
 
-/**
- * RoC for a set of strategies over their combined active span — same formula and
- * dollar-days basis as the per-symbol variant, only the filter differs. Used by
- * the Home strategy tiles (Options aggregate, Stock trades).
- */
 export function strategyReturnOnCapital(
   usage: CapitalUsage[],
-  strategies: string[],
+  strategies: readonly string[],
   pnl: number,
-  asOfDate: string,
+): { capital: number; roc: number | null } {
+  return scopedReturnOnCapital(usage, pnl, { strategies });
+}
+
+export function yearlyPortfolioReturnOnCapital(
+  monthly: MonthlyCapitalReturn[],
+  year: number,
+  usage?: CapitalUsage[],
+  maxCapital?: number,
 ): RocResult {
-  const rows = usage.filter((r) => strategies.includes(r.strategy) && r.amount > 0);
-  if (rows.length === 0) return build(pnl, 0, 0);
-  const start = rows.reduce((min, r) => (r.startDate < min ? r.startDate : min), rows[0].startDate);
-  const lastEnd = rows.reduce((max, r) => (r.endDate > max ? r.endDate : max), rows[0].endDate);
-  const end = lastEnd < asOfDate ? lastEnd : asOfDate;
-  const periodDays = daysInclusive(start, end);
-  return build(pnl, dollarDays(rows, start, end), periodDays);
+  const yearRows = monthly.filter((row) => row.year === year);
+  const base = portfolioReturnOnCapital(yearRows);
+  if (!usage) return base;
+  const yearUsage = closedCapitalUsage(usage).filter((row) => row.endDate.startsWith(`${year}-`));
+  const derivedCapital = peakConcurrentCapital(portfolioCapitalUsage(yearUsage));
+  const capital = maxCapital && maxCapital > 0 ? Math.min(derivedCapital, maxCapital) : derivedCapital;
+  return {
+    ...base,
+    capital,
+    roc: capital > 0 ? (base.pnl / capital) * 100 : null,
+  };
 }

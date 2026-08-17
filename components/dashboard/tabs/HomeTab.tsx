@@ -7,7 +7,7 @@ import { CalendarHeatmap } from "@/components/dashboard/CalendarHeatmap";
 import { DayDetail } from "@/components/dashboard/DayDetail";
 import { StrategyStrip, type StrategyTarget } from "@/components/dashboard/StrategyStrip";
 import { TickerLogo } from "@/components/common/TickerLogo";
-import { signedMoney, currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
+import { currentDeployedCapital, tone } from "@/components/dashboard/tabs/shared";
 import { dailyPnl } from "@/lib/selectors/daily-pnl";
 import { tradeQuality } from "@/lib/selectors/trade-quality";
 import { toAllPositionRows } from "@/components/dashboard/positions/columns";
@@ -33,12 +33,10 @@ function OpenPositions({
   result,
   onSelect,
   onViewAll,
-  maskAmounts = false,
 }: {
   result: CalculationResult;
   onSelect: (l: OptionLifecycle) => void;
   onViewAll: () => void;
-  maskAmounts?: boolean;
 }) {
   const open = toAllPositionRows(result, "active").filter((r) => r.lifecycle);
   const rows = [...open].sort((a, b) => (b.warm ? 1 : 0) - (a.warm ? 1 : 0)).slice(0, 6);
@@ -78,7 +76,7 @@ function OpenPositions({
                   <span className="text-muted-foreground"> · {r.when}</span>
                 </div>
               </div>
-              <div className="text-strong font-medium tabular-nums">{signedMoney(r.pnl, maskAmounts)}</div>
+              <div className="text-strong font-medium text-muted-foreground">Open</div>
             </button>
           ))}
         </div>
@@ -124,8 +122,8 @@ export function HomeTab({
         <MetricCard
           label="Net P&L · YTD"
           value={formatMaskedCurrency(ytdPnl, settings.maskAmounts)}
-          helper={`${returnOnCapital != null ? formatPercent(returnOnCapital) : "—"} RoC`}
-          tooltip="Calendar-year realized P&L across all closed events."
+          helper={`${returnOnCapital != null ? formatPercent(returnOnCapital) : "—"} Realized RoC`}
+          tooltip="Calendar-year realized P&L. Realized RoC divides it by peak concurrent capital behind positions realized during the period. Open positions remain exposure only."
           tone={tone(ytdPnl)}
         />
         <MetricCard
@@ -167,7 +165,7 @@ export function HomeTab({
 
         <div className="flex flex-col gap-4">
           <BuyingPowerGauge deployed={currentDeployed} maxBP={maxBP} maskAmounts={settings.maskAmounts} />
-          <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} maskAmounts={settings.maskAmounts} />
+          <OpenPositions result={result} onSelect={onSelectLifecycle} onViewAll={onOpenPositions} />
         </div>
       </div>
 

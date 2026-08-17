@@ -70,7 +70,7 @@ Every data route calls `auth()` and returns `401` when there is no `session.user
   warning metadata.
 
 `app/api/benchmark/route.ts`
-- Fetches benchmark closes (SPY/QQQ/VTI) for capital-matched comparison; see
+- Fetches adjusted benchmark closes (SPY/QQQ/VTI) for the directional market comparison; see
   `lib/benchmark/{compare,fetch}.ts`.
 
 ## Calculation engine
@@ -99,7 +99,8 @@ events), so the engine stays UI-agnostic:
 
 - `trade-quality` — win rate, profit factor, payoff ratio, expectancy, avg win/loss.
 - `premium-capture` — premium collected, capture rate (CC/CSP), assignment rates.
-- `capital-efficiency` — annualized return on capital, capital turnover, income/day.
+- `return-on-capital` — peak-concurrent realized-capital RoC plus time-weighted exposure primitives.
+- `capital-efficiency` — capital turnover and option income per capital-day.
 - `allocation` — symbol/strategy concentration (HHI + level).
 - `goal-pace` — YTD vs. annual goal, projection, required monthly run-rate.
 - `daily-pnl` — bins realized events by calendar day (powers the calendar heatmap).
