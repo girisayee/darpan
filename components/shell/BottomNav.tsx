@@ -1,9 +1,9 @@
 "use client";
-import { LayoutGrid, LineChart, Trophy, Layers } from "lucide-react";
+import { CalendarRange, LayoutGrid, ReceiptText, Trophy, Layers } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  Home: LayoutGrid, Performance: LineChart, Tickers: Trophy, Positions: Layers,
+  Home: LayoutGrid, Monthly: CalendarRange, Taxes: ReceiptText, Tickers: Trophy, Positions: Layers,
 };
 
 export function BottomNav({ tabs, activeTab, onSelectTab }: { tabs: readonly string[]; activeTab: string; onSelectTab: (t: string) => void; }) {

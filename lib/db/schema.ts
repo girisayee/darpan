@@ -7,7 +7,9 @@ import {
   boolean,
   primaryKey,
   index,
+  check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("user", {
   id: text("id")
@@ -95,13 +97,22 @@ export const transactions = pgTable(
   (t) => ({ byUser: index("transactions_user_trade_idx").on(t.userId, t.tradeDate) })
 );
 
-export const settings = pgTable("settings", {
-  userId: text("userId")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  value: jsonb("value").notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow(),
-});
+export const settings = pgTable(
+  "settings",
+  {
+    userId: text("userId")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    value: jsonb("value").notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow(),
+  },
+  (table) => ({
+    taxEstimateObject: check(
+      "settings_tax_estimate_object_check",
+      sql`NOT (${table.value} ? 'taxEstimate') OR jsonb_typeof(${table.value}->'taxEstimate') = 'object'`,
+    ),
+  }),
+);
 
 // Global (not per-user) cache of index/ETF close-price series for the benchmark
 // comparison. Durable so a transient Alpha Vantage rate-limit always has a

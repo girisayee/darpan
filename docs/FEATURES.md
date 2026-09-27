@@ -10,9 +10,9 @@ management. Everything below is computed from your imported activity.
    auto-detected, and a column-mapping step handles anything it can't map on its own.
 2. Rows are normalized into stock, option, cash, fee, dividend, transfer, and unknown
    transactions; anything uninterpretable is kept as **unresolved**, not discarded.
-3. Imported transactions and settings persist in local SQLite.
+3. Imported transactions and settings persist in per-user Postgres records.
 4. The dashboard reconstructs realized P&L, option lifecycles, tax lots, capital usage, and
-   monthly returns, and presents them across four tabs.
+   monthly returns, and presents them across five tabs.
 5. Resolve gaps (e.g. a sale missing its opening buy) through **Review & fix**.
 
 Sample data is on by default so the dashboard is populated before you import; disable it in
@@ -20,35 +20,37 @@ Settings.
 
 ## Navigation
 
-Four primary tabs. On desktop they sit in the top bar; on a phone they become a fixed bottom
+Five primary tabs. On desktop they sit in the top bar; on a phone they become a fixed bottom
 tab bar. Import, Settings, account switch, theme toggle, and backup export live behind the
 **⋯** overflow menu.
 
 ### Home
 
-At-a-glance, year-to-date by default:
-- **Verdict KPIs:** Net P&L · YTD (with return on capital), Expectancy, Profit factor,
-  Win rate.
-- **Daily P&L calendar** — a heatmap of daily realized P&L, toggling between a full year and
-  a single month; click any day to see that day's trades.
-- **Capital deployed** — a gauge of current deployed capital against your configured max
-  buying power.
-- **Open positions** — your active option plays (roll-soon first); click one for its detail
-  drawer, or jump to the full Positions tab.
-- **By strategy** — a P&L / RoC / win-rate snapshot per strategy; tap to open that strategy
-  in Positions.
+Realized results for the selected year and accounts:
+- **Headline:** realized net P&L and realized RoC, using peak concurrent capital behind
+  positions realized in the period.
+- **Cumulative realized P&L** — a close-date step line with an optional elapsed-year goal
+  pace overlay. The actual line stops at the last realized close; it is not an equity curve.
+- **Annual goal** — progress against the configured realized P&L target, shown only while
+  goal tracking is enabled.
+- **Quality:** expectancy, profit factor, and win rate over realized events. Assignment
+  legs can be grouped into one trade in the Monthly ledger, so these units differ.
+- **Contribution and context:** realized Options/Stocks P&L and a directional comparison
+  with adjusted SPY/QQQ/VTI returns.
 
-### Performance
+### Monthly
 
-- **Market comparison** — Realized RoC shown beside adjusted YTD total returns for
-  SPY / QQQ / VTI, explicitly labeled as directional because methodologies differ.
-- **Annual goal** — progress, pacing, projection, and required monthly run-rate.
-- **Equity curve** — cumulative realized P&L over the year vs. goal pace.
-- **Capital deployed** — average deployed, Realized RoC, capital-weighted trade ROI, utilization,
-  capital turnover, income per day, and concentration (HHI).
-- **Monthly P&L** — a bar chart plus a breakdown table (P&L, average exposure, and peak-capital
-  RoC overall and by strategy: CSP / CC / Swing). Return capital is shown beside the monthly
-  percentage so the denominator is auditable.
+- **Month strip and summary** — select a month in the chosen year to see realized P&L,
+  realized RoC, and grouped closed-trade count in one compact panel.
+- **Trades (default)** — Options/Stocks P&L and category RoC share that panel as figures,
+  followed by a grouped ledger with symbol/strategy search, close-date filtering, and P&L
+  sorting. There are no extra category charts.
+  A covered-call assignment appears once in the ledger while its option and stock P&L
+  appear in their respective category totals. Select a trade for its detail drawer.
+- **Daily view** — a weekday-aligned monthly calendar and selected-day grouped trades.
+  There is no additional daily bar chart or full ledger in this view.
+- Month and view persist in the URL alongside year/account filters, so links and browser
+  Back/Forward restore the selected view.
 
 ### Tickers
 
@@ -70,11 +72,22 @@ options, Swing.
   options, Qty + Cost basis for swing) along with **Opened** and **Closed** dates.
 - **Swing** shows closed positions only (open share lots aren't tracked as positions).
 - Click any position for a full P&L breakdown drawer.
+- The buying-power gauge shows current deployed capital against configured max buying power.
+
+### Taxes
+
+- **Tax reserve snapshot** — estimated short-term and long-term federal components,
+  NIIT, and state/local tax using editable planning assumptions.
+- **Realized activity** — disposition rows with proceeds, adjusted basis, gain/loss,
+  holding term, and a detail audit.
+- **Open lots** — reconstructed stock lots for the selected taxable accounts.
+- **Review** — missing-basis and unsupported activity is excluded from the estimate;
+  potential exact-ticker wash sales are flagged for broker-record review.
 
 ## Goal tracking
 
 The annual realized P&L goal (`annualRealizedPnlGoal`, default `$40,000`) drives the
-Performance goal card and the equity-curve goal-pace line.
+Home goal card and elapsed-year pace overlay on the cumulative realized P&L chart.
 
 ## Capital & collateral
 
@@ -115,8 +128,9 @@ is generated by the app and is not part of the backup.
 
 ## Product boundaries
 
-- No broker API, cloud sync, or multi-user support.
+- No broker API or live broker sync.
 - No live prices, option marks, or Greeks.
 - No max-drawdown / Sortino / Calmar / payoff-ratio surfacing, no discipline streak, and no
   social leaderboard — deliberately out of scope.
-- No wash-sale handling or tax filing. Verify against official brokerage and tax documents.
+- Potential wash sales are screening flags only; no automatic wash-sale adjustment or
+  tax filing. Verify estimates against official brokerage and tax documents.

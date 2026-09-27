@@ -9,10 +9,9 @@ import { Column, DataTable } from "@/components/tables/DataTable";
 import { StatusChip } from "@/components/common/StatusChip";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { cn } from "@/lib/utils/cn";
-import { compactMonth, formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
   CalculationResult,
-  MonthlyCapitalReturn,
   OptionLifecycle,
   RealizedPnLEvent,
 } from "@/types/trading";
@@ -122,86 +121,6 @@ export function SegmentedControl<T extends string>({
         </button>
       ))}
     </div>
-  );
-}
-
-// ── MonthlyRoiTable ──────────────────────────────────────────────────────────
-
-export function MonthlyRoiTable({ rows, maskAmounts = false }: { rows: MonthlyCapitalReturn[]; maskAmounts?: boolean }) {
-  const columns: Column<MonthlyCapitalReturn>[] = [
-    {
-      key: "month",
-      header: "Month",
-      value: (row) => `${row.year}-${String(row.month).padStart(2, "0")}`,
-      render: (row) => compactMonth(row.year, row.month),
-    },
-    {
-      key: "realizedPnl",
-      header: "Realized P&L",
-      value: (row) => row.realizedPnl,
-      render: (row) => signedMoney(row.realizedPnl, maskAmounts),
-      align: "right",
-      tooltip: "Net realized P&L from all events that closed during this month.",
-    },
-    {
-      key: "averageDeployedCapital",
-      header: "Avg Realized Capital",
-      value: (row) => row.averageDeployedCapital,
-      render: (row) => formatMaskedCurrency(row.averageDeployedCapital, maskAmounts),
-      align: "right",
-      tooltip: "Time-weighted average capital behind positions realized in this month, capped at configured max buying power. Inferred open holdings are excluded.",
-    },
-    {
-      key: "returnCapital",
-      header: "Realized Capital",
-      value: (row) => row.returnCapital,
-      render: (row) => formatMaskedCurrency(row.returnCapital, maskAmounts),
-      align: "right",
-      tooltip: "Peak concurrent capital behind positions realized in this month. Covered-call stock basis is counted once when its underlying shares also realize.",
-    },
-    {
-      key: "realizedRoiPercent",
-      header: "Realized RoC",
-      value: (row) => row.realizedRoiPercent ?? -999,
-      render: (row) => signedPercent(row.realizedRoiPercent),
-      align: "right",
-      tooltip: "Monthly realized P&L ÷ peak concurrent capital behind positions realized that month. Open positions remain exposure only; sequential reuse is counted once.",
-    },
-    {
-      key: "capitalWeightedTradeRoiPercent",
-      header: "Trade ROI",
-      value: (row) => row.capitalWeightedTradeRoiPercent ?? -999,
-      render: (row) => signedPercent(row.capitalWeightedTradeRoiPercent),
-      align: "right",
-      tooltip: "Monthly realized P&L ÷ the sum of capital on trades closed that month. Reused capital is counted again for each closed trade.",
-    },
-    {
-      key: "coveredCallRoiPercent",
-      header: "CC RoC",
-      value: (row) => row.coveredCallRoiPercent ?? -999,
-      render: (row) => signedPercent(row.coveredCallRoiPercent),
-      align: "right",
-      tooltip: "Realized covered-call P&L ÷ peak concurrent stock basis behind covered calls realized that month.",
-    },
-    {
-      key: "cashSecuredPutRoiPercent",
-      header: "CSP RoC",
-      value: (row) => row.cashSecuredPutRoiPercent ?? -999,
-      render: (row) => signedPercent(row.cashSecuredPutRoiPercent),
-      align: "right",
-      tooltip: "Realized cash-secured-put P&L ÷ peak concurrent CSP collateral behind puts realized that month.",
-    },
-    {
-      key: "swingTradeRoiPercent",
-      header: "Stock RoC",
-      value: (row) => row.swingTradeRoiPercent ?? -999,
-      render: (row) => signedPercent(row.swingTradeRoiPercent),
-      align: "right",
-      tooltip: "Realized stock P&L ÷ peak concurrent stock capital behind sales realized that month.",
-    },
-  ];
-  return (
-    <DataTable rows={rows} columns={columns} empty="No monthly RoC rows yet." />
   );
 }
 

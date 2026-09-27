@@ -1,426 +1,305 @@
 "use client";
 
-/**
- * PerformanceTab — market comparison + capital-deployed metrics + equity curve
- * + monthly breakdown.
- *
- * Excluded per spec: max drawdown, Sortino, Calmar, payoff ratio.
- */
-
-import { useMemo, useSyncExternalStore } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { InfoTooltip } from "@/components/common/InfoTooltip";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { BenchmarkComparison } from "@/components/dashboard/BenchmarkComparison";
-import { KpiCard } from "@/components/dashboard/KpiCard";
-import { MetricGroup } from "@/components/dashboard/MetricGroup";
-import { capitalEfficiency } from "@/lib/selectors/capital-efficiency";
-import { goalPace } from "@/lib/selectors/goal-pace";
-import { formatCurrency, formatMaskedCurrency, formatPercent, monthLabel, monthTick, MASKED_AMOUNT } from "@/lib/utils/format";
-import type { AppSettings, CalculationResult } from "@/types/trading";
-import { MonthlyRoiTable, tone } from "./shared";
+  MonthCalendar,
+  MonthStrip,
+  MonthTradeLedger,
+} from "@/components/dashboard/performance";
+import { label, signedMoney } from "@/components/dashboard/tabs/shared";
+import { dailyPnl } from "@/lib/selectors/daily-pnl";
+import { monthlyTrades, type MonthlyTrade } from "@/lib/selectors/monthly-trades";
+import {
+  defaultPerformanceMonth,
+  groupedDayTrades,
+  instrumentAttribution,
+  monthSlots,
+} from "@/lib/selectors/performance-view";
+import { cn } from "@/lib/utils/cn";
+import { formatDisplayDate, formatPercent } from "@/lib/utils/format";
+import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 
-const C_POS       = "rgb(var(--pos))";
-const C_NEG       = "rgb(var(--neg))";
-const C_MUTED     = "rgb(var(--text-muted))";
-const C_HAIRLINE  = "rgb(var(--hairline))";
-const C_SURFACE   = "rgb(var(--surface))";
-const C_GOAL_PACE = "rgb(var(--text-muted))";
+type View = "trades" | "daily";
 
-// Monthly P&L stacked-bar strategy colours
-const C_PREMIUM = "#34d399"; // options premium — emerald
-const C_STOCK   = "#60a5fa"; // stock / swing — blue
-const C_ASSIGN  = "#fbbf24"; // assignment P&L — amber
+function fullMonth(month: string): string {
+  const [year, number] = month.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, number - 1, 1)));
+}
 
-const TICK_STYLE = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  fill: C_MUTED,
-} as const;
+function signedRate(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return (value > 0 ? "+" : value < 0 ? "−" : "") + formatPercent(Math.abs(value), 1);
+}
 
-const TOOLTIP_CONTENT_STYLE: React.CSSProperties = {
-  background: C_SURFACE,
-  border: `1px solid ${C_HAIRLINE}`,
-  borderRadius: 8,
-  boxShadow: "none",
-  padding: "8px 12px",
-};
-
-const TOOLTIP_ITEM_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 12,
-  color: C_MUTED,
-};
-
-const TOOLTIP_LABEL_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  color: C_MUTED,
-  marginBottom: 4,
-};
-
-function EquityCurveChart({
-  result,
-  annualGoal,
-  maskAmounts = false,
+function MonthHeader({
+  month,
+  pnl,
+  roc,
+  tradeCount,
+  options,
+  stocks,
+  previous,
+  next,
+  view,
+  maskAmounts,
+  onSelectMonth,
+  onSelectView,
 }: {
-  result: CalculationResult;
-  annualGoal: number;
-  maskAmounts?: boolean;
+  month: string;
+  pnl: number;
+  roc: number | null;
+  tradeCount: number;
+  options: { pnl: number; roc: number | null };
+  stocks: { pnl: number; roc: number | null };
+  previous: string | null;
+  next: string | null;
+  view: View;
+  maskAmounts: boolean;
+  onSelectMonth: (month: string) => void;
+  onSelectView: (view: View) => void;
 }) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false
-  );
-
-  const data = useMemo(() => {
-    return result.monthlyReturns.map((m, i) => ({
-      month: `${m.year}-${String(m.month).padStart(2, "0")}`,
-      cumulative: result.monthlyReturns
-        .slice(0, i + 1)
-        .reduce((sum, x) => sum + x.realizedPnl, 0),
-      goalPace: annualGoal > 0 ? (annualGoal * (i + 1)) / 12 : undefined,
-    }));
-  }, [result.monthlyReturns, annualGoal]);
-
-  const finalCumulative = data.length > 0 ? data[data.length - 1].cumulative : 0;
-  const C_EQUITY = finalCumulative >= 0 ? C_POS : "rgb(var(--neg))";
-
-  if (!mounted) {
-    return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
-  }
-
+  const categoryRoc = (value: number | null) => value === null ? "RoC unavailable" : `RoC ${maskAmounts ? "•••%" : signedRate(value)}`;
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-4 px-1">
-        <span className="flex items-center gap-1.5 font-sans text-caption text-muted-foreground">
-          <span className="inline-block h-0.5 w-5 rounded-full" style={{ background: C_EQUITY }} />
-          Cumulative P&amp;L
-        </span>
-        {annualGoal > 0 && (
-          <span className="flex items-center gap-1.5 font-sans text-caption text-muted-foreground">
-            <span
-              className="inline-block h-0.5 w-5 rounded-full bg-muted-foreground opacity-50"
-              style={{ borderTop: "2px dashed" }}
-            />
-            Goal pace
-          </span>
-        )}
-      </div>
-      <div className="h-[200px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
-            <CartesianGrid
-              vertical={false}
-              strokeDasharray="0"
-              stroke={C_HAIRLINE}
-              opacity={1}
-            />
-            <XAxis
-              dataKey="month"
-              tick={TICK_STYLE}
-              tickFormatter={monthTick}
-              axisLine={{ stroke: C_HAIRLINE }}
-              tickLine={false}
-            />
-            <YAxis
-              tick={TICK_STYLE}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v: number) =>
-                maskAmounts
-                  ? ""
-                  : v >= 1000 || v <= -1000
-                  ? `$${(v / 1000).toFixed(0)}k`
-                  : `$${v.toFixed(0)}`
-              }
-              width={52}
-            />
-            <Tooltip
-              formatter={(value: unknown, name: string | number | undefined) => [
-                maskAmounts
-                  ? MASKED_AMOUNT
-                  : formatCurrency(typeof value === "number" ? value : Number(value)),
-                name === "goalPace" ? "Goal pace" : "Cumulative P&L",
-              ]}
-              labelFormatter={(label) => monthLabel(String(label))}
-              contentStyle={TOOLTIP_CONTENT_STYLE}
-              itemStyle={TOOLTIP_ITEM_STYLE}
-              labelStyle={TOOLTIP_LABEL_STYLE}
-              cursor={{ stroke: C_HAIRLINE, strokeWidth: 1 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="cumulative"
-              stroke={C_EQUITY}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, stroke: C_EQUITY, fill: C_SURFACE }}
-            />
-            {annualGoal > 0 && (
-              <Line
-                type="monotone"
-                dataKey="goalPace"
-                stroke={C_GOAL_PACE}
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-                activeDot={false}
-                opacity={0.6}
-              />
-            )}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-type StrategyTooltipProps = {
-  active?: boolean;
-  payload?: Array<{ value: number; dataKey: string; payload: Record<string, number> }>;
-  label?: string;
-  masked?: boolean;
-};
-
-function StrategyTooltip({ active, payload, label, masked = false }: StrategyTooltipProps) {
-  if (!active || !payload?.length || !label) return null;
-  const p = payload[0].payload;
-  const premium = p.premium ?? 0;
-  const stock   = p.stock   ?? 0;
-  const assign  = p.assign  ?? 0;
-  const total   = p.total    ?? 0;
-  const rows: [string, number, string][] = [
-    ["Premium", premium, C_PREMIUM],
-    ["Stock", stock, C_STOCK],
-    ["Assignment", assign, C_ASSIGN],
-  ];
-  return (
-    <div style={TOOLTIP_CONTENT_STYLE}>
-      <p style={TOOLTIP_LABEL_STYLE}>{monthLabel(label)}</p>
-      {rows.map(([name, val, color]) =>
-        val !== 0 ? (
-          <div key={name} className="flex items-center gap-2 py-0.5">
-            <span className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />
-            <span style={TOOLTIP_ITEM_STYLE} className="flex-1">{name}</span>
-            <span
-              style={{
-                ...TOOLTIP_ITEM_STYLE,
-                color: val > 0 ? C_POS : C_NEG,
-                fontVariantNumeric: "tabular-nums",
-              }}
+    <section className="min-w-0 rounded-xl border border-hairline bg-surface p-4 sm:p-5" aria-label={fullMonth(month) + " summary"}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={previous ? "Previous month: " + fullMonth(previous) : "Previous month"}
+            disabled={!previous}
+            onClick={() => previous && onSelectMonth(previous)}
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-inset hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+          </button>
+          <h2 className="min-w-[160px] text-center text-lead font-semibold text-foreground sm:min-w-0 sm:text-left">{fullMonth(month)}</h2>
+          <button
+            type="button"
+            aria-label={next ? "Next month: " + fullMonth(next) : "Next month"}
+            disabled={!next}
+            onClick={() => next && onSelectMonth(next)}
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-inset hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <ChevronRight aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
+        <div role="tablist" aria-label="Monthly view" className="flex w-full rounded-lg border border-hairline bg-surface-inset p-1 sm:w-auto">
+          {(["trades", "daily"] as const).map((item) => (
+            <button
+              key={item}
+              id={"performance-" + item + "-tab"}
+              type="button"
+              role="tab"
+              aria-selected={view === item}
+              aria-controls="performance-view-panel"
+              onClick={() => onSelectView(item)}
+              className={cn(
+                "min-h-11 flex-1 rounded-md px-5 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:flex-none",
+                view === item ? "bg-accent text-background" : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              {formatMaskedCurrency(val, masked)}
-            </span>
-          </div>
-        ) : null
-      )}
-      <div
-        className="mt-1 flex items-center justify-between border-t pt-1"
-        style={{ borderColor: C_HAIRLINE }}
-      >
-        <span style={{ ...TOOLTIP_ITEM_STYLE, color: C_MUTED }}>Net</span>
-        <span
-          style={{
-            ...TOOLTIP_ITEM_STYLE,
-            color: total > 0 ? C_POS : total < 0 ? C_NEG : C_MUTED,
-            fontVariantNumeric: "tabular-nums",
-            fontWeight: 600,
-          }}
-        >
-          {formatMaskedCurrency(total, masked)}
-        </span>
+              {item === "trades" ? "Trades" : "Daily view"}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+      <div className={cn("mt-4 grid grid-cols-6 gap-x-2 gap-y-3 border-t border-hairline pt-4 sm:gap-x-4", view === "trades" ? "lg:grid-cols-5" : "lg:grid-cols-3")}>
+        <div className="col-span-2 min-w-0 lg:col-span-1">
+          <p className="text-caption text-muted-foreground">Realized P&amp;L</p>
+          <p className="mt-1 text-[23px] font-semibold leading-tight tabular-nums sm:text-[26px]">{signedMoney(pnl, maskAmounts)}</p>
+        </div>
+        <div className="col-span-2 min-w-0 border-l border-hairline pl-2 sm:pl-4 lg:col-span-1">
+          <p className="flex items-center gap-1 text-caption text-muted-foreground">
+            Realized RoC
+            <InfoTooltip label="Monthly realized RoC" text="Realized P&L divided by capped peak concurrent capital behind positions realized in this month. Open exposure is excluded." />
+          </p>
+          <p className={cn("mt-1 text-[21px] font-semibold leading-tight tabular-nums sm:text-[24px]", roc !== null && roc > 0 && "text-pos", roc !== null && roc < 0 && "text-neg")} title={roc === null ? "Unavailable because no realized capital denominator exists" : undefined}>
+            {roc === null ? "—" : maskAmounts ? "•••%" : signedRate(roc)}
+          </p>
+        </div>
+        <div className="col-span-2 min-w-0 border-l border-hairline pl-2 sm:pl-4 lg:col-span-1">
+          <p className="text-caption text-muted-foreground">Closed trades</p>
+          <p className="mt-1 text-[21px] font-semibold leading-tight tabular-nums text-foreground sm:text-[24px]">{tradeCount}</p>
+        </div>
+        {view === "trades" && ([{ name: "Options", value: options }, { name: "Stocks", value: stocks }] as const).map(({ name, value }) => (
+          <div key={name} className="col-span-3 min-w-0 border-t border-hairline pt-3 lg:col-span-1 lg:border-l lg:border-t-0 lg:py-0 lg:pl-4">
+            <p className="flex items-center gap-1 text-caption text-muted-foreground">
+              {name}
+              <InfoTooltip label={`${name} realized return on capital`} text="Category P&L contributes to the month total. Category RoC uses peak concurrent realized capital within this category and does not add to monthly RoC." />
+            </p>
+            <p className="mt-1 text-[19px] font-semibold leading-tight tabular-nums sm:text-[22px]">{signedMoney(value.pnl, maskAmounts)}</p>
+            <p className="mt-1 text-caption tabular-nums text-muted-foreground" title={value.roc === null ? "Unavailable because no realized capital denominator exists" : undefined}>{categoryRoc(value.roc)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-function MonthlyPnlBar({ result, maskAmounts = false }: { result: CalculationResult; maskAmounts?: boolean }) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false
-  );
-
-  const data = useMemo(
-    () =>
-      result.monthlyReturns.map((m) => ({
-        month:   `${m.year}-${String(m.month).padStart(2, "0")}`,
-        total:   m.realizedPnl,
-        premium: m.optionsPremiumPnl,
-        stock:   m.stockTradingPnl,
-        assign:  m.assignmentPnl,
-      })),
-    [result.monthlyReturns]
-  );
-
-  if (!mounted) {
-    return <div className="h-[200px] animate-pulse rounded-md bg-surface-inset" />;
-  }
-
+function SelectedDayPanel({
+  date,
+  pnl,
+  trades,
+  maskAmounts,
+  onSelectTrade,
+}: {
+  date: string | null;
+  pnl: number;
+  trades: MonthlyTrade[];
+  maskAmounts: boolean;
+  onSelectTrade: (trade: MonthlyTrade) => void;
+}) {
   return (
-    <div className="h-[200px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 8, left: 4, bottom: 4 }} barCategoryGap="30%">
-          <CartesianGrid vertical={false} strokeDasharray="0" stroke={C_HAIRLINE} opacity={1} />
-          <XAxis
-            dataKey="month"
-            tick={TICK_STYLE}
-            tickFormatter={monthTick}
-            axisLine={{ stroke: C_HAIRLINE }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={TICK_STYLE}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(v: number) =>
-              maskAmounts ? "" : v >= 1000 || v <= -1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v.toFixed(0)}`
-            }
-            width={52}
-          />
-          <Tooltip
-            content={<StrategyTooltip masked={maskAmounts} />}
-            cursor={{ fill: C_HAIRLINE, fillOpacity: 0.25 }}
-          />
-          <Bar dataKey="total" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.total >= 0 ? C_POS : C_NEG} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+    <section className="min-h-[230px] rounded-xl border border-hairline bg-surface p-4" aria-live="polite" aria-label="Selected day">
+      {!date ? (
+        <div className="flex min-h-[190px] items-center justify-center text-center text-body text-muted-foreground">
+          No realized closes this month. Select a calendar day to inspect it.
+        </div>
+      ) : (
+        <>
+          <h3 className="text-section font-semibold text-foreground">{formatDisplayDate(date)}</h3>
+          <div className="mt-2 text-[28px] font-semibold tabular-nums">{signedMoney(pnl, maskAmounts)}</div>
+          <p className="mt-1 text-body text-muted-foreground">{trades.length} closed {trades.length === 1 ? "trade" : "trades"}</p>
+          {trades.length === 0 ? (
+            <p className="mt-5 border-t border-hairline pt-4 text-body text-muted-foreground">No realized closes on this day.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-hairline border-t border-hairline">
+              {trades.map((trade) => (
+                <li key={trade.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectTrade(trade)}
+                    className="flex min-h-14 w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left hover:bg-surface-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <span className="min-w-0"><span className="block font-semibold text-foreground">{trade.symbol}</span><span className="text-caption text-muted-foreground">{label(trade.event.strategy)}</span></span>
+                    <span className="shrink-0 font-semibold tabular-nums">{signedMoney(trade.pnl, maskAmounts)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 
 export function PerformanceTab({
   result,
   settings,
+  year,
+  dataLoaded,
+  onSelectEvent,
+  onSelectLifecycle,
 }: {
   result: CalculationResult;
   settings: AppSettings;
+  year: string;
+  dataLoaded: boolean;
+  onSelectEvent: (event: RealizedPnLEvent) => void;
+  onSelectLifecycle: (lifecycle: OptionLifecycle) => void;
 }) {
-  const annualGoal = settings.annualRealizedPnlGoal;
-  const maxBP = settings.maxBuyingPower ?? 125000;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedYear = Number(year) || new Date().getFullYear();
+  const slots = useMemo(() => monthSlots(result, selectedYear), [result, selectedYear]);
+  const defaultMonth = useMemo(() => defaultPerformanceMonth(result, selectedYear), [result, selectedYear]);
+  const monthParam = searchParams.get("month");
+  const validMonth = slots.find((slot) => slot.month === monthParam && !slot.isFuture);
+  const month = validMonth?.month ?? defaultMonth;
+  const viewParam = searchParams.get("view");
+  const view: View = viewParam === "daily" ? "daily" : "trades";
+  const accountScope = searchParams.get("accounts") ?? "";
+  const [selectedDay, setSelectedDay] = useState<{ month: string; date: string; accountScope: string; sourceResult: CalculationResult } | null>(null);
 
-  const monthlyRealized = result.monthlyReturns.map((m) => m.realizedPnl);
-  const monthIndex = result.monthlyReturns.length > 0 ? result.monthlyReturns.length - 1 : 0;
-  const pace = goalPace({ annualGoal, monthlyRealized, monthIndex });
+  useEffect(() => {
+    if (!dataLoaded) return;
+    if (monthParam === month && (viewParam === null || viewParam === "daily")) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", month);
+    if (view === "daily") params.set("view", "daily");
+    else params.delete("view");
+    router.replace(pathname + "?" + params.toString(), { scroll: false });
+  }, [dataLoaded, month, monthParam, pathname, router, searchParams, view, viewParam]);
 
-  const ce = capitalEfficiency(result.monthlyReturns);
-  const roc = result.aggregates.returnOnCapital;
-  const returnCapital = result.aggregates.returnCapital;
+  function selectMonth(next: string) {
+    if (next === month) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", next);
+    router.push(pathname + "?" + params.toString(), { scroll: false });
+  }
 
-  const avgDeployed = result.aggregates.averageDeployedCapital;
-  const bpUsed = maxBP > 0 ? (avgDeployed / maxBP) * 100 : null;
+  function selectView(next: View) {
+    if (next === view) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("month", month);
+    if (next === "daily") params.set("view", "daily");
+    else params.delete("view");
+    router.push(pathname + "?" + params.toString(), { scroll: false });
+  }
 
-  // The annual-goal headline and the equity curve only make sense when the user
-  // is tracking against a goal; hide both when the toggle is off or no goal is set.
-  const showGoal = (settings.trackAgainstGoal ?? true) && annualGoal > 0;
+  const slot = slots.find((item) => item.month === month);
+  const index = slots.findIndex((item) => item.month === month);
+  const previous = index > 0 ? slots[index - 1].month : null;
+  const nextSlot = index >= 0 ? slots[index + 1] : null;
+  const next = nextSlot && !nextSlot.isFuture ? nextSlot.month : null;
+  const trades = useMemo(() => monthlyTrades(result).find((item) => item.month === month)?.trades ?? [], [result, month]);
+  const attribution = useMemo(() => instrumentAttribution(result, month, settings.maxBuyingPower), [result, month, settings.maxBuyingPower]);
+  const daily = useMemo(() => dailyPnl(result.realizedEvents).filter((day) => day.date.startsWith(month)), [result.realizedEvents, month]);
+  const groupedDays = useMemo(() => groupedDayTrades(result, month), [result, month]);
+  const latestRealizedDay = groupedDays.at(-1)?.date ?? null;
+  const activeDate = selectedDay?.month === month && selectedDay.accountScope === accountScope && selectedDay.sourceResult === result
+    ? selectedDay.date
+    : latestRealizedDay;
+  const activeDay = groupedDays.find((day) => day.date === activeDate);
+  const rocByTradeId = useMemo(() => Object.fromEntries(trades.map((trade) => [
+    trade.id,
+    trade.event.strategy === "COVERED_CALL_ASSIGNMENT" || trade.event.strategy === "COVERED_CALL_ASSIGNMENT_STOCK"
+      ? null
+      : trade.event.roiPercent,
+  ])), [trades]);
+
+  function selectTrade(trade: MonthlyTrade) {
+    if (trade.lifecycle) onSelectLifecycle(trade.lifecycle);
+    else onSelectEvent(trade.event);
+  }
 
   return (
-    <div className="space-y-5 py-2">
-      {/* ── Annual goal (headline) ── */}
-      {showGoal && (
-        <div className="rounded-[14px] border border-hairline bg-surface p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-body font-medium text-muted-foreground">Annual goal</span>
-            <span className="text-body text-muted-foreground">{formatPercent(pace.pct, 0)} of goal</span>
+    <div className="space-y-4 py-2">
+      <header>
+        <h1 className="text-[30px] font-semibold tracking-tight text-foreground sm:text-[36px]">Monthly review</h1>
+        <p className="mt-1 text-body text-muted-foreground">Closed trades and daily results for the selected month.</p>
+      </header>
+      <MonthStrip slots={slots} selectedMonth={month} onSelectMonth={selectMonth} maskAmounts={settings.maskAmounts} />
+      <MonthHeader
+        month={month}
+        pnl={slot?.pnl ?? 0}
+        roc={slot?.roc ?? null}
+        tradeCount={slot?.tradeCount ?? 0}
+        options={attribution.options}
+        stocks={attribution.stocks}
+        previous={previous}
+        next={next}
+        view={view}
+        maskAmounts={settings.maskAmounts}
+        onSelectMonth={selectMonth}
+        onSelectView={selectView}
+      />
+      <div id="performance-view-panel" role="tabpanel" aria-labelledby={"performance-" + view + "-tab"} className="space-y-4">
+        {view === "trades" ? (
+          <MonthTradeLedger month={month} trades={trades} onSelectTrade={selectTrade} rocByTradeId={rocByTradeId} maskAmounts={settings.maskAmounts} />
+        ) : (
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,1fr)]">
+            <MonthCalendar month={month} days={daily} selectedDate={activeDate} onSelectDate={(date) => setSelectedDay({ month, date, accountScope, sourceResult: result })} maskAmounts={settings.maskAmounts} />
+            <SelectedDayPanel date={activeDate} pnl={activeDay?.pnl ?? 0} trades={activeDay?.trades ?? []} maskAmounts={settings.maskAmounts} onSelectTrade={selectTrade} />
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-[28px] font-semibold tabular-nums leading-none text-foreground">
-              {formatMaskedCurrency(pace.actual, settings.maskAmounts)}
-            </span>
-            <span className="text-strong tabular-nums text-muted-foreground">/ {formatMaskedCurrency(annualGoal, settings.maskAmounts)}</span>
-          </div>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background">
-            <div
-              className="h-full rounded-full bg-aurora transition-all"
-              style={{ width: `${Math.max(0, Math.min(100, (pace.actual / annualGoal) * 100)).toFixed(1)}%` }}
-            />
-          </div>
-          <p className="mt-2 text-body text-muted-foreground">
-            Projected {formatMaskedCurrency(pace.projectedYearEnd, settings.maskAmounts)} · needs {formatMaskedCurrency(pace.requiredMonthly, settings.maskAmounts)}/mo to hit goal
-          </p>
-        </div>
-      )}
-
-      {/* ── Equity curve + market comparison ── */}
-      {showGoal ? (
-        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
-          <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
-            <h2 className="font-sans text-strong font-medium text-foreground">Equity curve</h2>
-            <EquityCurveChart result={result} annualGoal={annualGoal} maskAmounts={settings.maskAmounts} />
-          </div>
-          <BenchmarkComparison result={result} />
-        </div>
-      ) : (
-        <BenchmarkComparison result={result} />
-      )}
-
-      {/* ── Capital deployed metrics ── */}
-      <MetricGroup label="Capital deployed" cols={4}>
-        <KpiCard
-          label="Avg realized capital"
-          value={formatMaskedCurrency(avgDeployed, settings.maskAmounts)}
-          helper="Time-weighted"
-          tooltip="Time-weighted average capital behind positions realized in each month, capped at configured max buying power. Inferred open holdings are excluded."
-          tone="neutral"
-          variant="compact"
-        />
-        <KpiCard
-          label="Realized RoC"
-          value={roc != null ? formatPercent(roc, 1) : "—"}
-          helper={returnCapital > 0 ? `P&L ÷ ${formatMaskedCurrency(returnCapital, settings.maskAmounts)} peak` : "P&L ÷ peak realized capital"}
-          tooltip="Realized P&L ÷ peak concurrent capital behind positions realized during the period, capped at configured max buying power. This is not a standard portfolio return."
-          tone={tone(roc ?? 0)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Trade ROI"
-          value={result.aggregates.capitalWeightedTradeRoi != null ? formatPercent(result.aggregates.capitalWeightedTradeRoi, 1) : "—"}
-          helper="P&L ÷ capital cycled"
-          tooltip="Capital-weighted closed-trade ROI: total realized P&L ÷ the sum of capital across closed trades. Reused capital is counted again for each closed trade, so this is secondary to Realized RoC."
-          tone={tone(result.aggregates.capitalWeightedTradeRoi ?? 0)}
-          variant="compact"
-        />
-        <KpiCard
-          label="Realized utilization"
-          value={bpUsed != null ? formatPercent(bpUsed, 0) : "—"}
-          helper="Avg deployed ÷ configured max"
-          tooltip="Average realized-position capital as a share of your configured max buying power."
-          tone="neutral"
-          variant="compact"
-        />
-        <KpiCard
-          label="Capital turnover"
-          value={ce.capitalTurnover != null ? ce.capitalTurnover.toFixed(2) + "×" : "—"}
-          helper="Closed capital ÷ avg deployed"
-          tooltip="How many times your average deployed capital cycled through closed trades."
-          tone="neutral"
-          variant="compact"
-        />
-      </MetricGroup>
-
-      {/* ── Monthly breakdown ── */}
-      <section className="space-y-2">
-        <h2 className="font-sans text-strong font-medium text-foreground">Monthly P&amp;L</h2>
-        <div className="rounded-[12px] border border-hairline bg-surface p-3">
-          <MonthlyPnlBar result={result} maskAmounts={settings.maskAmounts} />
-        </div>
-        <MonthlyRoiTable rows={result.monthlyReturns} maskAmounts={settings.maskAmounts} />
-      </section>
+        )}
+      </div>
     </div>
   );
 }

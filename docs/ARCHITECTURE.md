@@ -14,7 +14,7 @@ Broker CSV / pasted rows
   -> lib/db/database.ts                 (Drizzle/Postgres, scoped by userId)
   -> app/api/store/route.ts             (GET/PUT/DELETE, auth-gated)
   -> lib/storage/server-store-client.ts (client snapshot via useSyncExternalStore)
-  -> components/dashboard/DashboardApp.tsx
+  -> components/dashboard/DashboardShell.tsx
   -> lib/calculations/engine.ts         (calculateDashboard -> CalculationResult)
   -> lib/selectors/*                    (derive per-view data)
   -> tabs + charts + tables + KPIs
@@ -107,19 +107,24 @@ events), so the engine stays UI-agnostic:
 - `leaderboard` — ranks symbols into winners/losers (Tickers).
 - `strategy-analytics` — scopes quality/premium/capital metrics to one strategy (Positions).
 - `filter-result` — period / strategy / account scoping (recomputes from filtered rows).
+- `monthly-trades` — grouped closed-trade rows, including covered-call assignments.
+- `performance-view` — twelve-month slots, instrument attribution and category RoC,
+  grouped daily rows, and the Home cumulative realized P&L series.
 
 Risk ratios (max drawdown, Sortino, Calmar, payoff) are intentionally not computed or
 surfaced.
 
 ## UI structure
 
-`components/dashboard/DashboardApp.tsx` owns the active tab, filters (year/account), the
-detail-drawer selection, and Import/Settings panels. `components/shell/AppShell.tsx` renders
-the brand, the desktop tab bar + `OverflowMenu`, and the mobile `BottomNav`.
+`components/dashboard/DashboardShell.tsx` owns the year/account URL filters, filtered
+calculation result, and detail-drawer selection. App Router pages render the five primary
+tabs. Monthly owns URL-backed month and Trades/Daily view state. `components/shell/AppShell.tsx`
+renders the brand, desktop tab bar + `OverflowMenu`, and mobile `BottomNav`.
 
 Repeated primitives: `KpiCard` (label/value/helper with tooltip), `DataTable` (sortable +
-searchable + paginated, per-usage column definitions), `SegmentedControl`, `CalendarHeatmap`,
-`BuyingPowerGauge`, and `DetailDrawer` (event- and lifecycle-aware P&L breakdown).
+searchable + paginated, per-usage column definitions), `SegmentedControl`, the Monthly
+month strip/calendar/ledger, `BuyingPowerGauge` in Positions, and `DetailDrawer`
+(event- and lifecycle-aware P&L breakdown).
 
 ## Types
 

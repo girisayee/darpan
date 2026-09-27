@@ -5,7 +5,7 @@
  * shown beside Realized RoC as a directional market comparison. The UI states
  * the methodology difference because cash flows and portfolio equity are absent.
  *
- * Props: result: CalculationResult
+ * Props: selected calendar year.
  *
  * Each row shows that index's calendar year-to-date return (year-open close →
  * latest close) for the year in view. Fetches /api/benchmark once per session
@@ -15,7 +15,6 @@
 import { useEffect, useState } from "react";
 import { ytdReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
-import type { CalculationResult } from "@/types/trading";
 import { formatPercent } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
@@ -145,13 +144,12 @@ function deleteCache(key: string | null): void {
   }
 }
 
-export function BenchmarkComparison({ result }: { result: CalculationResult }) {
+export function BenchmarkComparison({ year }: { year: number }) {
   // The year in view drives YTD: each index's calendar return is measured from
   // its year-open close (first close on/after Jan 1) to the latest close.
-  const months = result.monthlyReturns;
-  const benchYear = months.length ? months[months.length - 1].year : null;
-  const fromISO = benchYear ? `${benchYear}-01-01` : null;
-  const toISO = new Date().toISOString().slice(0, 10);
+  const benchYear = year;
+  const fromISO = `${benchYear}-01-01`;
+  const toISO = year < new Date().getFullYear() ? `${year}-12-31` : new Date().toISOString().slice(0, 10);
   // v6 switches the source from raw weekly closes to adjusted weekly closes.
   const cacheKey = fromISO ? `benchmark|v6|${fromISO}|${toISO}` : null;
 
@@ -216,20 +214,11 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
     setRetryCount((c) => c + 1);
   }
 
-  // No monthly data at all → render nothing
-  if (!fromISO || benchYear === null) return null;
-
   const spyResult = data && data.spy.length >= 2 ? ytdReturn(data.spy, benchYear) : null;
   const qqqResult = data && data.qqq.length >= 2 ? ytdReturn(data.qqq, benchYear) : null;
   const vtiResult = data && data.vti && data.vti.length >= 2 ? ytdReturn(data.vti, benchYear) : null;
 
   const rows: RowSpec[] = [
-    {
-      label: "You",
-      sub: "Realized RoC",
-      pct: result.aggregates.returnOnCapital,
-      emphasis: true,
-    },
     {
       label: "SPY",
       sub: "S&P 500",
@@ -261,12 +250,12 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
     <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-sans text-strong font-medium text-foreground">Market comparison</h2>
-        <span className="font-sans text-caption text-muted-foreground">YTD {benchYear}</span>
+        <h2 className="font-sans text-strong font-medium text-foreground">Market context</h2>
+        <span className="font-sans text-caption text-muted-foreground">{year === new Date().getFullYear() ? "YTD" : year} adjusted return</span>
       </div>
 
       <p className="font-sans text-caption text-muted-foreground">
-        Realized RoC vs adjusted index total returns. Directional only: portfolio equity and cash flows are unavailable.
+        Adjusted index total returns. Directional context only; methodology differs from realized RoC.
       </p>
 
       {/* Error state */}
@@ -288,7 +277,6 @@ export function BenchmarkComparison({ result }: { result: CalculationResult }) {
       {/* Loading skeleton */}
       {status === "loading" && (
         <div>
-          <SkeletonRow />
           <SkeletonRow />
           <SkeletonRow />
           <SkeletonRow />

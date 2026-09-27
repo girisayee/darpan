@@ -3,8 +3,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { StrategyMetrics } from "@/components/dashboard/StrategyMetrics";
+import { BuyingPowerGauge } from "@/components/dashboard/BuyingPowerGauge";
 import { DataTable } from "@/components/tables/DataTable";
-import { SegmentedControl, signedMoney } from "@/components/dashboard/tabs/shared";
+import { SegmentedControl, currentDeployedCapital, signedMoney } from "@/components/dashboard/tabs/shared";
 import { allColumns, columnsFor, toAllPositionRows, toPositionRows } from "@/components/dashboard/positions/columns";
 import { optionsAnalytics, strategyAnalytics } from "@/lib/selectors/strategy-analytics";
 import { cn } from "@/lib/utils/cn";
@@ -165,6 +166,7 @@ export function PositionsTab(props: {
 
   return (
     <div className="space-y-4 py-2">
+      <BuyingPowerGauge deployed={currentDeployedCapital(result)} maxBP={settings.maxBuyingPower} maskAmounts={settings.maskAmounts} />
       <div className="grid grid-cols-2 gap-2.5">
         <TabCard
           name="Options"

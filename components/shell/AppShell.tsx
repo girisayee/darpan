@@ -35,14 +35,16 @@ function AccountSelect({
   accounts,
   selected,
   onChange,
+  allLabel = "All accounts",
 }: {
   accounts: TradingAccount[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  allLabel?: string;
 }) {
   const allMode = selected.length === 0;
   const labelText = allMode
-    ? "All accounts"
+    ? allLabel
     : selected.length === 1
       ? (accounts.find((a) => a.id === selected[0])?.name ?? "1 account")
       : `${selected.length} accounts`;
@@ -74,7 +76,7 @@ function AccountSelect({
             allMode ? "text-accent" : "text-muted-foreground hover:text-foreground"
           )}
         >
-          All accounts {allMode && <Check className="h-3.5 w-3.5" />}
+          {allLabel} {allMode && <Check className="h-3.5 w-3.5" />}
         </button>
         {accounts.length > 0 && <div className="my-1 border-t border-hairline-soft" />}
         {accounts.map((a) => (
@@ -190,7 +192,12 @@ export function AppShell({
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Segmented filter toolbar — account, year and the mask toggle read as one unit */}
           <div className="hidden items-stretch divide-x divide-hairline rounded-[8px] border border-hairline bg-surface sm:flex">
-            <AccountSelect accounts={accounts} selected={selectedAccountIds} onChange={onSelectAccounts} />
+            <AccountSelect
+              accounts={accounts}
+              selected={selectedAccountIds}
+              onChange={onSelectAccounts}
+              allLabel={activeTab === "Taxes" ? "Taxable accounts" : "All accounts"}
+            />
             <select
               value={year}
               onChange={(e) => onYear(e.target.value)}

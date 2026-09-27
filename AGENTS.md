@@ -7,7 +7,7 @@ Fast-start guide for coding agents and contributors working in this repo.
 Darpan is a hosted, multi-user Next.js dashboard for short-term retail traders. It imports
 broker CSV activity (Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, IBKR — auto-detected),
 reconstructs realized P&L / option income / capital usage in a pure calculation engine, and
-presents it across four tabs: **Home**, **Performance**, **Tickers**, **Positions** (Import
+presents it across five tabs: **Home**, **Monthly**, **Tickers**, **Positions**, **Taxes** (Import
 and Settings live behind a `⋯` overflow menu). Sign-in is Google SSO; access is governed by
 Google's OAuth config (no app-level allowlist), and all data is isolated per user.
 
@@ -25,8 +25,9 @@ set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env
 - App entry: `app/page.tsx`, `app/layout.tsx`
 - Shell / nav: `components/shell/AppShell.tsx` (desktop top bar + `OverflowMenu` + mobile `BottomNav`)
 - Main container: `components/dashboard/DashboardApp.tsx` (tab state, filters, drawer, import/settings)
-- Tabs: `components/dashboard/tabs/{HomeTab,PerformanceTab,TickersTab,PositionsTab}.tsx`
-- Shared tab helpers: `components/dashboard/tabs/shared.tsx` (`SegmentedControl`, `MonthlyRoiTable`, tone/format helpers, `ClosedCyclesTable`)
+- Tabs: `components/dashboard/tabs/{HomeTab,PerformanceTab,TickersTab,PositionsTab,TaxesTab}.tsx`
+- Shared tab helpers: `components/dashboard/tabs/shared.tsx` (`SegmentedControl`, tone/format helpers, `ClosedCyclesTable`)
+- Monthly review: `PerformanceTab.tsx` owns the month strip, compact summary, default Trades ledger, and Daily calendar. `lib/selectors/monthly-trades.ts` groups realized closes (including assignment legs) into trades; `lib/selectors/performance-view.ts` supplies month and category figures. Trade rows open the shared `DetailDrawer`.
 - Reusable UI: `KpiCard`, `MetricGroup`, `BuyingPowerGauge`, `CalendarHeatmap`, `DayDetail`,
   `Leaderboard`, `StrategyStrip`, `StrategyMetrics`, `DetailDrawer`, `ReviewFixPanel`,
   `common/{StatusChip,InfoTooltip,TickerLogo,Logo}.tsx`, `tables/DataTable.tsx`
@@ -89,7 +90,7 @@ typecheck/lint/build and the running dev server rather than component render tes
   positions add. Inferred open positions remain exposure only because there is no authoritative
   holdings/equity snapshot. Covered-call stock basis is portfolio capital only once when the
   supplied realized rows also contain its underlying stock/assignment interval.
-  Home, Performance, monthly, strategy, ticker, symbol, and `aggregates.returnOnCapital` use
+  Home, Monthly, strategy, ticker, symbol, and `aggregates.returnOnCapital` use
   this definition. Portfolio/monthly denominators are capped at configured max buying power,
   which is authoritative when notional trade intervals imply leverage. It is explicitly not
   a standard portfolio return or Modified Dietz. Time-weighted average realized capital uses

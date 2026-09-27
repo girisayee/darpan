@@ -31,6 +31,30 @@ export type Strategy =
 
 export type CostBasisMethod = "FIFO" | "LIFO" | "AVERAGE";
 
+export type TaxFilingStatus =
+  | "single"
+  | "married_joint"
+  | "married_separate"
+  | "head_of_household";
+
+export type TaxEstimateSettings = {
+  /** Marginal ordinary-income rate used for net short-term capital gains. */
+  shortTermRate: number;
+  /** Planning rate used for net long-term capital gains. */
+  longTermRate: number;
+  filingStatus: TaxFilingStatus;
+  /** Projected modified adjusted gross income; null keeps NIIT visibly unestimated. */
+  projectedMagi: number | null;
+  /** Investment income outside imported Darpan trading gains. */
+  otherNetInvestmentIncome: number;
+  /** User-supplied effective state/local rate; null keeps that component unestimated. */
+  stateLocalRate: number | null;
+  /** Explicit taxable trading-account scope; empty keeps realized activity gated. */
+  taxableAccountIds: string[];
+  /** Tax estimates remain explicitly provisional until assumptions are saved once. */
+  confirmed: boolean;
+};
+
 export type TradingAccount = {
   id: string;
   name: string;
@@ -249,6 +273,8 @@ export type AppSettings = {
   showSwingOpenPositions: boolean;
   /** Replace all dollar amounts with $•••• for screen-sharing / privacy mode. */
   maskAmounts: boolean;
+  /** Assumptions used only by the Taxes planning workspace. */
+  taxEstimate: TaxEstimateSettings;
 };
 
 export type CalculationResult = {

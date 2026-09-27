@@ -3,7 +3,7 @@
 import { PerformanceTab } from "@/components/dashboard/tabs/PerformanceTab";
 import { useDashboard } from "@/components/dashboard/DashboardShell";
 
-export default function PerformancePage() {
+export default function MonthlyPage() {
   const d = useDashboard();
   return (
     <PerformanceTab

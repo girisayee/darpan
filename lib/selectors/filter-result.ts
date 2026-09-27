@@ -56,5 +56,6 @@ export function filterResult(
     ? recalculated.monthlyReturns
     : recalculated.monthlyReturns.filter((m) => String(m.year) === filters.year);
 
-  return { ...recalculated, realizedEvents: nextEvents, monthlyReturns };
+  // Use recomputed events so drill-downs honor the selected accounts and their basis.
+  return { ...recalculated, realizedEvents: recalculated.realizedEvents.filter(eventFilter), monthlyReturns };
 }
