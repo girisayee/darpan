@@ -18,7 +18,7 @@ export interface PositionRow {
   capital?: number;
   cost?: number;
   qty?: string;
-  costBasis?: string;
+  costBasisPerShare?: number;
   openDate?: string;
   closeDate?: string;
   expirationDate?: string;
@@ -130,7 +130,8 @@ const dte = (): Column<PositionRow> => ({
 
 const roc = (): Column<PositionRow> => ({
   key: "roc",
-  header: "RoC",
+  header: "Trade ROI",
+  tooltip: "Realized P&L divided by this closed trade's capital or cost. This is separate from portfolio realized RoC.",
   align: "right",
   value: (r) => r.roc ?? null,
   render: (r) =>
@@ -150,7 +151,7 @@ const roc = (): Column<PositionRow> => ({
 
 const pnl = (maskAmounts = false): Column<PositionRow> => ({
   key: "pnl",
-  header: "P&L",
+  header: "Realized P&L",
   align: "right",
   value: (r) => r.pnl,
   render: (r) => signedMoney(r.pnl, maskAmounts),
@@ -169,15 +170,30 @@ const money = (key: keyof PositionRow, header: string, maskAmounts = false): Col
     ),
 });
 
-const text = (key: keyof PositionRow, header: string): Column<PositionRow> => ({
-  key,
-  header,
+const stockBasis = (maskAmounts: boolean): Column<PositionRow> => ({
+  key: "costBasisPerShare",
+  header: "Basis / share",
   align: "right",
-  value: (r) => (r[key] as string | undefined) ?? "",
+  value: (r) => r.costBasisPerShare ?? null,
+  render: (r) => r.costBasisPerShare == null ? "—" : formatMaskedCurrency(r.costBasisPerShare, maskAmounts),
+});
+
+const openCashflow = (maskAmounts: boolean): Column<PositionRow> => ({
+  key: "openCashflow",
+  header: "Premium / debit",
+  tooltip: "Premium received on short options or debit paid to open long options. This is not realized P&L.",
+  align: "right",
+  value: (r) => r.cost ?? r.premium ?? null,
+  render: (r) => (
+    <span className="inline-flex flex-col items-end tabular-nums">
+      <span>{formatMaskedCurrency(r.cost ?? r.premium ?? null, maskAmounts)}</span>
+      <span className="text-caption text-muted-foreground">{r.cost != null ? "Debit paid" : "Premium received"}</span>
+    </span>
+  ),
 });
 
 export function allColumns(maskAmounts = false, state: "all" | "active" | "closed" = "all"): Column<PositionRow>[] {
-  return [
+  const base: Column<PositionRow>[] = [
     position(),
     {
       key: "strategyLabel",
@@ -188,12 +204,10 @@ export function allColumns(maskAmounts = false, state: "all" | "active" | "close
       ),
     },
     stage(),
-    opened(),
-    ...(state === "active" ? [expiry(), dte()] : []),
-    closed(),
-    ...(state === "closed" ? [daysHeld(), roc()] : []),
-    ...(state === "active" ? [] : [pnl(maskAmounts)]),
   ];
+  return state === "active"
+    ? [...base, expiry(), dte(), openCashflow(maskAmounts)]
+    : [...base, closed(), daysHeld(), pnl(maskAmounts), roc()];
 }
 
 export function toAllPositionRows(
@@ -220,33 +234,15 @@ export function columnsFor(
   maskAmounts = false,
   state: "all" | "active" | "closed" = "all"
 ): Column<PositionRow>[] {
-  const closedCols = state === "closed" ? [daysHeld(), roc()] : [];
-  const activeCols = state === "active" ? [expiry(), dte()] : [];
-  const pnlCol = state === "active" ? [] : [pnl(maskAmounts)];
-  if (key === "csp" || key === "cc")
-    return [
-      position(),
-      stage(),
-      money("premium", "Premium", maskAmounts),
-      money("capital", "Capital", maskAmounts),
-      opened(),
-      ...activeCols,
-      closed(),
-      ...closedCols,
-      ...pnlCol,
-    ];
-  if (key === "long")
-    return [position(), stage(), money("cost", "Cost", maskAmounts), opened(), ...activeCols, closed(), ...closedCols, ...pnlCol];
-  return [
-    position(),
-    stage(),
-    text("qty", "Qty"),
-    text("costBasis", "Cost basis"),
-    opened(),
-    closed(),
-    ...closedCols,
-    ...pnlCol,
-  ];
+  if (key === "csp" || key === "cc") return state === "active"
+    ? [position(), stage(), expiry(), dte(), money("premium", "Premium received", maskAmounts), money("capital", "Collateral", maskAmounts)]
+    : [position(), stage(), closed(), daysHeld(), money("premium", "Premium received", maskAmounts), pnl(maskAmounts), roc()];
+  if (key === "long") return state === "active"
+    ? [position(), stage(), expiry(), dte(), money("cost", "Debit paid", maskAmounts)]
+    : [position(), stage(), closed(), daysHeld(), money("cost", "Debit paid", maskAmounts), pnl(maskAmounts), roc()];
+  return state === "active"
+    ? [position(), stockBasis(maskAmounts), opened()]
+    : [position(), closed(), pnl(maskAmounts), roc()];
 }
 
 export function toPositionRows(
@@ -367,7 +363,8 @@ export function toPositionRows(
         const statusStr = lc.status;
         const tag = statusStr.charAt(0).toUpperCase() + statusStr.slice(1);
         const closedPnl = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
-        const cost = lc.premiumReceived;
+        // A closed long stores sale proceeds in premiumReceived and original debit in closeCost.
+        const cost = lc.status === "closed" ? lc.closeCost : lc.premiumReceived;
         return {
           sym: lc.underlyingSymbol,
           detail,
@@ -388,7 +385,8 @@ export function toPositionRows(
 
   // key === "swing"
   // Open swing lots (held stock) are shown only when the user opts in; they have
-  // no realized P&L yet (the app doesn't track live quotes), so P&L reads $0.
+  // no realized P&L yet (the app doesn't track live quotes). The active view
+  // intentionally has no P&L column.
   const openSwingRows: PositionRow[] =
     showSwingOpen && state !== "closed"
       ? result.taxLots
@@ -406,7 +404,7 @@ export function toPositionRows(
               when: `${daysHeld}d`,
               pnl: 0,
               qty: `${l.remainingQuantity} sh`,
-              costBasis: `$${l.costBasisPerShare.toFixed(2)}`,
+              costBasisPerShare: l.costBasisPerShare,
               openDate: l.openDate,
             };
           })
@@ -434,8 +432,7 @@ export function toPositionRows(
         when: e.holdingDays != null ? `${e.holdingDays}d` : "—",
         pnl: e.realizedPnl,
         qty: `${e.quantity} sh`,
-        costBasis:
-          e.costBasis != null ? `$${(e.costBasis / e.quantity).toFixed(2)}` : "—",
+        costBasisPerShare: e.costBasis != null && e.quantity > 0 ? e.costBasis / e.quantity : undefined,
         openDate,
         closeDate: e.date,
         daysHeld: e.holdingDays ?? undefined,

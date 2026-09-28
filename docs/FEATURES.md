@@ -54,25 +54,28 @@ Realized results for the selected year and accounts:
 
 ### Tickers
 
-- **Leaderboard** — "Money makers" and "Account killers": your symbols ranked by net P&L,
-  annotated with win rate and trade count so a single lucky trade can't top the board.
-- **Full symbol table** — every symbol you've traded, sortable and searchable (net P&L, RoC,
-  trades, win rate).
+- One searchable, sortable symbol list leads the page. **All symbols / Winners / Losers**
+  filters use realized net P&L; symbols with zero net P&L remain in All.
+- Rows show realized P&L, realized RoC, closed-event count, and win rate. Phone rows keep
+  these measures visible without horizontal scrolling. Selecting a symbol opens its
+  detail drawer.
 
 ### Positions
 
-Your book organized **by strategy**: All strategies, Cash-secured puts, Covered calls, Long
-options, Swing.
-- The **All strategies** board lists option plays (CSP/CC/Long) with an Active / Closed / All
-  filter (default All) and a per-strategy summary tile row.
-- Each **strategy drill-down** shows its own metric set — e.g. premium collected, capture
-  rate, and assignment rate for options; profit factor and avg win/loss for swing — plus an
-  Active / Closed / All table.
-- Tables carry strategy-appropriate columns (Premium + Capital for CSP/CC, Cost for long
-  options, Qty + Cost basis for swing) along with **Opened** and **Closed** dates.
-- **Swing** shows closed positions only (open share lots aren't tracked as positions).
-- Click any position for a full P&L breakdown drawer.
-- The buying-power gauge shows current deployed capital against configured max buying power.
+**Options** and **Stock trades** have separate boards. Options / All is the default and
+lists open option plays before closed history. Strategy chips filter CSP, CC, and Long;
+All / Active / Closed controls which groups appear.
+- A compact **inferred open exposure** line compares reconstructed open capital with
+  configured max buying power. It is not a live broker balance; an overage is stated in text.
+- Open option rows show expiry, days to expiry, and received premium or long-option cost.
+  Closed rows show realized P&L and trade ROI where valid. Open cashflows are not labeled
+  as realized P&L.
+- Closed-trade results show realized P&L, win rate, and closed count together. More
+  strategy-specific metrics are available on demand rather than occupying the top of the page.
+- Stock trades shows closed results by default. Optional open stock lots appear only when
+  enabled in Settings, with shares and cost basis but no invented unrealized P&L.
+- Phone rows present the key values without horizontal table scrolling. Selecting a row
+  opens its existing detail drawer.
 
 ### Taxes
 

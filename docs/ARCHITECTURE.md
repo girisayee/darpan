@@ -104,7 +104,8 @@ events), so the engine stays UI-agnostic:
 - `allocation` — symbol/strategy concentration (HHI + level).
 - `goal-pace` — YTD vs. annual goal, projection, required monthly run-rate.
 - `daily-pnl` — bins realized events by calendar day (powers the calendar heatmap).
-- `leaderboard` — ranks symbols into winners/losers (Tickers).
+- `leaderboard` — a legacy top/bottom symbol grouping selector; Tickers now filters and
+  sorts `aggregates.symbolBreakdown` directly.
 - `strategy-analytics` — scopes quality/premium/capital metrics to one strategy (Positions).
 - `filter-result` — period / strategy / account scoping (recomputes from filtered rows).
 - `monthly-trades` — grouped closed-trade rows, including covered-call assignments.
@@ -123,7 +124,7 @@ renders the brand, desktop tab bar + `OverflowMenu`, and mobile `BottomNav`.
 
 Repeated primitives: `KpiCard` (label/value/helper with tooltip), `DataTable` (sortable +
 searchable + paginated, per-usage column definitions), `SegmentedControl`, the Monthly
-month strip/calendar/ledger, `BuyingPowerGauge` in Positions, and `DetailDrawer`
+month strip/calendar/ledger, the inferred-exposure line in Positions, and `DetailDrawer`
 (event- and lifecycle-aware P&L breakdown).
 
 ## Types

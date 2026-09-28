@@ -59,11 +59,11 @@ A short-term trader's "game tape." The five tabs:
 - **Monthly** — pick a month to review its realized P&L, RoC, closed-trade count, and
   Options/Stocks figures. The default Trades view has a searchable, sortable ledger;
   Daily view has a calendar and selected-day trades. Open any trade for its detail drawer.
-- **Tickers** — a per-symbol leaderboard ("Money makers" / "Account killers") plus a full
-  sortable, searchable table of every symbol you've traded.
-- **Positions** — your book organized by strategy (Cash-secured puts, Covered calls, Long
-  options, Swing), each with its own metrics and an Active / Closed / All drill-down. Click
-  any position for a full P&L breakdown.
+- **Tickers** — one searchable, sortable list of realized symbol results, with
+  All / Winners / Losers filters and phone-friendly rows. Open a symbol for its history.
+- **Positions** — open options first, closed trade history below, and separate Stock trades.
+  Strategy and status filters, compact closed-trade stats, and position detail drawers keep
+  the book useful without burying it under summary cards.
 - **Taxes** — a planning estimate from imported realized activity, with federal, NIIT, and
   state/local components, editable assumptions, a disposition audit, open lots, and potential
   wash-sale review.
