@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronRight, Search } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { label } from "@/components/dashboard/tabs/shared";
 import type { DailyPnl } from "@/lib/selectors/daily-pnl";
 import type { MonthlyTrade } from "@/lib/selectors/monthly-trades";
@@ -72,19 +72,31 @@ export function MonthStrip({
   const maxAbs = months.reduce((max, item) => Math.max(max, Math.abs(item.pnl ?? 0)), 0);
   const today = new Date();
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const selectedIndex = months.findIndex((item) => item.month === selectedMonth);
+  const previousMonth = selectedIndex > 0 ? months[selectedIndex - 1].month : null;
+  const nextSlot = selectedIndex >= 0 ? months[selectedIndex + 1] : null;
+  const nextMonth = nextSlot && !(nextSlot.isFuture ?? nextSlot.month > currentMonth) ? nextSlot.month : null;
 
   useEffect(() => {
     const strip = stripRef.current;
     const selected = selectedRef.current;
-    if (!strip || !selected || strip.scrollWidth <= strip.clientWidth) return;
-    const stripLeft = strip.getBoundingClientRect().left;
-    const selectedLeft = selected.getBoundingClientRect().left - stripLeft + strip.scrollLeft;
-    strip.scrollTo({ left: selectedLeft - (strip.clientWidth - selected.clientWidth) / 2, behavior: "smooth" });
+    if (!strip || !selected) return;
+    const centerSelected = () => {
+      if (strip.scrollWidth <= strip.clientWidth) return;
+      const stripLeft = strip.getBoundingClientRect().left;
+      const selectedLeft = selected.getBoundingClientRect().left - stripLeft + strip.scrollLeft;
+      strip.scrollTo({ left: selectedLeft - (strip.clientWidth - selected.clientWidth) / 2, behavior: "auto" });
+    };
+    centerSelected();
+    const observer = new ResizeObserver(centerSelected);
+    observer.observe(strip);
+    return () => observer.disconnect();
   }, [selectedMonth]);
 
   return (
-    <nav ref={stripRef} aria-label={`${year} monthly realized P&L`} className="overflow-x-auto overscroll-x-contain rounded-xl border border-hairline bg-surface/70">
-      <div className="flex min-w-max md:min-w-0">
+    <div className="flex min-w-0 overflow-hidden rounded-xl border border-hairline bg-surface/70">
+      <nav ref={stripRef} aria-label={`${year} monthly realized P&L`} className="scrollbar-hidden min-w-0 flex-1 overflow-x-auto overscroll-x-contain">
+        <div className="flex min-w-max lg:min-w-0">
         {months.map((slot, index) => {
           const isSelected = slot.month === selectedMonth;
           const hasRealizedClose = slot.hasRealizedClose ?? slot.pnl !== null;
@@ -100,22 +112,31 @@ export function MonthStrip({
               aria-label={`${monthLabel(slot.month)} realized P&L ${!hasRealizedClose || amount === null ? "no closes" : maskAmounts ? "hidden" : formatCurrency(amount)}${disabled ? ", future month" : ""}`}
               onClick={() => onSelectMonth(slot.month)}
               className={cn(
-                "flex min-h-[88px] w-[88px] shrink-0 flex-col items-center justify-center gap-1 border-r border-hairline px-2 last:border-r-0 md:min-h-[88px] md:w-auto md:flex-1",
+                "flex min-h-[96px] w-[106px] shrink-0 flex-col items-center justify-center gap-1 border-r border-hairline px-2 lg:w-auto lg:min-w-0 lg:flex-1",
                 "transition-colors hover:bg-surface-active focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
                 isSelected && "rounded-lg bg-accent/10 ring-2 ring-inset ring-accent",
                 (!hasRealizedClose || disabled) && "text-muted-foreground",
                 disabled && "cursor-not-allowed opacity-50",
-                index === 0 && "md:rounded-l-xl",
+                index === 0 && "lg:rounded-l-xl",
               )}
             >
               <span className="text-caption font-medium text-muted-foreground">{monthTick(slot.month)}</span>
-              <SignedAmount value={amount} masked={maskAmounts} className="text-body font-semibold" />
-              <MiniZeroBar value={maskAmounts ? null : amount} maxAbs={maxAbs} className="w-full max-w-[64px]" />
+              <SignedAmount value={amount} masked={maskAmounts} className="text-[13px] font-semibold leading-5 lg:text-[14px]" />
+              <MiniZeroBar value={maskAmounts ? null : amount} maxAbs={maxAbs} className="h-2 w-full max-w-[78px]" />
             </button>
           );
         })}
+        </div>
+      </nav>
+      <div className="hidden shrink-0 items-center gap-1 border-l border-hairline px-2 lg:flex">
+        <button type="button" aria-label="Previous month" disabled={!previousMonth} onClick={() => previousMonth && onSelectMonth(previousMonth)} className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-active hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+          <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+        </button>
+        <button type="button" aria-label="Next month" disabled={!nextMonth} onClick={() => nextMonth && onSelectMonth(nextMonth)} className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-active hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+          <ChevronRight aria-hidden="true" className="h-5 w-5" />
+        </button>
       </div>
-    </nav>
+    </div>
   );
 }
 

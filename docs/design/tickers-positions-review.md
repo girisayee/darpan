@@ -1,5 +1,13 @@
 # Tickers and Positions — design review
 
+> **Implementation update (2 October 2026):** The selected third Tickers concept is now
+> the live Highlights view, showing five Biggest wins and five Biggest losses with a
+> page-level search and an All symbols directory. Positions
+> search spans options and stocks. Stock trades shows lots still open that were opened
+> in the selected year, plus trades closed that year. The September review below is
+> retained as design history; [current features](../FEATURES.md) and
+> [design QA](../../design-qa.md) describe the implemented behavior.
+
 Reviewed the signed-in local Darpan app on 27 September 2026 at desktop and 390 px phone widths. These are design recommendations and a static prototype, not production changes. The [interactive mockups](../../public/design/tickers-positions-mockups.html) show Tickers and Positions at desktop and phone widths, including the Stock trades state. All prototype values and symbols are synthetic.
 
 ## Verdict

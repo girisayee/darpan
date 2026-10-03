@@ -384,9 +384,8 @@ export function toPositionRows(
   }
 
   // key === "swing"
-  // Open swing lots (held stock) are shown only when the user opts in; they have
-  // no realized P&L yet (the app doesn't track live quotes). The active view
-  // intentionally has no P&L column.
+  // Open stock lots have no realized P&L yet (the app doesn't track live quotes).
+  // The active view intentionally has no P&L column.
   const openSwingRows: PositionRow[] =
     showSwingOpen && state !== "closed"
       ? result.taxLots
@@ -445,4 +444,17 @@ export function toPositionRows(
     });
 
   return [...openSwingRows, ...closedSwingRows];
+}
+
+/** Current open stock lots grouped by opening year, not a historical holdings snapshot. */
+export function openStockRowsForYear(allYearsResult: CalculationResult, year?: string): PositionRow[] {
+  return toPositionRows(allYearsResult, "swing", "active", true)
+    .filter((row) => !year || row.openDate?.startsWith(year));
+}
+
+export function searchPositionRows(rows: PositionRow[], query: string): PositionRow[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return rows;
+  return rows.filter((row) => [row.sym, row.detail, row.tag, row.strategyLabel, row.openDate, row.closeDate, row.expirationDate]
+    .some((value) => value?.toLowerCase().includes(needle)));
 }

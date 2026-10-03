@@ -37,13 +37,6 @@ export function SettingsTab({
           }
         />
         <Toggle
-          label="Show open stock positions"
-          checked={settings.showSwingOpenPositions}
-          onChange={(checked) =>
-            onChange({ ...settings, showSwingOpenPositions: checked })
-          }
-        />
-        <Toggle
           label="Track against goal"
           checked={settings.trackAgainstGoal ?? true}
           onChange={(checked) => onChange({ ...settings, trackAgainstGoal: checked })}

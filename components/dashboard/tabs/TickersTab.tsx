@@ -10,7 +10,7 @@ import { formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult } from "@/types/trading";
 
 type SymbolRow = CalculationResult["aggregates"]["symbolBreakdown"][number];
-type ResultFilter = "all" | "winners" | "losers";
+type TickerView = "leaders" | "all" | "losses";
 type SortKey = "symbol" | "pnl" | "roiPercent" | "trades" | "winRate";
 type Sort = { key: SortKey; direction: "asc" | "desc" };
 
@@ -35,30 +35,69 @@ function compareSymbols(a: SymbolRow, b: SymbolRow, sort: Sort): number {
   return (sort.direction === "asc" ? order : -order) || a.symbol.localeCompare(b.symbol);
 }
 
+function LeaderRow({ row, rank, maxAbsPnl, maskAmounts, onSelect }: {
+  row: SymbolRow;
+  rank: number;
+  maxAbsPnl: number;
+  maskAmounts: boolean;
+  onSelect: (row: SymbolRow) => void;
+}) {
+  const barWidth = `${(Math.abs(row.pnl) / maxAbsPnl) * 100}%`;
+  return (
+    <button type="button" onClick={() => onSelect(row)} className="group relative grid min-h-[74px] w-full grid-cols-[20px_minmax(0,1fr)_auto_16px] items-center gap-2 border-b border-hairline-soft px-4 pb-2 text-left transition-colors last:border-b-0 hover:bg-accent/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/50 lg:grid-cols-[20px_minmax(0,1fr)_minmax(95px,auto)_52px_16px] lg:gap-3 lg:px-5">
+      <span className="text-caption tabular-nums text-muted-foreground">{rank}</span>
+      <span className="min-w-0">
+        <span className="block truncate text-strong font-semibold text-foreground">{row.symbol}</span>
+        <span className="block text-caption tabular-nums text-muted-foreground lg:hidden">{row.trades} closed {row.trades === 1 ? "event" : "events"}</span>
+      </span>
+      <span className={cn("shrink-0 text-right text-strong font-semibold tabular-nums", row.pnl >= 0 ? "text-pos" : "text-neg")}>{row.pnl > 0 && !maskAmounts ? "+" : ""}{signedMoney(row.pnl, maskAmounts)}</span>
+      <span className="hidden text-right text-body tabular-nums text-foreground lg:block">{row.trades}</span>
+      <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      {!maskAmounts && <span className="pointer-events-none absolute bottom-2 left-4 right-4 h-1 overflow-hidden rounded-full bg-surface-inset lg:left-5 lg:right-5" aria-hidden="true">
+        <span className={cn("block h-full rounded-full", row.pnl >= 0 ? "bg-pos/80" : "bg-neg/80")} style={{ width: barWidth }} />
+      </span>}
+    </button>
+  );
+}
+
+function LeaderColumns() {
+  return <div className="hidden grid-cols-[20px_minmax(0,1fr)_minmax(95px,auto)_52px_16px] gap-3 border-b border-hairline-soft px-5 py-2.5 text-caption text-muted-foreground lg:grid">
+    <span>#</span><span>Symbol</span><span className="text-right">Realized P&amp;L</span><span className="text-right">Closed</span><span aria-hidden="true" />
+  </div>;
+}
+
 export function TickersTab({ result, onSelectSymbol, settings, year }: {
   result: CalculationResult;
   onSelectSymbol: (row: SymbolRow) => void;
   settings: AppSettings;
   year?: string;
 }) {
-  const [filter, setFilter] = useState<ResultFilter>("all");
+  const [view, setView] = useState<TickerView>("leaders");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>({ key: "pnl", direction: "desc" });
   const [page, setPage] = useState(0);
   const rows = result.aggregates.symbolBreakdown;
+  const displayYear = year ?? String(new Date().getFullYear());
+
+  const { winners, losses } = useMemo(() => ({
+    winners: rows.filter((row) => row.pnl > 0).sort((a, b) => b.pnl - a.pnl || a.symbol.localeCompare(b.symbol)),
+    losses: rows.filter((row) => row.pnl < 0).sort((a, b) => a.pnl - b.pnl || a.symbol.localeCompare(b.symbol)),
+  }), [rows]);
+  const searching = query.trim().length > 0;
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     return rows
-      .filter((row) => filter === "all" || (filter === "winners" ? row.pnl > 0 : row.pnl < 0))
+      .filter((row) => view !== "losses" || row.pnl < 0)
       .filter((row) => !search || row.symbol.toLowerCase().includes(search))
       .sort((a, b) => compareSymbols(a, b, sort));
-  }, [rows, filter, query, sort]);
+  }, [rows, view, query, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
   const closedEvents = filtered.reduce((sum, row) => sum + row.trades, 0);
+  const displayedSymbolCount = searching || view !== "leaders" ? filtered.length : rows.length;
 
   function selectSort(key: SortKey) {
     setPage(0);
@@ -68,7 +107,7 @@ export function TickersTab({ result, onSelectSymbol, settings, year }: {
     }));
   }
 
-  const empty = rows.length === 0 ? "No symbol data yet." : "No symbols match this filter.";
+  const empty = rows.length === 0 ? "No realized symbol results for this year." : searching ? "No symbols match your search." : "No symbols match this view.";
 
   return (
     <div className="space-y-4 py-2 sm:space-y-5">
@@ -76,42 +115,55 @@ export function TickersTab({ result, onSelectSymbol, settings, year }: {
         <div>
           <p className="mb-1.5 text-caption font-semibold uppercase tracking-[0.12em] text-accent">Symbol analysis</p>
           <h1 className="text-[27px] font-semibold leading-tight tracking-tight text-foreground sm:text-[34px]">Tickers</h1>
-          <p className="mt-1 text-body text-muted-foreground">Realized results by symbol in {year ?? new Date().getFullYear()}.</p>
+          <p className="mt-1 text-body text-muted-foreground">Search and explore your trading results for {displayYear}.</p>
         </div>
         <p className="text-caption tabular-nums text-muted-foreground" aria-live="polite">
-          {filtered.length} {filtered.length === 1 ? "symbol" : "symbols"} · {closedEvents} closed events
+          {displayedSymbolCount} {displayedSymbolCount === 1 ? "symbol" : "symbols"} · {searching || view !== "leaders" ? closedEvents : rows.reduce((sum, row) => sum + row.trades, 0)} closed events
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center justify-between gap-2" aria-label="Ticker controls">
-        <div className="inline-flex max-w-full rounded-lg border border-hairline bg-surface-inset p-0.5" role="group" aria-label="Filter symbols by result">
-          {(["all", "winners", "losers"] as const).map((item) => (
+      <div className="space-y-1.5" aria-label="Ticker controls">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="relative min-w-0 flex-1">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(0);
+              if (event.target.value.trim()) { setView("all"); setSort({ key: "pnl", direction: "desc" }); }
+            }}
+            aria-label="Search all tickers"
+            placeholder="Search all tickers…"
+            className="h-12 w-full rounded-xl border border-hairline bg-surface pl-12 pr-4 text-body text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/50"
+          />
+        </div>
+        <div className="flex items-center gap-2" role="group" aria-label="Ticker view">
+          {(["leaders", "all", "losses"] as const).map((item) => (
             <button
               key={item}
               type="button"
-              aria-pressed={filter === item}
-              onClick={() => { setFilter(item); setPage(0); }}
+              aria-pressed={view === item}
+              onClick={() => {
+                setView(item);
+                setPage(0);
+                if (item === "leaders") setQuery("");
+                if (item !== "leaders") setSort({ key: "pnl", direction: item === "losses" ? "asc" : "desc" });
+              }}
               className={cn(
-                "min-h-9 rounded-md px-3 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 sm:px-4",
-                filter === item ? "bg-accent/15 text-accent" : "text-muted-foreground hover:text-foreground",
+                "min-h-11 flex-1 whitespace-nowrap rounded-lg border px-3 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 md:flex-none md:px-4",
+                view === item ? "border-accent bg-accent text-white" : "border-hairline bg-surface text-muted-foreground hover:text-foreground",
               )}
             >
-              {item === "all" ? "All symbols" : item === "winners" ? "Winners" : "Losers"}
+              {item === "leaders" ? "Highlights" : item === "all" ? "All symbols" : "Losses"}
             </button>
           ))}
         </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="relative min-w-0 flex-1 sm:w-[220px] sm:flex-none">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => { setQuery(event.target.value); setPage(0); }}
-              aria-label="Search symbols"
-              placeholder="Search symbols…"
-              className="h-10 w-full rounded-lg border border-hairline bg-surface pl-9 pr-3 text-body text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/50"
-            />
-          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-caption tabular-nums text-muted-foreground">Search all {rows.length} {rows.length === 1 ? "symbol" : "symbols"}</p>
+        {(searching || view !== "leaders") && <div className="flex items-center gap-2">
           <select
             aria-label="Sort symbols"
             value={`${sort.key}-${sort.direction}`}
@@ -128,14 +180,34 @@ export function TickersTab({ result, onSelectSymbol, settings, year }: {
             <option value="winRate-desc">Win rate ↓</option><option value="winRate-asc">Win rate ↑</option>
             <option value="symbol-asc">Symbol A–Z</option><option value="symbol-desc">Symbol Z–A</option>
           </select>
+        </div>}
         </div>
       </div>
 
-      <p className="text-caption text-muted-foreground md:hidden">
+      {(searching || view !== "leaders") && <p className="text-caption text-muted-foreground md:hidden">
         Realized RoC <InfoTooltip text={ROC_DESCRIPTION} label="Realized RoC" /> is based on peak capital behind closed positions.
-      </p>
+      </p>}
 
-      {filtered.length === 0 ? (
+      {!searching && view === "leaders" && rows.length > 0 ? (
+        <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
+          <div className="grid lg:grid-cols-2">
+            <section className="border-b border-hairline lg:border-b-0 lg:border-r" aria-label="Biggest wins">
+              <div className="flex items-baseline justify-between gap-2 px-4 py-4 lg:px-5"><h2 className="text-lead font-semibold text-foreground">Biggest wins</h2><p className="hidden text-caption text-muted-foreground xl:block">Realized P&amp;L ({displayYear})</p></div>
+              <LeaderColumns />
+              {winners.length ? winners.slice(0, 5).map((row, index) => <LeaderRow key={row.symbol} row={row} rank={index + 1} maxAbsPnl={winners[0].pnl} maskAmounts={settings.maskAmounts} onSelect={onSelectSymbol} />) : <p className="p-5 text-body text-muted-foreground">No profitable symbols this year.</p>}
+            </section>
+            <section aria-label="Biggest losses">
+              <div className="flex items-baseline justify-between gap-2 px-4 py-4 lg:px-5"><h2 className="text-lead font-semibold text-foreground">Biggest losses</h2><p className="hidden text-caption text-muted-foreground xl:block">Realized P&amp;L ({displayYear})</p></div>
+              <LeaderColumns />
+              {losses.length ? losses.slice(0, 5).map((row, index) => <LeaderRow key={row.symbol} row={row} rank={index + 1} maxAbsPnl={Math.abs(losses[0].pnl)} maskAmounts={settings.maskAmounts} onSelect={onSelectSymbol} />) : <p className="p-5 text-body text-muted-foreground">No loss-making symbols this year.</p>}
+            </section>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-3 sm:px-5">
+            <p className="text-caption text-muted-foreground">Top five by realized P&amp;L in {displayYear}.{!settings.maskAmounts && " Bars are scaled within each list."}</p>
+            <button type="button" onClick={() => { setView("all"); setPage(0); }} className="inline-flex items-center gap-1 text-body font-semibold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">Browse all {rows.length} symbols <ChevronRight aria-hidden="true" className="h-4 w-4" /></button>
+          </div>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-hairline bg-surface p-6 text-body text-muted-foreground">{empty}</div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-hairline bg-surface">

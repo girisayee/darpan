@@ -53,17 +53,17 @@ to open sign-in to any Google account).
 
 A short-term trader's "game tape." The five tabs:
 
-- **Home** — year-to-date realized P&L and RoC, a cumulative realized P&L chart with
-  optional goal pace, trading quality metrics, Options/Stocks contribution, and directional
-  comparison with adjusted SPY / QQQ / VTI returns.
+- **Home** — year-to-date realized P&L with an additive Options/Stocks breakdown,
+  realized RoC beside adjusted SPY / VTI / QQQ market returns, a cumulative P&L chart
+  with optional goal pace, and trading quality metrics.
 - **Monthly** — pick a month to review its realized P&L, RoC, closed-trade count, and
   Options/Stocks figures. The default Trades view has a searchable, sortable ledger;
   Daily view has a calendar and selected-day trades. Open any trade for its detail drawer.
-- **Tickers** — one searchable, sortable list of realized symbol results, with
-  All / Winners / Losers filters and phone-friendly rows. Open a symbol for its history.
-- **Positions** — open options first, closed trade history below, and separate Stock trades.
-  Strategy and status filters, compact closed-trade stats, and position detail drawers keep
-  the book useful without burying it under summary cards.
+- **Tickers** — clickable top-five Biggest wins and Biggest losses, a sortable All symbols
+  directory, Losses, and search across every symbol in the selected year.
+- **Positions** — open options first, closed trade history below, and Stock trades with
+  still-open lots opened in the selected year plus trades closed that year. Search works
+  across options and stocks; strategy and status filters organize the normal board.
 - **Taxes** — a planning estimate from imported realized activity, with federal, NIIT, and
   state/local components, editable assumptions, a disposition audit, open lots, and potential
   wash-sale review.

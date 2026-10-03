@@ -17,38 +17,44 @@ function valueTone(value: number) {
   return value > 0 ? "text-pos" : value < 0 ? "text-neg" : "text-foreground";
 }
 
-function QualityCard({ label, value, detail, tooltip, positive }: {
+function QualityMetric({ label, value, detail, tooltip, positive }: {
   label: string; value: string; detail: string; tooltip: string; positive?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-[14px] border border-hairline bg-surface p-4">
-      <div className="flex items-center gap-1 text-body font-medium text-muted-foreground">
+    <div className="min-w-0 border-l border-hairline pl-3 first:border-l-0 first:pl-0 sm:pl-5">
+      <div className="flex min-h-[34px] items-center gap-1 text-caption font-medium text-muted-foreground min-[380px]:min-h-0">
         {label}<InfoTooltip text={tooltip} label={label} />
       </div>
-      <div className={cn("mt-2 text-[25px] font-semibold leading-none tabular-nums sm:text-[29px]", positive ? "text-pos" : "text-foreground")}>{value}</div>
-      <p className="mt-2 text-caption text-muted-foreground">{detail}</p>
+      <div className={cn("mt-2 break-words text-[24px] font-semibold leading-none tabular-nums sm:text-[29px]", positive ? "text-pos" : "text-foreground")}>{value}</div>
+      <p className="mt-2 text-caption leading-snug text-muted-foreground">{detail}</p>
     </div>
   );
 }
 
-function InstrumentContribution({ options, stocks, masked }: { options: number; stocks: number; masked: boolean }) {
-  const max = Math.max(Math.abs(options), Math.abs(stocks), 1);
+function PnlSummary({ total, options, stocks, masked, hasCloses }: { total: number; options: number; stocks: number; masked: boolean; hasCloses: boolean }) {
   const rows = [{ label: "Options", value: options }, { label: "Stocks", value: stocks }];
+  const maxMagnitude = Math.max(1, Math.abs(options), Math.abs(stocks));
   return (
-    <section className="rounded-[14px] border border-hairline bg-surface p-4">
-      <h2 className="text-strong font-medium text-foreground">Realized P&amp;L by instrument</h2>
-      <div className="mt-3 space-y-3">
-        {rows.map(({ label, value }) => (
-          <div key={label} className="grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 text-body sm:grid-cols-[72px_minmax(0,1fr)_auto]">
-            <span className="text-foreground">{label}</span>
-            <div className="h-2.5 overflow-hidden rounded-full bg-surface-inset" aria-hidden="true">
-              <div className={cn("h-full rounded-full", value >= 0 ? "bg-accent" : "bg-neg")} style={{ width: `${Math.abs(value) / max * 100}%` }} />
-            </div>
-            <span className={cn("min-w-[74px] text-right font-medium tabular-nums", valueTone(value))}>{formatMaskedCurrency(value, masked, PNL_DISPLAY_PRECISION)}</span>
-          </div>
-        ))}
+    <section className="rounded-[14px] border border-hairline bg-surface p-4 sm:p-5" aria-label="Realized P&L and instrument breakdown">
+      <h2 className="text-body font-medium text-muted-foreground">Realized net P&amp;L</h2>
+      <div className={cn("mt-2 break-words text-[38px] font-semibold leading-none tracking-tight tabular-nums sm:text-[46px]", valueTone(total))}>
+        {formatMaskedCurrency(total, masked, PNL_DISPLAY_PRECISION)}
       </div>
-      {options === 0 && stocks === 0 && <p className="mt-3 text-caption text-muted-foreground">No realized closes in this period.</p>}
+      {hasCloses ? (
+        <div className="mt-4 grid grid-cols-[50px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-t border-hairline pt-3" aria-label="Options plus Stocks realized P&L breakdown">
+          {rows.map(({ label, value }) => (
+            <div key={label} className="contents">
+              <span className="text-caption font-medium text-muted-foreground">{label}</span>
+              <div className="h-2 overflow-hidden rounded-full bg-surface-inset" aria-hidden="true">
+                {!masked && <div className={cn("h-full rounded-full", value < 0 ? "bg-neg" : "bg-pos")} style={{ width: `${Math.abs(value) / maxMagnitude * 100}%` }} />}
+              </div>
+              <span className={cn("text-right text-[15px] font-semibold leading-tight tabular-nums min-[380px]:text-[17px] sm:text-[19px]", valueTone(value))}>
+                {!masked && value > 0 && "+"}{formatMaskedCurrency(value, masked, PNL_DISPLAY_PRECISION)}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : <p className="mt-4 border-t border-hairline pt-3 text-caption text-muted-foreground">No realized closes in this period.</p>}
     </section>
   );
 }
@@ -69,39 +75,23 @@ export function HomeTab({ result, settings, year }: {
   const goalPercent = showGoal ? (realizedPnl / settings.annualRealizedPnlGoal) * 100 : 0;
 
   return (
-    <div className="space-y-4 py-2 sm:space-y-5">
+    <div className="space-y-3 py-2 sm:space-y-4">
       <header>
         <h1 className="text-[27px] font-semibold leading-tight tracking-tight text-foreground sm:text-[34px]">
           {isCurrentYear ? "Year-to-date performance" : `${selectedYear} performance`}
         </h1>
-        <p className="mt-1 text-body text-muted-foreground">Realized trading results for the selected accounts and year.</p>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-[1.15fr_1fr]" aria-label="Realized performance">
-        <div className="rounded-[14px] border border-hairline bg-surface p-5 sm:p-6">
-          <div className="text-body font-medium text-muted-foreground">Realized net P&amp;L</div>
-          <div className={cn("mt-3 break-words text-[38px] font-semibold leading-none tracking-tight tabular-nums sm:text-[50px]", valueTone(realizedPnl))}>
-            {formatMaskedCurrency(realizedPnl, settings.maskAmounts, PNL_DISPLAY_PRECISION)}
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-hairline bg-surface p-5 sm:p-6">
-          <div className="flex items-center gap-1 text-body font-medium text-muted-foreground">Realized RoC <InfoTooltip text={ROC_DESCRIPTION} label="Realized RoC" /></div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div className={cn("text-[38px] font-semibold leading-none tracking-tight tabular-nums sm:text-[50px]", roc === null ? "text-muted-foreground" : valueTone(roc))}>
-              {roc === null ? "—" : settings.maskAmounts ? "••••" : formatPercent(roc, 1)}
-            </div>
-            <p className="max-w-[230px] border-l border-hairline pl-4 text-caption leading-relaxed text-muted-foreground">
-              {roc === null ? "No realized capital denominator is available for this period." : "Realized P&L divided by peak concurrent realized capital."}
-            </p>
-          </div>
-        </div>
+      <section className="grid gap-3 lg:grid-cols-2" aria-label="Realized performance">
+        <PnlSummary total={realizedPnl} options={contribution.options} stocks={contribution.stocks} masked={settings.maskAmounts} hasCloses={quality.totalTrades > 0} />
+        <BenchmarkComparison key={selectedYear} year={selectedYear} roc={quality.totalTrades > 0 ? roc : null} masked={settings.maskAmounts} rocDescription={ROC_DESCRIPTION} />
       </section>
 
       <section className="rounded-[14px] border border-hairline bg-surface p-4 sm:p-5">
         <CumulativePnlChart data={chart} year={selectedYear} currentYear={isCurrentYear} goal={showGoal ? settings.annualRealizedPnlGoal : null} maskAmounts={settings.maskAmounts} />
       </section>
 
-      <div className={cn("grid gap-3", showGoal ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3")}>
+      <div className={cn("grid gap-3", showGoal && "lg:grid-cols-[minmax(260px,1fr)_minmax(0,3fr)]")}>
         {showGoal && (
           <section className="rounded-[14px] border border-hairline bg-surface p-4">
             <div className="text-body font-medium text-muted-foreground">Annual realized P&amp;L goal</div>
@@ -114,14 +104,11 @@ export function HomeTab({ result, settings, year }: {
             </div>
           </section>
         )}
-        <QualityCard label="Expectancy" value={quality.expectancy === null ? "—" : formatMaskedCurrency(quality.expectancy, settings.maskAmounts)} detail="Per realized event" tooltip="Mean realized P&L per realized event. Some assignment legs are grouped into one trade in the Monthly ledger." positive={(quality.expectancy ?? 0) > 0} />
-        <QualityCard label="Profit factor" value={quality.profitFactor === null ? "—" : quality.profitFactor.toFixed(2)} detail="Across realized events" tooltip="Gross profit divided by absolute gross loss across realized events. Unavailable when there are no losses." positive={(quality.profitFactor ?? 0) > 1} />
-        <QualityCard label="Win rate" value={quality.winRate === null ? "—" : formatPercent(quality.winRate * 100, 0)} detail={`${quality.wins} of ${quality.totalTrades} realized events`} tooltip="Share of realized events with positive P&L. This differs from grouped trade counts in the Monthly ledger." />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <InstrumentContribution options={contribution.options} stocks={contribution.stocks} masked={settings.maskAmounts} />
-        <BenchmarkComparison key={selectedYear} year={selectedYear} />
+        <section className="grid min-w-0 grid-cols-3 rounded-[14px] border border-hairline bg-surface p-4" aria-label="Trade quality">
+          <QualityMetric label="Expectancy" value={quality.expectancy === null ? "—" : formatMaskedCurrency(quality.expectancy, settings.maskAmounts)} detail="Per event" tooltip="Mean realized P&L per realized event. Some assignment legs are grouped into one trade in the Monthly ledger." positive={(quality.expectancy ?? 0) > 0} />
+          <QualityMetric label="Profit factor" value={quality.profitFactor === null ? "—" : quality.profitFactor.toFixed(2)} detail="Gross win ÷ loss" tooltip="Gross profit divided by absolute gross loss across realized events. Unavailable when there are no losses." positive={(quality.profitFactor ?? 0) > 1} />
+          <QualityMetric label="Win rate" value={quality.winRate === null ? "—" : formatPercent(quality.winRate * 100, 0)} detail={`${quality.wins} of ${quality.totalTrades} events`} tooltip="Share of realized events with positive P&L. This differs from grouped trade counts in the Monthly ledger." />
+        </section>
       </div>
     </div>
   );

@@ -27,24 +27,25 @@ tab bar. Import, Settings, account switch, theme toggle, and backup export live 
 ### Home
 
 Realized results for the selected year and accounts:
-- **Headline:** realized net P&L and realized RoC, using peak concurrent capital behind
-  positions realized in the period.
+- **Paired summaries:** realized net P&L with its additive Options and Stocks amounts;
+  realized RoC with SPY, VTI, and QQQ adjusted returns beside it as market context.
+  RoC uses peak concurrent capital behind positions realized in the period, while ETF
+  returns use a different basis. Empty years show no breakdown or market comparison.
 - **Cumulative realized P&L** — a close-date step line with an optional elapsed-year goal
   pace overlay. The actual line stops at the last realized close; it is not an equity curve.
 - **Annual goal** — progress against the configured realized P&L target, shown only while
   goal tracking is enabled.
 - **Quality:** expectancy, profit factor, and win rate over realized events. Assignment
   legs can be grouped into one trade in the Monthly ledger, so these units differ.
-- **Contribution and context:** realized Options/Stocks P&L and a directional comparison
-  with adjusted SPY/QQQ/VTI returns.
 
 ### Monthly
 
-- **Month strip and summary** — select a month in the chosen year to see realized P&L,
-  realized RoC, and grouped closed-trade count in one compact panel.
-- **Trades (default)** — Options/Stocks P&L and category RoC share that panel as figures,
-  followed by a grouped ledger with symbol/strategy search, close-date filtering, and P&L
-  sorting. There are no extra category charts.
+- **Month strip and summary** — the scrollable year strip shows each month's signed realized
+  P&L and a zero-centered magnitude bar. The selected month's total is prominent, followed
+  by an additive Options + Stocks breakdown; realized RoC and grouped closed-trade count
+  are separate metrics. The compact summary remains visible in Trades and Daily views.
+- **Trades (default)** — the grouped ledger supports symbol/strategy search, close-date
+  filtering, and P&L sorting.
   A covered-call assignment appears once in the ledger while its option and stock P&L
   appear in their respective category totals. Select a trade for its detail drawer.
 - **Daily view** — a weekday-aligned monthly calendar and selected-day grouped trades.
@@ -54,8 +55,11 @@ Realized results for the selected year and accounts:
 
 ### Tickers
 
-- One searchable, sortable symbol list leads the page. **All symbols / Winners / Losers**
-  filters use realized net P&L; symbols with zero net P&L remain in All.
+- **Highlights** opens with the five Biggest wins and five Biggest losses ranked by realized
+  P&L. Compact bars show relative magnitude within each list and disappear when amounts
+  are masked. **All symbols** opens the sortable directory;
+  **Losses** shows all negative-result symbols. Search finds any symbol in the selected
+  year regardless of the active view. Zero-result symbols remain in All symbols.
 - Rows show realized P&L, realized RoC, closed-event count, and win rate. Phone rows keep
   these measures visible without horizontal scrolling. Selecting a symbol opens its
   detail drawer.
@@ -72,8 +76,11 @@ All / Active / Closed controls which groups appear.
   as realized P&L.
 - Closed-trade results show realized P&L, win rate, and closed count together. More
   strategy-specific metrics are available on demand rather than occupying the top of the page.
-- Stock trades shows closed results by default. Optional open stock lots appear only when
-  enabled in Settings, with shares and cost basis but no invented unrealized P&L.
+- Stock trades lists lots that are still open and were opened in the selected year,
+  then trades closed in that year. Open lots show shares and cost basis, without
+  invented unrealized P&L or a historical holdings snapshot.
+- The page-level search finds matching open and closed positions across both Options
+  and Stock trades, regardless of the currently selected board.
 - Phone rows present the key values without horizontal table scrolling. Selecting a row
   opens its existing detail drawer.
 

@@ -38,6 +38,7 @@ const PRIMARY_TABS = ["Home", "Monthly", "Tickers", "Positions", "Taxes"] as con
 
 type DashboardContextValue = {
   result: CalculationResult;
+  allYearsResult: CalculationResult;
   dataLoaded: boolean;
   settings: AppSettings;
   year: string;
@@ -156,6 +157,14 @@ export function DashboardShell({
     [baseResult, year, accountsParam, settings] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  // Positions needs today's open stock lots even when viewing an earlier year.
+  // Rebuilding from that year's transactions alone can turn a since-closed lot
+  // into an apparent holding. Keep the same account scope across both results.
+  const allYearsResult = useMemo(
+    () => selectedAccountIds.length === 0 ? baseResult : filterResult(baseResult, { symbol: "ALL", strategy: "ALL", year: "ALL", month: "ALL", accountIds: selectedAccountIds }, settings),
+    [baseResult, accountsParam, settings] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   const years = useMemo(() => {
     const fromData = new Set(allTransactions.map((t) => t.tradeDate.slice(0, 4)).filter(Boolean));
     fromData.add("2026");
@@ -207,6 +216,7 @@ export function DashboardShell({
 
   const ctx: DashboardContextValue = {
     result,
+    allYearsResult,
     dataLoaded: store.loaded,
     settings,
     year,

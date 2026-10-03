@@ -19,7 +19,7 @@ import {
   monthSlots,
 } from "@/lib/selectors/performance-view";
 import { cn } from "@/lib/utils/cn";
-import { formatDisplayDate, formatPercent } from "@/lib/utils/format";
+import { formatDisplayDate, formatMaskedCurrency, formatPercent } from "@/lib/utils/format";
 import type { AppSettings, CalculationResult, OptionLifecycle, RealizedPnLEvent } from "@/types/trading";
 
 type View = "trades" | "daily";
@@ -33,6 +33,14 @@ function fullMonth(month: string): string {
 function signedRate(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "—";
   return (value > 0 ? "+" : value < 0 ? "−" : "") + formatPercent(Math.abs(value), 1);
+}
+
+function SummaryAmount({ value, masked, digits = 0 }: { value: number; masked: boolean; digits?: number }) {
+  return (
+    <span className={cn("tabular-nums", masked ? "text-muted-foreground" : value > 0 ? "text-pos" : value < 0 ? "text-neg" : "text-foreground")}>
+      {formatMaskedCurrency(value, masked, { minimumFractionDigits: digits, maximumFractionDigits: digits })}
+    </span>
+  );
 }
 
 function MonthHeader({
@@ -62,81 +70,73 @@ function MonthHeader({
   onSelectMonth: (month: string) => void;
   onSelectView: (view: View) => void;
 }) {
-  const categoryRoc = (value: number | null) => value === null ? "RoC unavailable" : `RoC ${maskAmounts ? "•••%" : signedRate(value)}`;
+  const categoryRoc = (value: number | null) => value === null ? "RoC —" : `RoC ${maskAmounts ? "•••%" : signedRate(value)}`;
+  const displayDigits = Math.round(options.pnl) + Math.round(stocks.pnl) === Math.round(pnl) ? 0 : 2;
+  const hasRealizedActivity = tradeCount > 0 || pnl !== 0 || options.pnl !== 0 || stocks.pnl !== 0;
   return (
-    <section className="min-w-0 rounded-xl border border-hairline bg-surface p-4 sm:p-5" aria-label={fullMonth(month) + " summary"}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label={previous ? "Previous month: " + fullMonth(previous) : "Previous month"}
-            disabled={!previous}
-            onClick={() => previous && onSelectMonth(previous)}
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-inset hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
+    <>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between gap-2 sm:justify-start">
+          <button type="button" aria-label={previous ? "Previous month: " + fullMonth(previous) : "Previous month"} disabled={!previous} onClick={() => previous && onSelectMonth(previous)} className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-inset hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden">
             <ChevronLeft aria-hidden="true" className="h-5 w-5" />
           </button>
-          <h2 className="min-w-[160px] text-center text-lead font-semibold text-foreground sm:min-w-0 sm:text-left">{fullMonth(month)}</h2>
-          <button
-            type="button"
-            aria-label={next ? "Next month: " + fullMonth(next) : "Next month"}
-            disabled={!next}
-            onClick={() => next && onSelectMonth(next)}
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-inset hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
+          <h2 className="min-w-0 text-center text-lead font-semibold text-foreground sm:text-left sm:text-[28px]">{fullMonth(month)}</h2>
+          <button type="button" aria-label={next ? "Next month: " + fullMonth(next) : "Next month"} disabled={!next} onClick={() => next && onSelectMonth(next)} className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-muted-foreground hover:bg-surface-inset hover:text-foreground disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden">
             <ChevronRight aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
         <div role="tablist" aria-label="Monthly view" className="flex w-full rounded-lg border border-hairline bg-surface-inset p-1 sm:w-auto">
           {(["trades", "daily"] as const).map((item) => (
-            <button
-              key={item}
-              id={"performance-" + item + "-tab"}
-              type="button"
-              role="tab"
-              aria-selected={view === item}
-              aria-controls="performance-view-panel"
-              onClick={() => onSelectView(item)}
-              className={cn(
-                "min-h-11 flex-1 rounded-md px-5 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:flex-none",
-                view === item ? "bg-accent text-background" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+            <button key={item} id={"performance-" + item + "-tab"} type="button" role="tab" aria-selected={view === item} aria-controls="performance-view-panel" onClick={() => onSelectView(item)} className={cn("min-h-11 flex-1 rounded-md px-5 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:flex-none", view === item ? "bg-accent text-background" : "text-muted-foreground hover:text-foreground")}>
               {item === "trades" ? "Trades" : "Daily view"}
             </button>
           ))}
         </div>
       </div>
-      <div className={cn("mt-4 grid grid-cols-6 gap-x-2 gap-y-3 border-t border-hairline pt-4 sm:gap-x-4", view === "trades" ? "lg:grid-cols-5" : "lg:grid-cols-3")}>
-        <div className="col-span-2 min-w-0 lg:col-span-1">
-          <p className="text-caption text-muted-foreground">Realized P&amp;L</p>
-          <p className="mt-1 text-[23px] font-semibold leading-tight tabular-nums sm:text-[26px]">{signedMoney(pnl, maskAmounts)}</p>
-        </div>
-        <div className="col-span-2 min-w-0 border-l border-hairline pl-2 sm:pl-4 lg:col-span-1">
-          <p className="flex items-center gap-1 text-caption text-muted-foreground">
-            Realized RoC
-            <InfoTooltip label="Monthly realized RoC" text="Realized P&L divided by capped peak concurrent capital behind positions realized in this month. Open exposure is excluded." />
-          </p>
-          <p className={cn("mt-1 text-[21px] font-semibold leading-tight tabular-nums sm:text-[24px]", roc !== null && roc > 0 && "text-pos", roc !== null && roc < 0 && "text-neg")} title={roc === null ? "Unavailable because no realized capital denominator exists" : undefined}>
-            {roc === null ? "—" : maskAmounts ? "•••%" : signedRate(roc)}
-          </p>
-        </div>
-        <div className="col-span-2 min-w-0 border-l border-hairline pl-2 sm:pl-4 lg:col-span-1">
-          <p className="text-caption text-muted-foreground">Closed trades</p>
-          <p className="mt-1 text-[21px] font-semibold leading-tight tabular-nums text-foreground sm:text-[24px]">{tradeCount}</p>
-        </div>
-        {view === "trades" && ([{ name: "Options", value: options }, { name: "Stocks", value: stocks }] as const).map(({ name, value }) => (
-          <div key={name} className="col-span-3 min-w-0 border-t border-hairline pt-3 lg:col-span-1 lg:border-l lg:border-t-0 lg:py-0 lg:pl-4">
-            <p className="flex items-center gap-1 text-caption text-muted-foreground">
-              {name}
-              <InfoTooltip label={`${name} realized return on capital`} text="Category P&L contributes to the month total. Category RoC uses peak concurrent realized capital within this category and does not add to monthly RoC." />
-            </p>
-            <p className="mt-1 text-[19px] font-semibold leading-tight tabular-nums sm:text-[22px]">{signedMoney(value.pnl, maskAmounts)}</p>
-            <p className="mt-1 text-caption tabular-nums text-muted-foreground" title={value.roc === null ? "Unavailable because no realized capital denominator exists" : undefined}>{categoryRoc(value.roc)}</p>
+      <section className="min-w-0 rounded-xl border border-hairline bg-surface p-4 sm:p-5" aria-label={fullMonth(month) + " summary"}>
+        {!hasRealizedActivity ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-body font-medium text-muted-foreground">Total realized P&amp;L</p>
+              <p className="mt-1 text-[32px] font-semibold leading-none tracking-tight"><SummaryAmount value={0} masked={maskAmounts} /></p>
+            </div>
+            <p className="text-body text-muted-foreground">No closed trades this month.</p>
           </div>
-        ))}
-      </div>
-    </section>
+        ) : (
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.5fr)_minmax(0,0.85fr)] lg:gap-0">
+          <div className="min-w-0 lg:pr-5">
+            <p className="text-body font-medium text-muted-foreground">Total realized P&amp;L</p>
+            <p className="mt-2 break-words text-[38px] font-semibold leading-none tracking-tight sm:text-[44px]"><SummaryAmount value={pnl} masked={maskAmounts} digits={displayDigits} /></p>
+          </div>
+          <div className="min-w-0 border-t border-hairline pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <p className="flex items-center gap-1 text-caption font-medium text-muted-foreground">By instrument <InfoTooltip label="Monthly P&L breakdown" text="Options and Stocks realized P&L add to the monthly total. Their individual RoC rates use separate capital denominators and do not add." /></p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <p className="text-caption text-muted-foreground">Options</p>
+                <p className="break-words text-[21px] font-semibold leading-tight"><SummaryAmount value={options.pnl} masked={maskAmounts} digits={displayDigits} /></p>
+                <p className="text-caption tabular-nums text-muted-foreground">{categoryRoc(options.roc)}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-caption text-muted-foreground">Stocks</p>
+                <p className="break-words text-[21px] font-semibold leading-tight"><SummaryAmount value={stocks.pnl} masked={maskAmounts} digits={displayDigits} /></p>
+                <p className="text-caption tabular-nums text-muted-foreground">{categoryRoc(stocks.roc)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 border-t border-hairline pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1 text-caption text-muted-foreground">Realized RoC <InfoTooltip label="Monthly realized RoC" text="Realized P&L divided by capped peak concurrent capital behind positions realized in this month. Open exposure is excluded." /></p>
+              <p className={cn("mt-2 text-[24px] font-semibold leading-tight tabular-nums", roc !== null && roc > 0 && "text-pos", roc !== null && roc < 0 && "text-neg")} title={roc === null ? "Unavailable because no realized capital denominator exists" : undefined}>{roc === null ? "—" : maskAmounts ? "•••%" : signedRate(roc)}</p>
+            </div>
+            <div className="min-w-0 border-l border-hairline pl-3">
+              <p className="text-caption text-muted-foreground">Closed trades</p>
+              <p className="mt-2 text-[24px] font-semibold leading-tight tabular-nums text-foreground">{tradeCount}</p>
+            </div>
+          </div>
+        </div>
+        )}
+      </section>
+    </>
   );
 }
 

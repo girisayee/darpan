@@ -74,7 +74,7 @@ export function PositionMobileList({
                   {activeOption
                     ? <>{row.strategyLabel ?? row.tag} · {row.tag} · Expires {row.expirationDate ? formatDisplayDate(row.expirationDate) : "—"}{row.dte != null ? ` · ${row.dte} DTE` : ""}</>
                     : activeStock
-                      ? <>{row.qty ?? row.detail} · Opened {row.openDate ? formatDisplayDate(row.openDate) : "—"}</>
+                      ? <>Opened {row.openDate ? formatDisplayDate(row.openDate) : "—"}</>
                       : <>Closed {row.closeDate ? formatDisplayDate(row.closeDate) : "—"}{row.roc != null ? ` · Trade ROI ${formatPercent(row.roc, 1)}` : ""}</>}
                 </span>
               </span>

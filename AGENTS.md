@@ -99,8 +99,10 @@ typecheck/lint/build and the running dev server rather than component render tes
 - `winRate` convention is inconsistent by source and easy to get wrong: `tradeQuality().winRate`
   is a **fraction (0–1)**, while `aggregates.winRate` and `symbolBreakdown[].winRate` are a
   **percent (0–100)**. `formatPercent` does not multiply — it appends `%`.
-- Positions: the combined "All strategies" board lists **option plays only** (CSP/CC/Long);
-  Swing shows **closed** positions only. Per-strategy and combined views default to **All**.
+- Positions: the combined "All strategies" board lists **option plays only** (CSP/CC/Long).
+  Stock trades lists still-open lots opened in the selected year and trades closed in
+  that year; historical years are not holdings snapshots. Search spans both categories.
+  Per-strategy and combined views default to **All**.
 - Chart axes use month abbreviations (`monthTick`); tooltips use `monthLabel` ("Jun '26").
   Dates everywhere use `formatDisplayDate`.
 

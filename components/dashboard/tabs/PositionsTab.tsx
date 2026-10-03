@@ -8,7 +8,7 @@ import { InfoTooltip } from "@/components/common/InfoTooltip";
 import { PositionMobileList } from "@/components/dashboard/positions/PositionMobileList";
 import { DataTable } from "@/components/tables/DataTable";
 import { SegmentedControl, currentDeployedCapital, signedMoney } from "@/components/dashboard/tabs/shared";
-import { allColumns, columnsFor, toAllPositionRows, toPositionRows, type PositionRow } from "@/components/dashboard/positions/columns";
+import { allColumns, columnsFor, openStockRowsForYear, searchPositionRows, toAllPositionRows, toPositionRows, type PositionRow } from "@/components/dashboard/positions/columns";
 import { optionsAnalytics, strategyAnalytics } from "@/lib/selectors/strategy-analytics";
 import { cn } from "@/lib/utils/cn";
 import { formatMaskedCurrency } from "@/lib/utils/format";
@@ -76,12 +76,6 @@ function ClosedTradeStats({ analytics, count, maskAmounts, category }: {
   );
 }
 
-function filterRows(rows: PositionRow[], query: string): PositionRow[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return rows;
-  return rows.filter((row) => [row.sym, row.detail, row.tag, row.strategyLabel, row.openDate, row.closeDate, row.expirationDate].some((value) => value?.toLowerCase().includes(q)));
-}
-
 function PositionSection({ title, rows, total, kind, status, chip, maskAmounts, onSelect, empty, helper, hideHeading = false }: {
   title: string;
   rows: PositionRow[];
@@ -116,15 +110,15 @@ function PositionSection({ title, rows, total, kind, status, chip, maskAmounts, 
 
 export function PositionsTab(props: {
   result: CalculationResult;
+  allYearsResult: CalculationResult;
   settings: AppSettings;
   year?: string;
   onReviewFix?: () => void;
   onSelectEvent: (e: RealizedPnLEvent) => void;
   onSelectLifecycle: (l: OptionLifecycle) => void;
 }) {
-  const { result, settings, year, onReviewFix, onSelectEvent, onSelectLifecycle } = props;
+  const { result, allYearsResult, settings, year, onReviewFix, onSelectEvent, onSelectLifecycle } = props;
   const isCurrentYear = year == null || Number(year) === new Date().getFullYear();
-  const showSwingOpen = settings.showSwingOpenPositions;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -140,8 +134,9 @@ export function PositionsTab(props: {
   const stateParam = searchParams.get("state");
   const initialStateFilter: StateFilter =
     stateParam === "active" ? "Active" : stateParam === "closed" ? "Closed" : "All";
-  const stateFilter: StateFilter = (!isCurrentYear || (tab === "swing" && !showSwingOpen)) && initialStateFilter === "Active" ? "All" : initialStateFilter;
+  const stateFilter: StateFilter = tab === "options" && !isCurrentYear && initialStateFilter === "Active" ? "All" : initialStateFilter;
   const [query, setQuery] = useState("");
+  const searching = query.trim().length > 0;
 
   function navigate(next: { view?: TabKey; strategy?: OptionChip; state?: StateFilter }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -163,17 +158,24 @@ export function PositionsTab(props: {
     : strategyAnalytics(result, "swing");
   const openRows = tab === "options"
     ? optionChip === "all" ? toAllPositionRows(result, "active") : toPositionRows(result, optionChip, "active")
-    : showSwingOpen ? toPositionRows(result, "swing", "active", true) : [];
+    : openStockRowsForYear(allYearsResult, year);
   const closedRowsInResult = tab === "options"
     ? optionChip === "all" ? toAllPositionRows(result, "closed") : toPositionRows(result, optionChip, "closed")
-    : toPositionRows(result, "swing", "closed", showSwingOpen);
+    : toPositionRows(result, "swing", "closed");
   // A filtered year can carry an earlier option lifecycle forward for basis
   // reconstruction. Its eventual close belongs only to the close year.
   const closedRows = year ? closedRowsInResult.filter((row) => row.closeDate?.startsWith(year)) : closedRowsInResult;
-  const visibleOpenRows = filterRows(openRows, query);
-  const visibleClosedRows = filterRows(closedRows, query);
-  const showOpen = isCurrentYear && stateFilter !== "Closed" && (tab === "options" || showSwingOpen);
+  const visibleOpenRows = searchPositionRows(openRows, query);
+  const visibleClosedRows = searchPositionRows(closedRows, query);
+  const showOpen = stateFilter !== "Closed" && (tab === "swing" || isCurrentYear);
   const showClosed = stateFilter !== "Active";
+  const searchGroups = searching ? [
+    { title: "Open options", rows: isCurrentYear ? searchPositionRows(toAllPositionRows(result, "active"), query) : [], kind: "options" as const, status: "active" as const },
+    { title: "Closed options", rows: searchPositionRows(toAllPositionRows(result, "closed").filter((row) => !year || row.closeDate?.startsWith(year)), query), kind: "options" as const, status: "closed" as const },
+    { title: `Open stock lots · opened in ${year ?? new Date().getFullYear()}`, rows: searchPositionRows(openStockRowsForYear(allYearsResult, year), query), kind: "swing" as const, status: "active" as const },
+    { title: "Closed stock trades", rows: searchPositionRows(toPositionRows(result, "swing", "closed").filter((row) => !year || row.closeDate?.startsWith(year)), query), kind: "swing" as const, status: "closed" as const },
+  ] : [];
+  const searchCount = searchGroups.reduce((sum, group) => sum + group.rows.length, 0);
   const selectRow = (row: PositionRow) => {
     if (row.lifecycle) onSelectLifecycle(row.lifecycle);
     else if (row.event) onSelectEvent(row.event);
@@ -186,53 +188,61 @@ export function PositionsTab(props: {
       <div>
         <p className="mb-1 text-caption font-semibold uppercase tracking-[0.12em] text-accent">Open book and trade record</p>
         <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-foreground sm:text-[32px]">Positions</h1>
-        <p className="mt-1 text-body text-muted-foreground">{isCurrentYear ? `Options and stock trades in ${year ?? new Date().getFullYear()}` : `Closed options and stock trades in ${year}`}</p>
+        <p className="mt-1 text-body text-muted-foreground">Options and stock trades closed in {year ?? new Date().getFullYear()}, plus stock lots still open from that year.</p>
       </div>
       {isCurrentYear && <ExposureLine result={result} settings={settings} />}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="relative w-full">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search all positions…" aria-label="Search all positions" className="h-12 w-full rounded-xl border border-hairline bg-surface pl-12 pr-4 text-body text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40" />
+      </div>
+
+      {!searching && <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border border-hairline bg-surface-inset p-0.5" role="group" aria-label="Position category">
           {([{ key: "options", label: "Options" }, { key: "swing", label: "Stock trades" }] as const).map((item) => (
-            <button key={item.key} type="button" onClick={() => { navigate({ view: item.key, state: "All" }); setQuery(""); }} aria-pressed={tab === item.key} className={cn("rounded-md px-3 py-1.5 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40", tab === item.key ? "bg-accent/15 text-accent" : "text-muted-foreground hover:text-foreground")}>{item.label}</button>
+            <button key={item.key} type="button" onClick={() => navigate({ view: item.key, state: "All" })} aria-pressed={tab === item.key} className={cn("rounded-md px-3 py-1.5 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40", tab === item.key ? "bg-accent/15 text-accent" : "text-muted-foreground hover:text-foreground")}>{item.label}</button>
           ))}
         </div>
         <SegmentedControl<StateFilter>
           value={stateFilter}
-          options={!isCurrentYear || (tab === "swing" && !showSwingOpen) ? ["All", "Closed"] : ["All", "Active", "Closed"]}
+          options={tab === "options" && !isCurrentYear ? ["All", "Closed"] : ["All", "Active", "Closed"]}
           onChange={(state) => navigate({ state })}
         />
-      </div>
-      {tab === "options" && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Option strategy">
+      </div>}
+      {!searching && tab === "options" && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Option strategy">
         {OPTION_CHIPS.map((chip) => (
           <button key={chip.key} type="button" onClick={() => navigate({ strategy: chip.key })} aria-pressed={optionChip === chip.key} aria-label={chip.label} className={cn("rounded-full border px-3 py-1 text-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40", optionChip === chip.key ? "border-accent bg-accent/15 text-accent" : "border-hairline text-muted-foreground hover:text-foreground")}>{chip.short}</button>
         ))}
       </div>}
 
       {hasDataIssues && onReviewFix && <ReviewFixBanner onReviewFix={onReviewFix} />}
-      <div className="relative max-w-[320px]">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "options" ? "Search option positions…" : "Search stock trades…"} aria-label="Search positions" className="h-9 w-full rounded-md border border-hairline bg-surface pl-8 pr-2.5 text-body text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent/40" />
-      </div>
 
-      {showOpen && <PositionSection
-        title={tab === "options" ? "Open options" : "Open stock lots"}
+      {searching && <div className="space-y-4">
+        <p className="text-body tabular-nums text-muted-foreground" aria-live="polite">{searchCount} {searchCount === 1 ? "position" : "positions"} found across options and stocks in {year ?? new Date().getFullYear()}</p>
+        {searchCount === 0 ? <div className="rounded-xl border border-hairline bg-surface p-6 text-body text-muted-foreground">No positions match your search in this year.</div> : searchGroups.filter((group) => group.rows.length > 0).map((group) => <PositionSection
+          key={`${group.kind}-${group.status}`} title={group.title} rows={group.rows} total={group.rows.length} kind={group.kind} status={group.status} chip="all" maskAmounts={settings.maskAmounts} onSelect={selectRow} empty="No matching positions."
+        />)}
+      </div>}
+
+      {!searching && showOpen && <PositionSection
+        title={tab === "options" ? "Open options" : `Open stock lots · opened in ${year ?? new Date().getFullYear()}`}
         rows={visibleOpenRows} total={openRows.length} kind={tab} status="active" chip={optionChip}
         maskAmounts={settings.maskAmounts} onSelect={selectRow}
-        empty={query ? "No open positions match your search." : tab === "options" ? "No open option positions." : "No open stock lots in the selected accounts."}
+        empty={tab === "options" ? "No open option positions." : "No stock lots opened in this year are still open."}
         helper={tab === "options" ? "Default sort: nearest expiry" : "Reconstructed from imported trades; no live mark"}
       />}
 
-      {showClosed && <div className="space-y-2.5">
+      {!searching && showClosed && <div className="space-y-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="text-lead font-semibold text-foreground">{tab === "options" ? "Closed options" : "Closed stock trades"} <span className="ml-1 text-body font-normal tabular-nums text-muted-foreground">{closedRows.length}</span></h2>
-          <span className="text-caption text-muted-foreground">{!isCurrentYear ? "Realized results in the selected year" : tab === "swing" && !showSwingOpen ? "Open stock holdings are disabled in Settings" : "Realized results in the selected period"}</span>
+          <span className="text-caption text-muted-foreground">Realized results in the selected year</span>
         </div>
         <ClosedTradeStats analytics={analytics} count={closedRows.length} maskAmounts={settings.maskAmounts} category={tab} />
         <PositionSection
           title={tab === "options" ? "Closed options" : "Closed stock trades"} hideHeading
           rows={visibleClosedRows} total={closedRows.length} kind={tab} status="closed" chip={optionChip}
           maskAmounts={settings.maskAmounts} onSelect={selectRow}
-          empty={query ? "No closed positions match your search." : tab === "options" ? "No closed option positions." : "No closed stock trades."}
+          empty={tab === "options" ? "No closed option positions." : "No closed stock trades."}
         />
       </div>}
     </div>

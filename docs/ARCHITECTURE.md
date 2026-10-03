@@ -104,8 +104,8 @@ events), so the engine stays UI-agnostic:
 - `allocation` — symbol/strategy concentration (HHI + level).
 - `goal-pace` — YTD vs. annual goal, projection, required monthly run-rate.
 - `daily-pnl` — bins realized events by calendar day (powers the calendar heatmap).
-- `leaderboard` — a legacy top/bottom symbol grouping selector; Tickers now filters and
-  sorts `aggregates.symbolBreakdown` directly.
+- `leaderboard` — a legacy top/bottom symbol grouping selector; Tickers ranks
+  `aggregates.symbolBreakdown` directly for its Leaders view and sortable directory.
 - `strategy-analytics` — scopes quality/premium/capital metrics to one strategy (Positions).
 - `filter-result` — period / strategy / account scoping (recomputes from filtered rows).
 - `monthly-trades` — grouped closed-trade rows, including covered-call assignments.

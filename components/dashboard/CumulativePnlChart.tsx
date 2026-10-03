@@ -39,11 +39,11 @@ export function CumulativePnlChart({ data, year, currentYear, goal, maskAmounts 
         </div>
       </div>
       {data.length === 0 ? (
-        <div className="mt-4 flex h-[260px] items-center justify-center rounded-lg bg-surface-inset/40 text-center text-body text-muted-foreground">No realized closes in {year} yet.</div>
+        <div className="mt-3 flex h-[220px] items-center justify-center rounded-lg bg-surface-inset/40 text-center text-body text-muted-foreground sm:h-[280px]">No realized closes in {year} yet.</div>
       ) : !mounted ? (
-        <div className="mt-4 h-[260px] animate-pulse rounded-lg bg-surface-inset" />
+        <div className="mt-3 h-[220px] animate-pulse rounded-lg bg-surface-inset sm:h-[280px]" />
       ) : (
-        <div className="mt-4 h-[260px] w-full sm:h-[310px]" role="img" aria-label={`Cumulative realized P&L ending at ${maskAmounts ? MASKED_AMOUNT : formatCurrency(actual)} on ${formatDisplayDate(data.at(-1)?.date)}`}>
+        <div className="mt-3 h-[220px] w-full sm:h-[280px]" role="img" aria-label={`Cumulative realized P&L ending at ${maskAmounts ? MASKED_AMOUNT : formatCurrency(actual)} on ${formatDisplayDate(data.at(-1)?.date)}`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke={HAIRLINE} />
