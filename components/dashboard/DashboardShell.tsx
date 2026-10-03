@@ -34,12 +34,15 @@ import type {
   TradingAccount,
 } from "@/types/trading";
 
-const PRIMARY_TABS = ["Home", "Performance", "Tickers", "Positions"] as const;
+const PRIMARY_TABS = ["Home", "Monthly", "Tickers", "Positions", "Taxes"] as const;
 
 type DashboardContextValue = {
   result: CalculationResult;
+  allYearsResult: CalculationResult;
+  dataLoaded: boolean;
   settings: AppSettings;
   year: string;
+  selectedAccountIds: string[];
   storedTransactions: TradeTransaction[];
   manualTransactions: TradeTransaction[];
   onSelectEvent: (e: RealizedPnLEvent | null) => void;
@@ -68,15 +71,18 @@ export function useDashboard(): DashboardContextValue {
 
 /** Map a pathname to the primary nav pill that should read as active. */
 function pathToTab(pathname: string): string {
-  if (pathname.startsWith("/performance")) return "Performance";
+  if (pathname.startsWith("/monthly") || pathname.startsWith("/performance")) return "Monthly";
   if (pathname.startsWith("/tickers")) return "Tickers";
   if (pathname.startsWith("/positions")) return "Positions";
+  if (pathname.startsWith("/taxes")) return "Taxes";
   return "Home"; // /, /import, /settings all show the Home pill
 }
 
-function tabHref(tab: string): string {
-  if (tab === "Home") return "/";
-  return `/${tab.toLowerCase()}`;
+function tabHref(tab: string, year: string, accounts: string): string {
+  const path = tab === "Home" ? "/" : `/${tab.toLowerCase()}`;
+  const params = new URLSearchParams({ year });
+  if (accounts) params.set("accounts", accounts);
+  return `${path}?${params.toString()}`;
 }
 
 export function DashboardShell({
@@ -151,6 +157,14 @@ export function DashboardShell({
     [baseResult, year, accountsParam, settings] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  // Positions needs today's open stock lots even when viewing an earlier year.
+  // Rebuilding from that year's transactions alone can turn a since-closed lot
+  // into an apparent holding. Keep the same account scope across both results.
+  const allYearsResult = useMemo(
+    () => selectedAccountIds.length === 0 ? baseResult : filterResult(baseResult, { symbol: "ALL", strategy: "ALL", year: "ALL", month: "ALL", accountIds: selectedAccountIds }, settings),
+    [baseResult, accountsParam, settings] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   const years = useMemo(() => {
     const fromData = new Set(allTransactions.map((t) => t.tradeDate.slice(0, 4)).filter(Boolean));
     fromData.add("2026");
@@ -165,6 +179,7 @@ export function DashboardShell({
   function setYear(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("year", next);
+    if (pathname === "/monthly" || pathname === "/performance") params.delete("month");
     router.replace(`${pathname}?${params.toString()}`);
   }
 
@@ -201,8 +216,11 @@ export function DashboardShell({
 
   const ctx: DashboardContextValue = {
     result,
+    allYearsResult,
+    dataLoaded: store.loaded,
     settings,
     year,
+    selectedAccountIds,
     storedTransactions,
     manualTransactions,
     onSelectEvent: setSelectedEvent,
@@ -226,7 +244,7 @@ export function DashboardShell({
       <AppShell
         tabs={PRIMARY_TABS}
         activeTab={activeTab}
-        onSelectTab={(t) => router.push(tabHref(t))}
+        onSelectTab={(t) => router.push(tabHref(t, year, accountsParam))}
         years={years}
         year={year}
         onYear={setYear}
@@ -282,7 +300,6 @@ export function DashboardShell({
         events={result.realizedEvents}
         optionLifecycles={result.optionLifecycles}
         taxLots={result.taxLots}
-        capitalUsage={result.capitalUsage}
         onSelectEvent={setSelectedEvent}
         onSelectLifecycle={setSelectedLifecycle}
         onReviewFix={() => {

@@ -7,7 +7,7 @@ Fast-start guide for coding agents and contributors working in this repo.
 Darpan is a hosted, multi-user Next.js dashboard for short-term retail traders. It imports
 broker CSV activity (Robinhood, Fidelity, Schwab, E*TRADE, Vanguard, IBKR — auto-detected),
 reconstructs realized P&L / option income / capital usage in a pure calculation engine, and
-presents it across four tabs: **Home**, **Performance**, **Tickers**, **Positions** (Import
+presents it across five tabs: **Home**, **Monthly**, **Tickers**, **Positions**, **Taxes** (Import
 and Settings live behind a `⋯` overflow menu). Sign-in is Google SSO; access is governed by
 Google's OAuth config (no app-level allowlist), and all data is isolated per user.
 
@@ -25,8 +25,9 @@ set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env
 - App entry: `app/page.tsx`, `app/layout.tsx`
 - Shell / nav: `components/shell/AppShell.tsx` (desktop top bar + `OverflowMenu` + mobile `BottomNav`)
 - Main container: `components/dashboard/DashboardApp.tsx` (tab state, filters, drawer, import/settings)
-- Tabs: `components/dashboard/tabs/{HomeTab,PerformanceTab,TickersTab,PositionsTab}.tsx`
-- Shared tab helpers: `components/dashboard/tabs/shared.tsx` (`SegmentedControl`, `MonthlyRoiTable`, tone/format helpers, `ClosedCyclesTable`)
+- Tabs: `components/dashboard/tabs/{HomeTab,PerformanceTab,TickersTab,PositionsTab,TaxesTab}.tsx`
+- Shared tab helpers: `components/dashboard/tabs/shared.tsx` (`SegmentedControl`, tone/format helpers, `ClosedCyclesTable`)
+- Monthly review: `PerformanceTab.tsx` owns the month strip, compact summary, default Trades ledger, and Daily calendar. `lib/selectors/monthly-trades.ts` groups realized closes (including assignment legs) into trades; `lib/selectors/performance-view.ts` supplies month and category figures. Trade rows open the shared `DetailDrawer`.
 - Reusable UI: `KpiCard`, `MetricGroup`, `BuyingPowerGauge`, `CalendarHeatmap`, `DayDetail`,
   `Leaderboard`, `StrategyStrip`, `StrategyMetrics`, `DetailDrawer`, `ReviewFixPanel`,
   `common/{StatusChip,InfoTooltip,TickerLogo,Logo}.tsx`, `tables/DataTable.tsx`
@@ -37,7 +38,7 @@ set in `app/globals.css` + `tailwind.config.ts`) · Recharts · Vitest (Node env
   — `trade-quality`, `premium-capture`, `allocation`, `capital-efficiency`, `goal-pace`,
   `top-movers`, `daily-pnl`, `leaderboard`, `strategy-analytics`, `filter-result`, `analytics`
 - Broker-agnostic CSV parser: `lib/import/transactions.ts` (`parseTransactionsCsv`; auto-detects broker + columns)
-- Benchmarks: `lib/benchmark/{compare,fetch}.ts` (capital-matched SPY/QQQ/VTI)
+- Market context: `lib/benchmark/{compare,fetch}.ts` (adjusted YTD SPY/QQQ/VTI returns)
 - Persistence: Postgres via Drizzle in `lib/db/database.ts` (every helper takes `userId`);
   schema `lib/db/schema.ts`; client `lib/db/client.ts`; client bridge `lib/storage/server-store-client.ts`;
   `lib/storage/local-store.ts` holds `defaultSettings` and backup create/parse
@@ -84,18 +85,24 @@ typecheck/lint/build and the running dev server rather than component render tes
   stock lots already cover the assigned shares.
 - Do **not** surface max drawdown, Sortino, Calmar, payoff ratio, a discipline streak, live
   option marks, or a social leaderboard — these were explicitly cut from the product.
-- **Return on capital has one definition**: realized P&L ÷ time-weighted average
-  deployed capital (dollar-days ÷ days), via `lib/selectors/return-on-capital.ts`.
-  Home, Performance ("Your return" + the RoC KPI), and `aggregates.returnOnCapital`
-  all read it; the monthly table and per-symbol RoC use the same formula. Annualized
-  is always RoC × (365 ÷ days), shown only as an explicitly-labeled secondary — never
-  the headline. Tickers' "Peak-capital ROI" (÷ peak concurrent capital) is a separate,
-  labeled metric, not a second RoC. Don't reintroduce alternative denominators.
+- **Realized RoC has one headline definition**: realized P&L ÷ peak concurrent capital behind
+  positions realized in the period. Sequential trades reuse capital; genuinely overlapping
+  positions add. Inferred open positions remain exposure only because there is no authoritative
+  holdings/equity snapshot. Covered-call stock basis is portfolio capital only once when the
+  supplied realized rows also contain its underlying stock/assignment interval.
+  Home, Monthly, strategy, ticker, symbol, and `aggregates.returnOnCapital` use
+  this definition. Portfolio/monthly denominators are capped at configured max buying power,
+  which is authoritative when notional trade intervals imply leverage. It is explicitly not
+  a standard portfolio return or Modified Dietz. Time-weighted average realized capital uses
+  the same realized rows and cap. The secondary
+  capital-weighted trade ROI may sum closed-trade capital but must not replace headline RoC.
 - `winRate` convention is inconsistent by source and easy to get wrong: `tradeQuality().winRate`
   is a **fraction (0–1)**, while `aggregates.winRate` and `symbolBreakdown[].winRate` are a
   **percent (0–100)**. `formatPercent` does not multiply — it appends `%`.
-- Positions: the combined "All strategies" board lists **option plays only** (CSP/CC/Long);
-  Swing shows **closed** positions only. Per-strategy and combined views default to **All**.
+- Positions: the combined "All strategies" board lists **option plays only** (CSP/CC/Long).
+  Stock trades lists still-open lots opened in the selected year and trades closed in
+  that year; historical years are not holdings snapshots. Search spans both categories.
+  Per-strategy and combined views default to **All**.
 - Chart axes use month abbreviations (`monthTick`); tooltips use `monthLabel` ("Jun '26").
   Dates everywhere use `formatDisplayDate`.
 

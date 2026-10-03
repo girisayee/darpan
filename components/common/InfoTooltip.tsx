@@ -36,8 +36,8 @@ export function InfoTooltip({
         id={id}
         role="tooltip"
         className={cn(
-          "pointer-events-none absolute left-1/2 z-50 w-max max-w-64 -translate-x-1/2 rounded-md border border-hairline bg-foreground px-3 py-2 text-xs font-medium normal-case leading-5 text-background opacity-0 transition group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100",
-          side === "top" ? "bottom-full mb-2" : "top-full mt-2"
+          "pointer-events-none fixed inset-x-4 top-4 z-50 rounded-md border border-hairline bg-foreground px-3 py-2 text-xs font-medium normal-case leading-5 text-background opacity-0 transition group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 sm:absolute sm:left-1/2 sm:right-auto sm:w-max sm:max-w-64 sm:-translate-x-1/2",
+          side === "top" ? "sm:bottom-full sm:top-auto sm:mb-2" : "sm:top-full sm:mt-2"
         )}
       >
         {text}

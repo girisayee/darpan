@@ -41,7 +41,7 @@ function Tile({
       <div className="mt-1 text-[24px] font-semibold tabular-nums leading-none">{signedMoney(pnl, maskAmounts)}</div>
       <div className="mt-1.5 text-strong font-medium text-foreground">{hint}</div>
       <div className="mt-0.5 text-caption text-dim">
-        {roc != null ? formatPercent(roc) : "—"} RoC · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
+        {roc != null ? formatPercent(roc) : "—"} Realized RoC · {winRate != null ? `${Math.round(winRate * 100)}%` : "—"} win
       </div>
     </button>
   );
@@ -58,13 +58,12 @@ export function StrategyStrip({
 }) {
   const options = optionsAnalytics(result);
   const swing = strategyAnalytics(result, "swing");
-  const asOf = new Date().toISOString().slice(0, 10);
   return (
     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
       <Tile
         name="Options"
         pnl={options.pnl}
-        roc={strategyReturnOnCapital(result.capitalUsage, OPTION_ENUMS, options.pnl, asOf).roc}
+        roc={strategyReturnOnCapital(result.capitalUsage, OPTION_ENUMS, options.pnl).roc}
         winRate={options.quality.winRate}
         hint="CSP · Covered calls · Long"
         onClick={() => onOpen("options")}
@@ -73,7 +72,7 @@ export function StrategyStrip({
       <Tile
         name="Stock trades"
         pnl={swing.pnl}
-        roc={strategyReturnOnCapital(result.capitalUsage, STRATEGY_EVENT_ENUMS.swing, swing.pnl, asOf).roc}
+        roc={strategyReturnOnCapital(result.capitalUsage, STRATEGY_EVENT_ENUMS.swing, swing.pnl).roc}
         winRate={swing.quality.winRate}
         hint={`${swing.quality.totalTrades} trade${swing.quality.totalTrades === 1 ? "" : "s"}`}
         onClick={() => onOpen("swing")}

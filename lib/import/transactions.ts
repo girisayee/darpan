@@ -216,7 +216,7 @@ function normalizeAction(value: string, description: string): TradeAction {
   if (code === "STC") return "SELL_TO_CLOSE";
   if (code === "OASGN") return "ASSIGNMENT";
   if (code === "OEXP") return "EXPIRATION";
-  if (code === "CDIV" || code === "INT" || code === "GDBP" || code === "SLIP") return "DIVIDEND";
+  if (code === "CDIV" || code === "INT" || code === "GDBP" || code === "GMPC" || code === "SLIP") return "DIVIDEND";
   if (code === "MINT") return "FEE";
   if (code === "ACH") return "TRANSFER";
   if (code === "SXCH" || code === "MISC") return "OTHER";

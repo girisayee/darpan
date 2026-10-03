@@ -102,3 +102,10 @@ the Settings control, `closedTradeRoiPercent`): pure variation-generator.
   == `aggregates.returnOnCapital`; and `annualizedReturnOnCapital == roc × 365/periodDays`.
 - Keep existing engine/selector suites green; update those asserting removed fields.
 ```
+# Superseded
+
+This historical design used time-weighted average deployed capital as the RoC denominator.
+The current product definition is Realized RoC: realized P&L divided by peak concurrent
+capital behind positions realized in the period. Inferred open positions remain exposure
+only. It is not a standard portfolio return; see `AGENTS.md` and
+`lib/selectors/return-on-capital.ts`.

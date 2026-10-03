@@ -1,134 +1,25 @@
 "use client";
 
-/**
- * BenchmarkComparison — "Market comparison": index calendar-YTD (SPY / VTI / QQQ)
- * vs your realized return, shown as a single set of data bars — each row carries
- * its own inline bar plus the exact % and $ (chart and figures combined).
- *
- * Props: result: CalculationResult
- *
- * Each row shows that index's calendar year-to-date return (year-open close →
- * latest close) for the year in view. Fetches /api/benchmark once per session
- * (keyed in sessionStorage). Fail-soft: never fabricated numbers.
- */
-
 import { useEffect, useState } from "react";
+import { InfoTooltip } from "@/components/common/InfoTooltip";
 import { ytdReturn } from "@/lib/benchmark/compare";
 import type { ClosePoint } from "@/lib/benchmark/fetch";
-import type { CalculationResult } from "@/types/trading";
-import { formatMaskedCurrency, formatPercent } from "@/lib/utils/format";
+import { formatDisplayDate, formatPercent } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 type BenchmarkData = { spy: ClosePoint[]; qqq: ClosePoint[]; vti: ClosePoint[] };
 type FetchStatus = "loading" | "success" | "error";
 
-const C_POS = "rgb(var(--pos))";
-const C_NEG = "rgb(var(--neg))";
-const C_MUTED = "rgb(var(--text-muted))";
+const BENCHMARKS = [
+  { key: "spy", ticker: "SPY", name: "S&P 500" },
+  { key: "vti", ticker: "VTI", name: "US market" },
+  { key: "qqq", ticker: "QQQ", name: "Nasdaq 100" },
+] as const;
 
-type RowSpec = {
-  label: string;
-  /** What the ticker tracks, shown under the label (e.g. "S&P 500"). */
-  sub?: string;
-  pct: number | null;
-  dollarPnl: number | null;
-  emphasis?: boolean;
-  unavailable?: boolean;
-};
-
-/** One data-bar row: label · inline bar · exact % and $. */
-function DataBarRow({
-  row,
-  maxAbs,
-  hasNeg,
-  maskAmounts,
-}: {
-  row: RowSpec;
-  maxAbs: number;
-  hasNeg: boolean;
-  maskAmounts: boolean;
-}) {
-  const { label, pct, dollarPnl, emphasis } = row;
-  const value = row.unavailable || pct === null ? null : pct;
-  const pos = value !== null && value > 0;
-  const neg = value !== null && value < 0;
-
-  // Bar geometry. When any return is negative we anchor a zero line at the
-  // track centre (positive → right, negative → left); otherwise bars fill
-  // from the left edge so the common all-positive case uses the full width.
-  let barLeft = "0%";
-  let barWidth = "0%";
-  if (value !== null) {
-    if (hasNeg) {
-      const half = (Math.abs(value) / maxAbs) * 50;
-      barWidth = `${half}%`;
-      barLeft = value >= 0 ? "50%" : `${50 - half}%`;
-    } else {
-      barWidth = `${(value / maxAbs) * 100}%`;
-    }
-  }
-  const fill = emphasis ? (value !== null && value < 0 ? C_NEG : C_POS) : C_MUTED;
-
-  return (
-    <div className="grid grid-cols-[96px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
-      <span className="font-sans leading-tight">
-        {row.sub && <span className={cn("block text-body", emphasis ? "font-medium text-foreground" : "text-foreground")}>{row.sub}</span>}
-        <span className="block text-micro text-muted-foreground">{label}</span>
-      </span>
-
-      <div className="relative h-3.5 rounded bg-surface-inset">
-        {hasNeg && <div className="absolute inset-y-0 w-px bg-hairline" style={{ left: "50%" }} />}
-        {value !== null && (
-          <div
-            className="absolute inset-y-0 rounded"
-            style={{ left: barLeft, width: barWidth, background: fill, opacity: emphasis ? 1 : 0.5 }}
-          />
-        )}
-      </div>
-
-      <div className="text-right leading-tight">
-        {value === null ? (
-          <span className="font-sans text-body font-medium text-muted-foreground">—</span>
-        ) : (
-          <>
-            <div
-              className={cn(
-                "font-sans text-body font-semibold tabular-nums",
-                pos && "text-pos",
-                neg && "text-neg",
-                !pos && !neg && "text-foreground"
-              )}
-            >
-              {formatPercent(value, 2)}
-            </div>
-            {dollarPnl !== null && (
-              <div className="font-sans text-caption tabular-nums text-muted-foreground">
-                {formatMaskedCurrency(dollarPnl, maskAmounts)}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SkeletonRow() {
-  return (
-    <div className="grid grid-cols-[96px_minmax(0,1fr)_84px] items-center gap-3 py-1.5">
-      <div className="h-3 w-7 rounded bg-surface-inset animate-pulse" />
-      <div className="h-3.5 rounded bg-surface-inset animate-pulse" />
-      <div className="ml-auto h-4 w-16 rounded bg-surface-inset animate-pulse" />
-    </div>
-  );
-}
-
-function readCache(key: string | null): BenchmarkData | null {
-  if (!key) return null;
+function readCache(key: string): BenchmarkData | null {
   try {
     const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as BenchmarkData;
+    return raw ? JSON.parse(raw) as BenchmarkData : null;
   } catch {
     return null;
   }
@@ -138,201 +29,117 @@ function writeCache(key: string, data: BenchmarkData): void {
   try {
     sessionStorage.setItem(key, JSON.stringify(data));
   } catch {
-    // ignore storage quota / availability errors
+    // Market context still works when session storage is unavailable.
   }
 }
 
-function deleteCache(key: string | null): void {
-  if (!key) return;
-  try {
-    sessionStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-}
-
-export function BenchmarkComparison({
-  result,
-  maskAmounts = false,
-}: {
-  result: CalculationResult;
-  maskAmounts?: boolean;
+export function BenchmarkComparison({ year, roc, masked, rocDescription }: {
+  year: number;
+  roc: number | null;
+  masked: boolean;
+  rocDescription: string;
 }) {
-  // The year in view drives YTD: each index's calendar return is measured from
-  // its year-open close (first close on/after Jan 1) to the latest close.
-  const months = result.monthlyReturns;
-  const benchYear = months.length ? months[months.length - 1].year : null;
-  const fromISO = benchYear ? `${benchYear}-01-01` : null;
-  const toISO = new Date().toISOString().slice(0, 10);
-  // "v5" invalidates older cache entries (prior-December baseline windows, plus
-  // SPY/QQQ-only or empty results a prior broken data source cached as success).
-  const cacheKey = fromISO ? `benchmark|v5|${fromISO}|${toISO}` : null;
-
-  // Lazy state init: seed from sessionStorage on first render to avoid a
-  // loading flash when the data is already cached. This runs only once.
-  const [status, setStatus] = useState<FetchStatus>(() => {
-    if (!cacheKey) return "loading";
-    const cached = readCache(cacheKey);
-    return cached ? "success" : "loading";
-  });
-
-  const [data, setData] = useState<BenchmarkData | null>(() => {
-    if (!cacheKey) return null;
-    return readCache(cacheKey);
-  });
-
-  // retryCount increments trigger re-fetches
+  const fromISO = `${year}-01-01`;
+  const toISO = year < new Date().getFullYear() ? `${year}-12-31` : new Date().toISOString().slice(0, 10);
+  const cacheKey = `benchmark|v6|${fromISO}|${toISO}`;
+  const [status, setStatus] = useState<FetchStatus>("loading");
+  const [data, setData] = useState<BenchmarkData | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    if (!fromISO || !cacheKey) return;
-    // If we already have success data (from cache seed), skip the fetch
-    if (status === "success" && data !== null) return;
-
+    if (roc === null) return;
     let cancelled = false;
+    const cached = readCache(cacheKey);
+    if (cached) {
+      queueMicrotask(() => {
+        if (cancelled) return;
+        setData(cached);
+        setStatus("success");
+      });
+      return () => { cancelled = true; };
+    }
 
     fetch(`/api/benchmark?from=${fromISO}&to=${toISO}`, { cache: "no-store" })
-      .then((r) => {
-        if (!r.ok) throw new Error("non-ok");
-        return r.json() as Promise<BenchmarkData>;
+      .then((response) => {
+        if (!response.ok) throw new Error("Market data unavailable");
+        return response.json() as Promise<BenchmarkData>;
       })
-      .then((d) => {
+      .then((nextData) => {
         if (cancelled) return;
-        // If every series came back empty, treat it as a failure rather than
-        // caching a permanent "—" for the session.
-        const hasAny =
-          (d.spy?.length ?? 0) > 0 || (d.qqq?.length ?? 0) > 0 || (d.vti?.length ?? 0) > 0;
-        if (!hasAny) {
+        if (!BENCHMARKS.some(({ key }) => (nextData[key]?.length ?? 0) > 0)) {
           setStatus("error");
           return;
         }
-        writeCache(cacheKey, d);
-        setData(d);
+        writeCache(cacheKey, nextData);
+        setData(nextData);
         setStatus("success");
       })
       .catch(() => {
         if (!cancelled) setStatus("error");
       });
 
-    return () => {
-      cancelled = true;
-    };
-    // retryCount is intentionally included so Retry re-runs the fetch.
-    // status and data are excluded: we only want to fetch when NOT already cached.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromISO, toISO, cacheKey, retryCount]);
+    return () => { cancelled = true; };
+  }, [cacheKey, fromISO, toISO, retryCount, roc]);
+
+  const benchmarks = BENCHMARKS.map(({ key, ticker, name }) => {
+    const points = data?.[key];
+    const result = points && points.length >= 2 ? ytdReturn(points, year) : null;
+    return { ticker, name, value: result?.returnPct ?? null, endDate: result?.endDate ?? null };
+  });
+  const latestClose = benchmarks.map((row) => row.endDate).filter((date): date is string => date !== null).sort().at(-1);
+  const maxReturnMagnitude = Math.max(1, masked ? 0 : Math.abs(roc ?? 0), ...benchmarks.map((row) => Math.abs(row.value ?? 0)));
 
   function retry() {
-    deleteCache(cacheKey);
+    try { sessionStorage.removeItem(cacheKey); } catch { /* ignore */ }
     setData(null);
     setStatus("loading");
-    setRetryCount((c) => c + 1);
+    setRetryCount((count) => count + 1);
   }
 
-  // No monthly data at all → render nothing
-  if (!fromISO || benchYear === null) return null;
-
-  const avgDeployed = result.aggregates.averageDeployedCapital;
-  const totalPnl = result.aggregates.totalRealizedPnl;
-
-  // Canonical return on capital — the same field shown on Home and the
-  // Performance "Return on capital" KPI, so the three never disagree.
-  const yourReturnPct = result.aggregates.returnOnCapital;
-
-  // Dollar figure for an index: what the year-to-date index return would have
-  // earned on your average deployed capital (apples-to-apples with the $ shown
-  // on "You"). Null when no capital was deployed.
-  const dollarsOn = (pct: number | undefined) =>
-    pct != null && avgDeployed > 0 ? avgDeployed * (pct / 100) : null;
-
-  const spyResult = data && data.spy.length >= 2 ? ytdReturn(data.spy, benchYear) : null;
-  const qqqResult = data && data.qqq.length >= 2 ? ytdReturn(data.qqq, benchYear) : null;
-  const vtiResult = data && data.vti && data.vti.length >= 2 ? ytdReturn(data.vti, benchYear) : null;
-
-  const rows: RowSpec[] = [
-    { label: "You", sub: "Your return", pct: yourReturnPct, dollarPnl: totalPnl, emphasis: true },
-    {
-      label: "SPY",
-      sub: "S&P 500",
-      pct: spyResult?.returnPct ?? null,
-      dollarPnl: dollarsOn(spyResult?.returnPct),
-      unavailable: status === "success" && !spyResult,
-    },
-    {
-      label: "VTI",
-      sub: "Total market",
-      pct: vtiResult?.returnPct ?? null,
-      dollarPnl: dollarsOn(vtiResult?.returnPct),
-      unavailable: status === "success" && !vtiResult,
-    },
-    {
-      label: "QQQ",
-      sub: "Nasdaq 100",
-      pct: qqqResult?.returnPct ?? null,
-      dollarPnl: dollarsOn(qqqResult?.returnPct),
-      unavailable: status === "success" && !qqqResult,
-    },
-  ];
-
-  // Shared bar scale across all rows so lengths are comparable.
-  const activePcts = rows
-    .filter((r) => !r.unavailable && r.pct !== null)
-    .map((r) => r.pct as number);
-  const maxAbs = Math.max(1, ...activePcts.map((p) => Math.abs(p)));
-  const hasNeg = activePcts.some((p) => p < 0);
-
   return (
-    <div className="rounded-[14px] border border-hairline bg-surface px-4 py-3 space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="font-sans text-strong font-medium text-foreground">Market comparison</h2>
-        <span className="font-sans text-caption text-muted-foreground">YTD {benchYear}</span>
+    <section className="rounded-[14px] border border-hairline bg-surface p-4 sm:p-5" aria-label="Realized return and market context">
+      <div className="flex items-center gap-1 text-body font-medium text-muted-foreground">
+        Realized RoC <InfoTooltip text={rocDescription} label="Realized RoC" />
       </div>
-
-      {/* Helper: deployed capital basis */}
-      <p className="font-sans text-caption text-muted-foreground">
-        Index $ shown on your avg deployed capital{" "}
-        {avgDeployed > 0 ? (
-          <span className="font-medium text-foreground">{formatMaskedCurrency(avgDeployed, maskAmounts)}</span>
-        ) : (
-          "—"
-        )}
-      </p>
-
-      {/* Error state */}
-      {status === "error" && (
-        <div className="flex flex-col items-center gap-2 py-4 text-center">
-          <span className="font-sans text-strong text-muted-foreground">
-            Benchmark unavailable — couldn&apos;t reach market data
+      {roc !== null ? (
+        <div className="mt-2 grid grid-cols-[50px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
+          <span className="text-caption font-medium text-muted-foreground">Trading</span>
+          <div className="h-2 overflow-hidden rounded-full bg-surface-inset" aria-hidden="true">
+            {!masked && <div className={cn("h-full rounded-full", roc < 0 ? "bg-neg" : "bg-pos")} style={{ width: `${Math.abs(roc) / maxReturnMagnitude * 100}%` }} />}
+          </div>
+          <span className={cn("text-right text-[32px] font-semibold leading-none tracking-tight tabular-nums sm:text-[40px]", masked ? "text-muted-foreground" : roc > 0 ? "text-pos" : roc < 0 ? "text-neg" : "text-foreground")}>
+            {masked ? "••••" : formatPercent(roc, 1)}
           </span>
-          <button
-            type="button"
-            onClick={retry}
-            className="rounded-md border border-hairline bg-surface-inset px-4 py-1.5 font-sans text-body font-medium text-foreground transition hover:bg-surface active:opacity-80"
-          >
-            Retry
-          </button>
-        </div>
-      )}
 
-      {/* Loading skeleton */}
-      {status === "loading" && (
-        <div>
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </div>
-      )}
+          <div className="col-span-3 mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-hairline pt-3">
+            <h2 className="text-caption font-medium text-muted-foreground">Market backdrop</h2>
+            <span className="text-caption tabular-nums text-muted-foreground">
+              {year === new Date().getFullYear() ? "YTD" : year} adjusted{latestClose ? ` · ${formatDisplayDate(latestClose)}` : ""}
+            </span>
+          </div>
 
-      {/* Success — combined data bars (bar + exact % and $ per row) */}
-      {status === "success" && (
-        <div>
-          {rows.map((row) => (
-            <DataBarRow key={row.label} row={row} maxAbs={maxAbs} hasNeg={hasNeg} maskAmounts={maskAmounts} />
+          {status === "error" ? (
+            <div className="col-span-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-inset px-3 py-2 text-caption text-muted-foreground">
+              <span>Market data unavailable.</span>
+              <button type="button" onClick={retry} className="font-medium text-accent hover:underline">Retry</button>
+            </div>
+          ) : benchmarks.map(({ ticker, name, value }) => (
+            <div key={ticker} className="contents">
+              <span className="text-caption font-semibold text-foreground" title={name}>{ticker}<span className="sr-only"> {name}</span></span>
+              <div className="h-2 overflow-hidden rounded-full bg-accent/15" aria-hidden="true">
+                {status === "success" && value !== null && <div className={cn("h-full rounded-full", value < 0 ? "bg-neg" : "bg-accent")} style={{ width: `${Math.abs(value) / maxReturnMagnitude * 100}%` }} />}
+              </div>
+              {status === "loading" ? (
+                <span className="h-5 w-16 animate-pulse rounded bg-accent/15" aria-label={`Loading ${ticker} return`} />
+              ) : (
+                <span className={cn("text-right text-[15px] font-semibold leading-none tabular-nums min-[380px]:text-[17px] sm:text-[19px]", value === null ? "text-muted-foreground" : value < 0 ? "text-neg" : "text-accent")}>
+                  {value === null ? "—" : `${value > 0 ? "+" : ""}${formatPercent(value, 1)}`}
+                </span>
+              )}
+            </div>
           ))}
         </div>
-      )}
-    </div>
+      ) : <p className="mt-4 border-t border-hairline pt-3 text-caption text-muted-foreground">No realized return available for this period.</p>}
+    </section>
   );
 }

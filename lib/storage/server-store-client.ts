@@ -1,5 +1,5 @@
 import type { AppSettings, TradeTransaction } from "@/types/trading";
-import { defaultSettings } from "@/lib/storage/local-store";
+import { defaultSettings, normalizeAppSettings } from "@/lib/storage/local-store";
 
 type StoreSnapshot = {
   transactions: TradeTransaction[];
@@ -10,7 +10,7 @@ type StoreSnapshot = {
 
 let snapshot: StoreSnapshot = {
   transactions: [],
-  settings: { ...defaultSettings, showSampleData: false },
+  settings: normalizeAppSettings(defaultSettings),
   loaded: false,
   error: null
 };
@@ -45,7 +45,7 @@ export function loadStore() {
     .then((data) => {
       snapshot = {
         transactions: data.transactions,
-        settings: { ...defaultSettings, ...data.settings, showSampleData: false },
+        settings: normalizeAppSettings(data.settings),
         loaded: true,
         error: null
       };
@@ -71,7 +71,7 @@ export async function saveStore(next: { transactions?: TradeTransaction[]; setti
   const data = (await response.json()) as { transactions: TradeTransaction[]; settings: AppSettings };
   snapshot = {
     transactions: data.transactions,
-    settings: { ...defaultSettings, ...data.settings, showSampleData: false },
+    settings: normalizeAppSettings(data.settings),
     loaded: true,
     error: null
   };
@@ -84,7 +84,7 @@ export async function clearStore() {
   const data = (await response.json()) as { transactions: TradeTransaction[]; settings: AppSettings };
   snapshot = {
     transactions: data.transactions,
-    settings: { ...defaultSettings, ...data.settings, showSampleData: false },
+    settings: normalizeAppSettings(data.settings),
     loaded: true,
     error: null
   };

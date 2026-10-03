@@ -9,10 +9,9 @@ import { Column, DataTable } from "@/components/tables/DataTable";
 import { StatusChip } from "@/components/common/StatusChip";
 import { TickerLogo } from "@/components/common/TickerLogo";
 import { cn } from "@/lib/utils/cn";
-import { compactMonth, formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
+import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
 import type {
   CalculationResult,
-  MonthlyCapitalReturn,
   OptionLifecycle,
   RealizedPnLEvent,
 } from "@/types/trading";
@@ -122,78 +121,6 @@ export function SegmentedControl<T extends string>({
         </button>
       ))}
     </div>
-  );
-}
-
-// ── MonthlyRoiTable ──────────────────────────────────────────────────────────
-
-export function MonthlyRoiTable({ rows, maskAmounts = false }: { rows: MonthlyCapitalReturn[]; maskAmounts?: boolean }) {
-  const columns: Column<MonthlyCapitalReturn>[] = [
-    {
-      key: "month",
-      header: "Month",
-      value: (row) => `${row.year}-${String(row.month).padStart(2, "0")}`,
-      render: (row) => compactMonth(row.year, row.month),
-    },
-    {
-      key: "realizedPnl",
-      header: "Realized P&L",
-      value: (row) => row.realizedPnl,
-      render: (row) => signedMoney(row.realizedPnl, maskAmounts),
-      align: "right",
-      tooltip: "Net realized P&L from all events that closed during this month.",
-    },
-    {
-      key: "averageDeployedCapital",
-      header: "Average Capital",
-      value: (row) => row.averageDeployedCapital,
-      render: (row) => formatMaskedCurrency(row.averageDeployedCapital, maskAmounts),
-      align: "right",
-      tooltip: "Average capital deployed across the month (time-weighted by days).",
-    },
-    {
-      key: "peakDeployedCapital",
-      header: "Peak Capital",
-      value: (row) => row.peakDeployedCapital,
-      render: (row) => formatMaskedCurrency(row.peakDeployedCapital, maskAmounts),
-      align: "right",
-      tooltip: "Highest capital deployed on any single day that month.",
-    },
-    {
-      key: "realizedRoiPercent",
-      header: "Monthly RoC",
-      value: (row) => row.realizedRoiPercent ?? -999,
-      render: (row) => signedPercent(row.realizedRoiPercent),
-      align: "right",
-      tooltip: "Realized P&L ÷ average capital deployed all month.",
-    },
-    {
-      key: "coveredCallRoiPercent",
-      header: "CC RoC",
-      value: (row) => row.coveredCallRoiPercent ?? -999,
-      render: (row) => signedPercent(row.coveredCallRoiPercent),
-      align: "right",
-      tooltip: "Realized P&L ÷ deployed capital, for covered calls that closed that month.",
-    },
-    {
-      key: "cashSecuredPutRoiPercent",
-      header: "CSP RoC",
-      value: (row) => row.cashSecuredPutRoiPercent ?? -999,
-      render: (row) => signedPercent(row.cashSecuredPutRoiPercent),
-      align: "right",
-      tooltip: "Realized P&L ÷ deployed capital, for cash-secured puts that closed that month.",
-    },
-    {
-      key: "swingTradeRoiPercent",
-      header: "Stock RoC",
-      value: (row) => row.swingTradeRoiPercent ?? -999,
-      render: (row) => signedPercent(row.swingTradeRoiPercent),
-      align: "right",
-      tooltip: "Realized P&L ÷ deployed capital, for swing trades that closed that month.",
-    },
-  ];
-  return (
-    <DataTable rows={rows} columns={columns} empty="No monthly RoC rows yet." />
   );
 }
 

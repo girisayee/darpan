@@ -2,7 +2,7 @@ import "server-only";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { transactions, tradingAccounts, settings } from "@/lib/db/schema";
-import { defaultSettings } from "@/lib/storage/local-store";
+import { defaultSettings, normalizeAppSettings } from "@/lib/storage/local-store";
 import { stampCreatedAt } from "@/lib/entries/entry-meta";
 import type { AppSettings, TradeTransaction, TradingAccount } from "@/types/trading";
 
@@ -45,12 +45,12 @@ export async function replaceDbTransactions(userId: string, txns: TradeTransacti
 
 export async function getDbSettings(userId: string): Promise<AppSettings> {
   const rows = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
-  if (!rows.length) return { ...defaultSettings, showSampleData: false };
-  return { ...defaultSettings, showSampleData: false, ...(rows[0].value as Partial<AppSettings>) };
+  if (!rows.length) return normalizeAppSettings(defaultSettings);
+  return normalizeAppSettings(rows[0].value);
 }
 
 export async function saveDbSettings(userId: string, s: AppSettings): Promise<void> {
-  const value = { ...s, showSampleData: false };
+  const value = normalizeAppSettings(s);
   await db
     .insert(settings)
     .values({ userId, value })
@@ -59,7 +59,7 @@ export async function saveDbSettings(userId: string, s: AppSettings): Promise<vo
 
 export async function clearDbData(userId: string): Promise<void> {
   await db.delete(transactions).where(eq(transactions.userId, userId));
-  await saveDbSettings(userId, { ...defaultSettings, showSampleData: false });
+  await saveDbSettings(userId, normalizeAppSettings(defaultSettings));
 }
 
 // ── Trading accounts ─────────────────────────────────────────────────────────

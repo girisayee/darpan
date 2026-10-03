@@ -30,9 +30,11 @@ const sign = (v: number | null | undefined): Tone =>
 export function StrategyMetrics({
   a,
   maskAmounts = false,
+  secondaryOnly = false,
 }: {
   a: StrategyAnalytics | OptionsAggregateAnalytics;
   maskAmounts?: boolean;
+  secondaryOnly?: boolean;
 }) {
   const money = (v: number | null | undefined) => formatMaskedCurrency(v, maskAmounts);
   const q = a.quality;
@@ -93,9 +95,12 @@ export function StrategyMetrics({
       { label: "Trades", value: String(q.totalTrades) }
     );
   }
+  const visibleCells = secondaryOnly
+    ? cells.filter((cell) => cell.label !== "Realized P&L" && cell.label !== "Win rate" && cell.label !== "Trades")
+    : cells;
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-      {cells.map((c) => (
+      {visibleCells.map((c) => (
         <Cell key={c.label} {...c} />
       ))}
     </div>

@@ -132,7 +132,7 @@ describe("calculation engine", () => {
     expect(result.realizedEvents[0].realizedPnl).toBe(110);
   });
 
-  it("keeps current cash-secured put collateral on open cycles", () => {
+  it("keeps open CSP collateral in exposure but out of Realized RoC", () => {
     const result = calculateDashboard([optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "put", 50, "2025-01-31", 150)], defaultSettings, new Date("2025-01-15T12:00:00Z"));
     expect(result.realizedEvents).toHaveLength(0);
     expect(result.optionLifecycles[0]).toMatchObject({
@@ -146,10 +146,16 @@ describe("calculation engine", () => {
       endDate: "2025-01-15",
       amount: 5000
     });
-    expect(result.monthlyReturns[0].peakCashSecuredPutCollateral).toBe(5000);
+    expect(result.monthlyReturns).toHaveLength(1);
+    expect(result.monthlyReturns[0]).toMatchObject({
+      realizedPnl: 0,
+      returnCapital: 0,
+      realizedRoiPercent: null,
+    });
+    expect(result.monthlyReturns[0].averageDeployedCapital).toBe(0);
   });
 
-  it("keeps current covered call stock capital on open cycles", () => {
+  it("keeps open covered-call stock in exposure but out of Realized RoC", () => {
     const result = calculateDashboard([
       stockTx("b1", "2025-01-02", "BUY", "AMD", 100, 10),
       optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "call", 12, "2025-01-31", 100)
@@ -166,10 +172,17 @@ describe("calculation engine", () => {
       endDate: "2025-01-15",
       amount: 1000
     });
-    expect(result.monthlyReturns[0].peakCoveredCallCapital).toBe(1000);
+    expect(result.monthlyReturns).toHaveLength(1);
+    expect(result.monthlyReturns[0]).toMatchObject({
+      realizedPnl: 0,
+      returnCapital: 0,
+      realizedRoiPercent: null,
+    });
+    expect(result.capitalUsage).toHaveLength(2);
+    expect(result.monthlyReturns[0].averageDeployedCapital).toBe(0);
   });
 
-  it("shows open June option exposure as peak deployed capital", () => {
+  it("keeps open option and stock exposure visible without creating a realized return", () => {
     const result = calculateDashboard(
       [
         optionTx("snow-cc", "2026-05-20", "SELL_TO_OPEN", "SNOW", "call", 185, "2026-06-18", 889),
@@ -181,12 +194,13 @@ describe("calculation engine", () => {
       defaultSettings,
       new Date("2026-06-02T12:00:00Z")
     );
+    expect(result.capitalUsage).toHaveLength(5);
     const june = result.monthlyReturns.find((row) => row.year === 2026 && row.month === 6);
-    expect(june?.peakCoveredCallCapital).toBe(50800);
-    expect(june?.peakCashSecuredPutCollateral).toBe(49200);
-    expect(june?.peakDeployedCapital).toBe(100000);
-    expect(june?.capitalDays).toBe(200000);
-    expect(june?.averageDeployedCapital).toBe(100000);
+    expect(june?.averageDeployedCapital).toBe(0);
+    expect(june?.returnCapital).toBe(0);
+    expect(june?.realizedRoiPercent).toBeNull();
+    expect(result.aggregates.totalRealizedPnl).toBe(0);
+    expect(result.aggregates.returnOnCapital).toBeNull();
   });
 
   it("links same-day option open and close rows even when imported close appears first", () => {
@@ -206,6 +220,8 @@ describe("calculation engine", () => {
     const result = calculateDashboard([optionTx("o1", "2025-01-03", "SELL_TO_OPEN", "AMD", "put", 50, "2025-01-31", 150), optionTx("o2", "2025-01-31", "ASSIGNMENT", "AMD", "put", 50, "2025-01-31", 0)]);
     expect(result.taxLots[0].source).toBe("CASH_SECURED_PUT_ASSIGNMENT");
     expect(result.taxLots[0].costBasisTotal).toBe(4850);
+    expect(result.realizedEvents).toHaveLength(0);
+    expect(result.aggregates.totalRealizedPnl).toBe(0);
   });
 
   it("calculates a losing swing trade", () => {
@@ -222,17 +238,56 @@ describe("calculation engine", () => {
     const events: RealizedPnLEvent[] = [];
     const usage: CapitalUsage[] = [{ id: "c1", strategy: "SWING_TRADE", symbol: "AMD", startDate: "2025-01-01", endDate: "2025-01-15", capitalType: "SWING_TRADE_CAPITAL", amount: 10000, quantity: 100, linkedTransactionIds: [] }];
     const monthly = calculateMonthlyReturns(events, usage);
-    expect(monthly[0].capitalDays).toBe(150000);
-    expect(monthly[0].averageDeployedCapital).toBeCloseTo(4838.71, 2);
+    expect(monthly[0].capitalDays).toBe(140000);
+    expect(monthly[0].averageDeployedCapital).toBeCloseTo(4516.13, 2);
   });
 
   it("calculates monthly ROI with partial-month capital deployment", () => {
     const result = calculateDashboard([stockTx("b1", "2025-01-01", "BUY", "AMD", 100, 100), stockTx("s1", "2025-01-15", "SELL", "AMD", 100, 101)]);
-    expect(result.monthlyReturns[0].realizedRoiPercent).toBeCloseTo(2.066, 2);
+    expect(result.monthlyReturns[0].realizedRoiPercent).toBeCloseTo(1, 2);
+  });
+
+  it("uses only positions realized in that month for monthly return capital", () => {
+    const result = calculateDashboard([
+      stockTx("a-buy", "2026-01-01", "BUY", "AAA", 100, 100),
+      stockTx("a-sell", "2026-01-15", "SELL", "AAA", 100, 101),
+      stockTx("b-buy", "2026-01-01", "BUY", "BBB", 100, 1000),
+      stockTx("b-sell", "2026-02-15", "SELL", "BBB", 100, 1001),
+    ]);
+    const january = result.monthlyReturns.find((row) => row.year === 2026 && row.month === 1)!;
+    expect(january.realizedPnl).toBe(100);
+    expect(january.returnCapital).toBe(10_000);
+    expect(january.realizedRoiPercent).toBeCloseTo(1, 6);
+  });
+
+  it("does not inflate a one-day monthly CSP loss with idle calendar days", () => {
+    const event: RealizedPnLEvent = {
+      id: "be-csp-close",
+      date: "2026-07-01",
+      symbol: "BE",
+      strategy: "CASH_SECURED_PUT",
+      grossProceeds: 0,
+      costBasis: 0,
+      optionPremium: -1950.12,
+      fees: 0,
+      realizedPnl: -1950.12,
+      quantity: 1,
+      capitalDeployed: 29_500,
+      roiPercent: null,
+      annualizedRoiPercent: null,
+      holdingDays: 1,
+      linkedTransactionIds: [],
+      explanation: "Synthetic regression fixture",
+      warnings: [],
+    };
+
+    const july = calculateMonthlyReturns([event], [], [], "2026-07-31")[0];
+    expect(july.realizedRoiPercent).toBeCloseTo(-6.6106, 3);
+    expect(july.cashSecuredPutRoiPercent).toBeCloseTo(-6.6106, 3);
   });
 
   it("return on capital is one definition: Home, Performance, and aggregates agree", () => {
-    // Two overlapping symbols over different spans — exercises the time-weighted denominator.
+    // Different holding spans do not cause sequential capital to be added.
     const result = calculateDashboard(
       [
         stockTx("b1", "2026-01-05", "BUY", "AMD", 100, 50),
@@ -244,18 +299,12 @@ describe("calculation engine", () => {
       new Date("2026-06-30T12:00:00Z"),
     );
     const agg = result.aggregates;
-    // The canonical field equals P&L ÷ time-weighted avg deployed (what Home shows
-    // as "% on capital" and Performance shows as "Your return" — both read this field).
     expect(agg.returnOnCapital).not.toBeNull();
-    expect(agg.returnOnCapital!).toBeCloseTo((agg.totalRealizedPnl / agg.averageDeployedCapital) * 100, 6);
-    // It matches the shared selector over the same monthly rows.
-    expect(agg.returnOnCapital!).toBeCloseTo(portfolioReturnOnCapital(result.monthlyReturns).roc!, 6);
-    // Annualized is exactly RoC × 365 / period days.
-    const periodDays = result.monthlyReturns.reduce((s, m) => s + m.periodDays, 0);
-    expect(agg.annualizedReturnOnCapital!).toBeCloseTo(agg.returnOnCapital! * (365 / periodDays), 6);
+    expect(agg.returnOnCapital!).toBeCloseTo((agg.totalRealizedPnl / agg.returnCapital) * 100, 6);
+    expect(agg.returnOnCapital!).toBeCloseTo(portfolioReturnOnCapital(result.monthlyReturns, result.capitalUsage).roc!, 6);
   });
 
-  it("computes portfolio return on capital from time-weighted deployed capital", () => {
+  it("computes portfolio return on capital from peak realized capital", () => {
     const result = calculateDashboard(
       [stockTx("b1", "2026-01-01", "BUY", "AMD", 100, 10), stockTx("s1", "2026-06-30", "SELL", "AMD", 100, 10.7)],
       defaultSettings,
@@ -263,8 +312,19 @@ describe("calculation engine", () => {
     );
     // $1000 deployed Jan 1–Jun 30, $70 realized → 7% on capital.
     expect(result.aggregates.returnOnCapital).toBeCloseTo(7, 2);
-    // Annualized over ~181 days ≈ 7 × 365/181.
-    expect(result.aggregates.annualizedReturnOnCapital).toBeCloseTo(7 * (365 / 181), 1);
+  });
+
+  it("caps portfolio and monthly return capital at configured max buying power", () => {
+    const settings = { ...defaultSettings, maxBuyingPower: 125_000 };
+    const result = calculateDashboard([
+      stockTx("a-buy", "2026-01-01", "BUY", "AAA", 100, 1000),
+      stockTx("b-buy", "2026-01-01", "BUY", "BBB", 100, 1000),
+      stockTx("a-sell", "2026-01-15", "SELL", "AAA", 100, 1001),
+      stockTx("b-sell", "2026-01-15", "SELL", "BBB", 100, 1001),
+    ], settings);
+    expect(result.monthlyReturns[0].returnCapital).toBe(125_000);
+    expect(result.aggregates.returnCapital).toBe(125_000);
+    expect(result.aggregates.returnOnCapital).toBeCloseTo((200 / 125_000) * 100, 6);
   });
 
   it("keeps cost basis for matched shares when a sell slightly exceeds the lot", () => {
@@ -446,7 +506,7 @@ describe("calculation engine", () => {
     const lot = r.taxLots.find((t) => t.symbol === "SNOW");
     expect(lot!.costBasisPerShare).toBe(198.5); // override, not strike−premium ($219.50)
     const put = r.realizedEvents.find((e) => e.strategy === "PUT_ASSIGNMENT");
-    expect(put!.realizedPnl).toBe(1050); // premium income unchanged
+    expect(put).toBeUndefined(); // premium is deferred into the assigned-share basis
     const stock = r.realizedEvents.find((e) => e.strategy === "COVERED_CALL_ASSIGNMENT_STOCK");
     expect(stock!.costBasis).toBe(19850);
     expect(stock!.realizedPnl).toBe(-1350); // 18,500 strike proceeds − 19,850 basis

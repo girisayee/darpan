@@ -3,12 +3,12 @@
 import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
-import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent } from "@/lib/utils/format";
-import type { CalculationResult, CapitalUsage, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
+import { formatCurrency, formatMaskedCurrency, MASKED_AMOUNT, formatDisplayDate, formatNumber, formatPercent, monthLabel } from "@/lib/utils/format";
+import type { CalculationResult, OptionLifecycle, RealizedPnLEvent, TaxLot, TradeTransaction, TradingAccount } from "@/types/trading";
 import { assignmentShareDetail, lifecycleShareDetail } from "@/lib/utils/option-helpers";
-import { peakCapitalRoi, peakConcurrentCapital } from "@/lib/selectors/symbol-capital";
-import { symbolReturnOnCapital } from "@/lib/selectors/return-on-capital";
 import { TickerLogo } from "@/components/common/TickerLogo";
+import { MonthDetailBody } from "@/components/dashboard/MonthDetailBody";
+import type { MonthTrades } from "@/lib/selectors/monthly-trades";
 
 /** Summary row for a single symbol, as produced by the calculation engine. */
 export type SymbolSummary = CalculationResult["aggregates"]["symbolBreakdown"][number];
@@ -129,6 +129,9 @@ function MetaCell({ label, value, valueClass }: { label: string; value: React.Re
 // ---------- DetailDrawer ----------
 
 export function DetailDrawer({
+  month,
+  months = [],
+  onSelectMonth,
   event,
   lifecycle,
   symbol,
@@ -138,7 +141,6 @@ export function DetailDrawer({
   events = [],
   optionLifecycles = [],
   taxLots = [],
-  capitalUsage = [],
   onReviewFix,
   onSelectEvent,
   onSelectLifecycle,
@@ -146,17 +148,19 @@ export function DetailDrawer({
   onAssignAccount,
   maskAmounts,
 }: {
+  month?: MonthTrades | null;
+  months?: MonthTrades[];
+  onSelectMonth?: (month: string) => void;
   event?: RealizedPnLEvent | null;
   lifecycle?: OptionLifecycle | null;
   symbol?: SymbolSummary | null;
   onClose: () => void;
-  /** When present, the active event/lifecycle view shows a back arrow that returns to the symbol view. */
+  /** Returns from an event/lifecycle to its parent symbol or month review. */
   onBack?: () => void;
   transactions: TradeTransaction[];
   events?: RealizedPnLEvent[];
   optionLifecycles?: OptionLifecycle[];
   taxLots?: TaxLot[];
-  capitalUsage?: CapitalUsage[];
   onReviewFix?: () => void;
   onSelectEvent?: (e: RealizedPnLEvent) => void;
   onSelectLifecycle?: (l: OptionLifecycle) => void;
@@ -169,8 +173,25 @@ export function DetailDrawer({
   const previousFocusRef = useRef<Element | null>(null);
   const masked = maskAmounts ?? false;
 
-  // The drawer is open when an event (stock/swing), a lifecycle (option), or a symbol is set.
-  const open = !!event || !!lifecycle || !!symbol;
+  // Month and symbol reviews share the same dialog with their trade details.
+  const open = !!event || !!lifecycle || !!symbol || !!month;
+
+  useEffect(() => {
+    if (!open) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; };
+  }, [open]);
+
+  // A trade replaces the month content within the same dialog.
+  useEffect(() => {
+    if (!event && !lifecycle) return;
+    const frame = requestAnimationFrame(() => {
+      panelRef.current?.scrollTo({ top: 0 });
+      closeButtonRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [event, lifecycle]);
 
   // Capture the element that had focus before the drawer opened
   useEffect(() => {
@@ -210,7 +231,7 @@ export function DetailDrawer({
     function getFocusable() {
       return Array.from(
         panel.querySelectorAll<HTMLElement>(
-          'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])'
+          'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
         )
       ).filter((el) => !el.closest("[hidden]"));
     }
@@ -244,7 +265,7 @@ export function DetailDrawer({
     ? `${lifecycle.underlyingSymbol} option cycle detail`
     : event
       ? `${event.symbol} realized P&L detail`
-      : `${symbol!.symbol} activity detail`;
+      : month ? `${monthLabel(month.month)} monthly review` : `${symbol!.symbol} activity detail`;
 
   // A drill-in view (event/lifecycle on top of a symbol) shows a back arrow.
   const backHandler = symbol && (event || lifecycle) ? onBack : undefined;
@@ -266,11 +287,30 @@ export function DetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        className="motion-safe:animate-[slideIn_160ms_ease] relative z-10 h-full w-[64%] min-w-[380px] overflow-y-auto bg-surface border-l border-hairline"
-        style={{ maxWidth: "640px", background: "rgb(var(--surface))" }}
+        className={cn("motion-safe:animate-[slideIn_160ms_ease] relative z-10 h-full w-full bg-surface border-l border-hairline shadow-2xl", month && !event && !lifecycle ? "overflow-hidden" : "overflow-y-auto")}
+        style={{ maxWidth: month ? "720px" : "640px", background: "rgb(var(--surface))" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5">
+        {month && (
+          <div className="h-full" hidden={!!(event || lifecycle)}>
+            <MonthDetailBody
+              key={month.month}
+              month={month}
+              months={months}
+              active={!event && !lifecycle}
+              onSelectMonth={onSelectMonth}
+              onSelectTrade={(trade) => trade.lifecycle ? onSelectLifecycle?.(trade.lifecycle) : onSelectEvent?.(trade.event)}
+              onClose={onClose}
+              maskAmounts={masked}
+            />
+          </div>
+        )}
+        <div className="p-5" hidden={!event && !lifecycle && !symbol}>
+          {month && (event || lifecycle) && onBack && (
+            <button type="button" onClick={onBack} className="mb-4 flex min-h-11 items-center gap-2 rounded-lg px-2 text-body font-medium text-accent hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to {monthLabel(month.month)}
+            </button>
+          )}
           {lifecycle ? (
             <OptionCycleBody
               lifecycle={lifecycle}
@@ -282,6 +322,7 @@ export function DetailDrawer({
               onReviewFix={onReviewFix}
               closeButtonRef={closeButtonRef}
               maskAmounts={masked}
+              hideCapitalMetrics={!!month}
             />
           ) : event ? (
             <EventDetailBody
@@ -293,20 +334,20 @@ export function DetailDrawer({
               onBack={backHandler}
               closeButtonRef={closeButtonRef}
               maskAmounts={masked}
+              hideCapitalMetrics={!!month}
             />
-          ) : (
+          ) : symbol ? (
             <SymbolDetailBody
               summary={symbol!}
               events={events}
               optionLifecycles={optionLifecycles}
-              capitalUsage={capitalUsage}
               onClose={onClose}
               onSelectEvent={onSelectEvent}
               onSelectLifecycle={onSelectLifecycle}
               closeButtonRef={closeButtonRef}
               maskAmounts={masked}
             />
-          )}
+          ) : null}
 
           {(event || lifecycle) && accounts.length > 0 && onAssignAccount && activeTxIds.length > 0 && (
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-hairline pt-4">
@@ -354,6 +395,7 @@ function EventDetailBody({
   onBack,
   closeButtonRef,
   maskAmounts = false,
+  hideCapitalMetrics = false,
 }: {
   event: RealizedPnLEvent;
   transactions: TradeTransaction[];
@@ -363,6 +405,7 @@ function EventDetailBody({
   onBack?: () => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
   maskAmounts?: boolean;
+  hideCapitalMetrics?: boolean;
 }) {
   // Derived values — null-safe throughout
   const grossProceeds = event.grossProceeds ?? 0;
@@ -459,7 +502,7 @@ function EventDetailBody({
             {signedCurrency(realizedPnl, maskAmounts)}
           </div>
         </div>
-        <div className="ml-auto text-right">
+        {!hideCapitalMetrics && <div className="ml-auto text-right">
           <div className="font-sans text-caption text-muted-foreground">RoC</div>
           <div
             className={cn(
@@ -471,7 +514,7 @@ function EventDetailBody({
               ? `${roiPercent >= 0 ? "+" : ""}${formatPercent(roiPercent)}`
               : "N/A"}
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* ── Calculation waterfall ── */}
@@ -590,17 +633,17 @@ function EventDetailBody({
       )}
 
       {/* ── 3×2 meta grid ── */}
-      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+      <div className={cn("mt-4 grid divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden", hideCapitalMetrics ? "grid-cols-2" : "grid-cols-3")}>
         <MetaCell label="Opened" value={openDate ? formatDisplayDate(openDate) : "N/A"} />
         <MetaCell
           label="Holding"
           value={holdingDays !== null ? `${formatNumber(holdingDays)} days` : "N/A"}
         />
-        <MetaCell
+        {!hideCapitalMetrics && <MetaCell
           label="Capital"
           value={capitalDeployed !== null ? formatMaskedCurrency(capitalDeployed, maskAmounts) : "N/A"}
-        />
-        <MetaCell
+        />}
+        {!hideCapitalMetrics && <MetaCell
           label="Annualized"
           value={
             annualizedRoiPercent !== null
@@ -608,7 +651,7 @@ function EventDetailBody({
               : "N/A"
           }
           valueClass={toneClass(annualizedRoiPercent)}
-        />
+        />}
         <MetaCell
           label="Cost method"
           value={event.explanation?.match(/\b(FIFO|LIFO|AVERAGE)\b/i)?.[0] ?? "N/A"}
@@ -662,6 +705,7 @@ function OptionCycleBody({
   onReviewFix,
   closeButtonRef,
   maskAmounts = false,
+  hideCapitalMetrics = false,
 }: {
   lifecycle: OptionLifecycle;
   transactions: TradeTransaction[];
@@ -672,17 +716,19 @@ function OptionCycleBody({
   onReviewFix?: () => void;
   closeButtonRef: React.RefObject<HTMLButtonElement | null>;
   maskAmounts?: boolean;
+  hideCapitalMetrics?: boolean;
 }) {
   const lc = lifecycle;
   const share = lifecycleShareDetail(lc, events, taxLots);
 
   // ── Numbers ────────────────────────────────────────────────────────────────
   const isOpen = lc.status === "open";
+  const isDeferredPutAssignment = lc.status === "assigned" && lc.optionType === "put";
   const capital = lc.capitalDeployed ?? 0;
   const assignmentStockPnl = lc.assignmentStockPnl ?? 0;
-  const total = lc.netOptionPnl + (share ? assignmentStockPnl : 0);
-  const cycleRoi = capital > 0 ? (total / capital) * 100 : null;
-  const optionRoi = capital > 0 ? (lc.netOptionPnl / capital) * 100 : null;
+  const total = isDeferredPutAssignment ? 0 : lc.netOptionPnl + (share ? assignmentStockPnl : 0);
+  const cycleRoi = !isDeferredPutAssignment && capital > 0 ? (total / capital) * 100 : null;
+  const optionRoi = !isDeferredPutAssignment && capital > 0 ? (lc.netOptionPnl / capital) * 100 : null;
 
   const isShort = lc.direction === "short";
   const endDate = lc.closeDate ?? lc.expirationDate;
@@ -725,7 +771,7 @@ function OptionCycleBody({
       (tx.importBatchId === "manual" || tx.tags.includes("manual"))
   );
 
-  const contractsNote = `${lc.contracts} contract${lc.contracts !== 1 ? "s" : ""} · ${formatNumber(lc.sharesControlled)} sh · strike ${formatCurrency(lc.strikePrice, { maximumFractionDigits: 2 })} · exp ${formatDisplayDate(lc.expirationDate)}`;
+  const contractsNote = `${lc.contracts} contract${lc.contracts !== 1 ? "s" : ""} · ${formatNumber(lc.sharesControlled)} sh · strike ${formatMaskedCurrency(lc.strikePrice, maskAmounts, { maximumFractionDigits: 2 })} · exp ${formatDisplayDate(lc.expirationDate)}`;
 
   return (
     <>
@@ -793,8 +839,13 @@ function OptionCycleBody({
               Open · not yet realized
             </div>
           )}
+          {isDeferredPutAssignment && (
+            <div className="font-sans text-caption text-muted-foreground mt-0.5">
+              Premium deferred into assigned-share basis
+            </div>
+          )}
         </div>
-        <div className="ml-auto text-right">
+        {!hideCapitalMetrics && <div className="ml-auto text-right">
           {isOpen ? (
             <>
               <div className="font-sans text-caption text-muted-foreground">Days to expiry</div>
@@ -820,7 +871,7 @@ function OptionCycleBody({
               </div>
             </>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* ── Option trade ── */}
@@ -855,14 +906,14 @@ function OptionCycleBody({
           }
         />
         <Row
-          label={isOpen ? (isShort ? "Net premium" : "Net debit") : "Net option P&L"}
+          label={isDeferredPutAssignment ? "Premium applied to basis" : isOpen ? (isShort ? "Net premium" : "Net debit") : "Net option P&L"}
           helper={isOpen && isShort ? "max if held to expiry" : undefined}
           bold
           topBorder
           value={signedCurrency(lc.netOptionPnl, maskAmounts)}
-          valueClass={toneClass(lc.netOptionPnl)}
+          valueClass={isDeferredPutAssignment ? "text-foreground" : toneClass(lc.netOptionPnl)}
         />
-        {!(isOpen && !isShort) && (
+        {!isDeferredPutAssignment && !(isOpen && !isShort) && (
           <Row
             label={isOpen ? "Max RoC" : "Option RoC"}
             helper={
@@ -992,21 +1043,21 @@ function OptionCycleBody({
       )}
 
       {/* ── Meta grid ── */}
-      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+      <div className={cn("mt-4 grid divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden", hideCapitalMetrics ? "grid-cols-2" : "grid-cols-3")}>
         <MetaCell label="Opened" value={lc.openDate ? formatDisplayDate(lc.openDate) : "—"} />
         <MetaCell
           label="Held"
           value={heldDays != null ? `${formatNumber(heldDays)} days` : "—"}
         />
-        <MetaCell
+        {!hideCapitalMetrics && <MetaCell
           label="Capital"
           value={capital > 0 ? formatMaskedCurrency(capital, maskAmounts) : "—"}
-        />
-        <MetaCell
+        />}
+        {!hideCapitalMetrics && <MetaCell
           label="Annualized"
           value={annualized !== null ? signedPercentText(annualized) : "N/A"}
           valueClass={annualized !== null ? toneClass(annualized) : undefined}
-        />
+        />}
         <MetaCell
           label="Warnings"
           value={lc.warnings.length > 0 ? String(lc.warnings.length) : "None"}
@@ -1090,7 +1141,6 @@ function SymbolDetailBody({
   summary,
   events,
   optionLifecycles,
-  capitalUsage,
   onClose,
   onSelectEvent,
   onSelectLifecycle,
@@ -1100,7 +1150,6 @@ function SymbolDetailBody({
   summary: SymbolSummary;
   events: RealizedPnLEvent[];
   optionLifecycles: OptionLifecycle[];
-  capitalUsage: CapitalUsage[];
   onClose: () => void;
   onSelectEvent?: (e: RealizedPnLEvent) => void;
   onSelectLifecycle?: (l: OptionLifecycle) => void;
@@ -1111,7 +1160,7 @@ function SymbolDetailBody({
     .filter((e) => e.symbol === summary.symbol)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const symbolCycles = optionLifecycles
-    .filter((l) => l.underlyingSymbol === summary.symbol)
+    .filter((l) => l.underlyingSymbol === summary.symbol && l.status !== "open")
     .sort((a, b) => {
       const aEnd = a.closeDate ?? a.expirationDate;
       const bEnd = b.closeDate ?? b.expirationDate;
@@ -1127,10 +1176,7 @@ function SymbolDetailBody({
   );
 
   const avgPnl = summary.trades > 0 ? summary.pnl / summary.trades : null;
-  const peakRoi = peakCapitalRoi(capitalUsage, summary.symbol, summary.pnl);
-  const peakCapital = peakConcurrentCapital(capitalUsage, summary.symbol);
-  const asOf = new Date().toISOString().slice(0, 10);
-  const roc = symbolReturnOnCapital(capitalUsage, summary.symbol, summary.pnl, asOf).roc;
+  const roc = summary.roiPercent;
 
   return (
     <>
@@ -1175,7 +1221,7 @@ function SymbolDetailBody({
           </div>
         </div>
         <div className="ml-auto text-right">
-          <div className="font-sans text-caption text-muted-foreground">Return on capital</div>
+          <div className="font-sans text-caption text-muted-foreground">Realized RoC</div>
           <div
             className={cn(
               "font-sans text-[18px] font-medium tabular-nums mt-1",
@@ -1188,7 +1234,7 @@ function SymbolDetailBody({
       </div>
 
       {/* ── Meta grid ── */}
-      <div className="mt-4 grid grid-cols-3 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
+      <div className="mt-4 grid grid-cols-2 divide-x divide-y divide-hairline border border-hairline rounded-lg overflow-hidden">
         <MetaCell label="Trades" value={formatNumber(summary.trades)} />
         <MetaCell
           label="Win rate"
@@ -1200,30 +1246,17 @@ function SymbolDetailBody({
           valueClass={avgPnl != null ? toneClass(avgPnl) : undefined}
         />
         <MetaCell
-          label="Peak deployed"
-          value={peakCapital > 0 ? formatMaskedCurrency(peakCapital, maskAmounts) : "—"}
-        />
-        <MetaCell
-          label="Capital cycled"
+          label="Peak realized capital"
           value={summary.capital > 0 ? formatMaskedCurrency(summary.capital, maskAmounts) : "—"}
-        />
-        <MetaCell
-          label="Peak-capital RoC"
-          value={signedPercentText(peakRoi)}
-          valueClass={toneClass(peakRoi)}
         />
       </div>
 
       {/* ── Capital RoC note ── */}
       <div className="mt-3 rounded-r-xl border-y border-r border-l-2 border-hairline border-l-accent bg-surface px-3 py-2.5">
         <div className="font-sans text-caption tabular-nums text-muted-foreground leading-relaxed">
-          <span className="font-medium text-foreground">Return on capital</span> is P&amp;L over
-          this symbol&apos;s time-weighted average deployed capital — the same definition used on
-          Home, Performance, and Tickers.{" "}
-          <span className="font-medium text-foreground">Peak-capital RoC</span> divides instead
-          by the most cash this symbol ever tied up at once
-          {peakCapital > 0 ? ` (${formatMaskedCurrency(peakCapital, maskAmounts)})` : ""}, so recycling the same
-          collateral across cycles doesn&apos;t inflate it — a stricter view.
+          <span className="font-medium text-foreground">Realized RoC</span> is P&amp;L over
+          this symbol&apos;s peak concurrent capital behind realized positions. Open positions remain
+          exposure only, and covered-call shares are de-duplicated when the underlying also realizes.
         </div>
       </div>
 
@@ -1233,7 +1266,9 @@ function SymbolDetailBody({
           <SectionLabel>Option cycles</SectionLabel>
           <div className="mt-1.5">
             {symbolCycles.map((lc) => {
-              const total = lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
+              const total = lc.status === "assigned" && lc.optionType === "put"
+                ? 0
+                : lc.netOptionPnl + (lc.assignmentStockPnl ?? 0);
               return (
                 <ActivityRow
                   key={lc.id}

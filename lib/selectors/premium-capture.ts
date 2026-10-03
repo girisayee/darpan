@@ -14,6 +14,11 @@ export interface PremiumStats {
 
 const TERMINAL = new Set(["expired", "closed", "assigned"]);
 
+function premiumIsRealized(lifecycle: OptionLifecycle) {
+  return lifecycle.status === "expired" || lifecycle.status === "closed" ||
+    (lifecycle.status === "assigned" && lifecycle.optionType === "call");
+}
+
 function capture(list: OptionLifecycle[]): number | null {
   const prem = list.reduce((s, l) => s + l.premiumReceived, 0);
   if (prem === 0) return null;
@@ -29,25 +34,26 @@ function assignRate(list: OptionLifecycle[]): number | null {
 }
 
 export function premiumStats(lifecycles: OptionLifecycle[]): PremiumStats {
-  const premiumCollected = lifecycles.reduce((s, l) => s + l.premiumReceived, 0);
-  const netOptionPnl = lifecycles.reduce((s, l) => s + l.netOptionPnl, 0);
   const terminal = lifecycles.filter((l) => TERMINAL.has(l.status));
+  const realized = terminal.filter(premiumIsRealized);
+  const premiumCollected = realized.reduce((s, l) => s + l.premiumReceived, 0);
+  const netOptionPnl = realized.reduce((s, l) => s + l.netOptionPnl, 0);
 
   return {
     premiumCollected,
     netOptionPnl,
     captureRate: premiumCollected === 0 ? null : netOptionPnl / premiumCollected,
-    captureCoveredCall: capture(lifecycles.filter((l) => l.strategy === "COVERED_CALL")),
-    captureCashSecuredPut: capture(lifecycles.filter((l) => l.strategy === "CASH_SECURED_PUT")),
-    assignmentRate: assignRate(lifecycles),
-    assignmentRateCall: assignRate(lifecycles.filter((l) => l.optionType === "call")),
-    assignmentRatePut: assignRate(lifecycles.filter((l) => l.optionType === "put")),
+    captureCoveredCall: capture(realized.filter((l) => l.strategy === "COVERED_CALL")),
+    captureCashSecuredPut: capture(realized.filter((l) => l.strategy === "CASH_SECURED_PUT")),
+    assignmentRate: assignRate(terminal),
+    assignmentRateCall: assignRate(terminal.filter((l) => l.optionType === "call")),
+    assignmentRatePut: assignRate(terminal.filter((l) => l.optionType === "put")),
     counts: {
-      total: lifecycles.length,
+      total: realized.length,
       terminal: terminal.length,
       assigned: terminal.filter((l) => l.status === "assigned").length,
-      calls: lifecycles.filter((l) => l.optionType === "call").length,
-      puts: lifecycles.filter((l) => l.optionType === "put").length,
+      calls: realized.filter((l) => l.optionType === "call").length,
+      puts: realized.filter((l) => l.optionType === "put").length,
     },
   };
 }

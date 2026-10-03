@@ -22,10 +22,10 @@ vi.mock("@/lib/benchmark/cache-store", () => ({
 
 const AV_RESPONSE = (closes: Record<string, string>) => ({
   "Meta Data": { "2. Symbol": "SPY" },
-  "Weekly Time Series": Object.fromEntries(
+  "Weekly Adjusted Time Series": Object.fromEntries(
     Object.entries(closes).map(([date, c]) => [
       date,
-      { "1. open": c, "2. high": c, "3. low": c, "4. close": c, "5. volume": "1" },
+      { "1. open": c, "2. high": c, "3. low": c, "4. close": c, "5. adjusted close": c, "6. volume": "1" },
     ])
   ),
 });
@@ -66,6 +66,10 @@ describe("fetchDailyCloses (Alpha Vantage + cache)", () => {
       { date: "2026-01-02", close: 400 },
       { date: "2026-03-15", close: 420.5 },
     ]);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("function=TIME_SERIES_WEEKLY_ADJUSTED"),
+      expect.any(Object),
+    );
   });
 
   it("serves the second call from cache without re-fetching (within TTL)", async () => {

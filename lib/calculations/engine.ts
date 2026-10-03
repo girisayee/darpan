@@ -13,7 +13,12 @@ import type {
 } from "@/types/trading";
 import { compactMonth } from "@/lib/utils/format";
 import { defaultSettings } from "@/lib/storage/local-store";
-import { portfolioReturnOnCapital } from "@/lib/selectors/return-on-capital";
+import {
+  closedCapitalUsage,
+  peakConcurrentCapital,
+  portfolioCapitalUsage,
+  portfolioReturnOnCapital,
+} from "@/lib/selectors/return-on-capital";
 
 type MutableLot = TaxLot & { remainingCostBasis: number };
 type MutableLifecycle = OptionLifecycle;
@@ -64,8 +69,9 @@ export function calculateDashboard(
 
   finalizeOpenLots(taxLots);
   addOpenOptionCapitalUsage(optionLifecycles, capitalUsage, settings, asOfDate);
-  const monthlyReturns = calculateMonthlyReturns(realizedEvents, capitalUsage, warnings, asOfDate);
-  const aggregates = calculateAggregates(realizedEvents, monthlyReturns, warnings, asOfDate);
+  addOpenStockCapitalUsage(taxLots, capitalUsage, asOfDate);
+  const monthlyReturns = calculateMonthlyReturns(realizedEvents, capitalUsage, warnings, asOfDate, settings.maxBuyingPower);
+  const aggregates = calculateAggregates(realizedEvents, monthlyReturns, warnings, asOfDate, capitalUsage, settings.maxBuyingPower);
 
   return {
     transactions: sorted,
@@ -87,18 +93,44 @@ function addOpenOptionCapitalUsage(lifecycles: MutableLifecycle[], usage: Capita
     if (lifecycle.status !== "open") continue;
     const capital = currentOpenOptionCapital(lifecycle, settings);
     if (capital <= 0) continue;
-    const strategy: Strategy = lifecycle.optionType === "call" ? "COVERED_CALL" : "CASH_SECURED_PUT";
+    const strategy: Strategy = lifecycle.direction === "long"
+      ? "LONG_OPTION"
+      : lifecycle.optionType === "call"
+        ? "COVERED_CALL"
+        : "CASH_SECURED_PUT";
     usage.push({
       id: `cap-${lifecycle.id}-open`,
       strategy,
       symbol: lifecycle.underlyingSymbol,
       startDate: lifecycle.openDate,
       endDate: minDate(asOfDate, lifecycle.expirationDate),
-      capitalType: lifecycle.optionType === "call" ? "STOCK_CAPITAL" : "OPTION_COLLATERAL",
+      capitalType: lifecycle.direction === "short" && lifecycle.optionType === "call" ? "STOCK_CAPITAL" : "OPTION_COLLATERAL",
       amount: capital,
       quantity: lifecycle.sharesControlled,
       linkedTransactionIds: lifecycle.linkedTransactionIds,
-      notes: lifecycle.optionType === "call" ? "Current stock capital tied to open covered call." : "Current collateral tied to open cash-secured put."
+      notes: lifecycle.direction === "long"
+        ? "Current debit tied to open long option."
+        : lifecycle.optionType === "call"
+          ? "Current stock capital attributed to open covered call."
+          : "Current collateral tied to open cash-secured put."
+    });
+  }
+}
+
+function addOpenStockCapitalUsage(lots: MutableLot[], usage: CapitalUsage[], asOfDate: string) {
+  for (const lot of lots) {
+    if (lot.remainingQuantity <= 0 || lot.remainingCostBasis <= 0) continue;
+    usage.push({
+      id: `cap-${lot.id}-stock-open`,
+      strategy: "SWING_TRADE",
+      symbol: lot.symbol,
+      startDate: lot.openDate,
+      endDate: asOfDate,
+      capitalType: "SWING_TRADE_CAPITAL",
+      amount: lot.remainingCostBasis,
+      quantity: lot.remainingQuantity,
+      linkedTransactionIds: lot.linkedTransactionIds,
+      notes: "Cost basis still deployed in an open stock lot.",
     });
   }
 }
@@ -287,7 +319,7 @@ function handleOptionTransaction(
     if (lifecycle.optionType === "call") {
       handleCoveredCallAssignment(transaction, lifecycle, lots, events, usage, positionCapital, settings);
     } else {
-      handlePutAssignment(transaction, lifecycle, lots, events, usage, positionCapital, settings);
+      handlePutAssignment(transaction, lifecycle, lots, usage, settings);
     }
     return;
   }
@@ -554,10 +586,8 @@ function handlePutAssignment(
   transaction: TradeTransaction,
   lifecycle: MutableLifecycle,
   lots: MutableLot[],
-  events: RealizedPnLEvent[],
   usage: CapitalUsage[],
-  positionCapital: PositionCapitalRecord[],
-  settings: AppSettings
+  settings: AppSettings,
 ) {
   const grossAssignedCost = lifecycle.strikePrice * lifecycle.sharesControlled;
   const derivedBasis = grossAssignedCost - lifecycle.netOptionPnl + lifecycle.fees;
@@ -582,43 +612,22 @@ function handlePutAssignment(
   };
   lots.push(lot);
   lifecycle.linkedStockLotIds = [lot.id];
-  const capital = optionCapital(lifecycle, settings);
-  const roiPercent = capital > 0 ? (lifecycle.netOptionPnl / capital) * 100 : null;
-  const holdingDays = dateDiffDays(lifecycle.openDate, transaction.tradeDate);
-  const annualizedRoiPercent = roiPercent !== null && settings.annualizedReturn && holdingDays > 0 ? roiPercent * (365 / holdingDays) : null;
-  const event: RealizedPnLEvent = {
-    id: `pnl-${lifecycle.id}-put-assignment`,
-    date: transaction.tradeDate,
-    symbol: lifecycle.underlyingSymbol,
-    strategy: "PUT_ASSIGNMENT",
-    grossProceeds: lifecycle.premiumReceived,
-    costBasis: grossAssignedCost,
-    optionPremium: lifecycle.netOptionPnl,
-    fees: lifecycle.fees,
-    realizedPnl: lifecycle.netOptionPnl,
-    quantity: lifecycle.sharesControlled,
-    capitalDeployed: capital || null,
-    roiPercent,
-    annualizedRoiPercent,
-    holdingDays,
-    linkedTransactionIds: lifecycle.linkedTransactionIds,
-    explanation: `Cash-secured put assignment bought ${lifecycle.sharesControlled} shares of ${lifecycle.underlyingSymbol}. Gross assigned cost was ${money(grossAssignedCost)} and effective stock basis became ${money(effectiveBasis)} after premium.`,
-    warnings: lifecycle.warnings
-  };
-  events.push(event);
   usage.push({
-    id: `cap-${lifecycle.id}-put-assignment`,
-    strategy: "PUT_ASSIGNMENT",
+    id: `cap-${lifecycle.id}-assignment`,
+    strategy: "CASH_SECURED_PUT",
     symbol: lifecycle.underlyingSymbol,
     startDate: lifecycle.openDate,
     endDate: transaction.tradeDate,
     capitalType: "OPTION_COLLATERAL",
-    amount: capital,
+    amount: optionCapital(lifecycle, settings),
     quantity: lifecycle.sharesControlled,
     linkedTransactionIds: lifecycle.linkedTransactionIds,
-    notes: "Collateral tied up for cash-secured put assignment."
+    notes: "Put collateral deployed until assignment; assigned shares become stock capital.",
   });
-  positionCapital.push(eventToPosition(event, lifecycle.openDate));
+  // A put assignment is not a realized gain: the premium reduces the basis of
+  // shares that are still open. Realized P&L is created later when those shares
+  // are sold/called away, using this adjusted basis. Emitting a premium event
+  // here would both inflate current performance and double-count the premium.
 }
 
 type Allocation = {
@@ -718,7 +727,8 @@ export function calculateMonthlyReturns(
   events: RealizedPnLEvent[],
   usage: CapitalUsage[],
   warnings: string[] = [],
-  asOfDate?: string
+  asOfDate?: string,
+  maxCapital?: number,
 ): MonthlyCapitalReturn[] {
   const monthKeys = new Set<string>();
   for (const event of events) monthKeys.add(event.date.slice(0, 7));
@@ -727,42 +737,52 @@ export function calculateMonthlyReturns(
     for (const month of months) monthKeys.add(month);
   }
   const sortedKeys = [...monthKeys].sort();
+  const realizedUsage = closedCapitalUsage(usage);
   return sortedKeys.map((key) => {
     const [year, month] = key.split("-").map(Number);
     const monthlyEvents = events.filter((event) => event.date.startsWith(key));
-    const capital = capitalForMonth(usage, year, month, asOfDate);
     const realizedPnl = sum(monthlyEvents.map((event) => event.realizedPnl));
     const closedTradeCapital = sum(monthlyEvents.map((event) => event.capitalDeployed ?? 0));
+    const monthlyRealizedUsage = realizedUsage.filter((row) => row.endDate.startsWith(key));
+    const monthlyCapitalUsage = portfolioCapitalUsage(monthlyRealizedUsage);
+    const capital = capitalForMonth(monthlyCapitalUsage, year, month, asOfDate, maxCapital);
+    const derivedReturnCapital = peakConcurrentCapital(monthlyCapitalUsage);
+    // Public callers can supply synthetic events without CapitalUsage rows.
+    // Fall back to the largest event basis so their RoC remains computable.
+    const returnCapital = cappedCapital(
+      derivedReturnCapital || Math.max(
+        0,
+        ...monthlyEvents.map((event) => event.capitalDeployed ?? 0),
+      ),
+      maxCapital,
+    );
     const optionsPremiumPnl = sum(monthlyEvents.filter((event) => ["COVERED_CALL", "CASH_SECURED_PUT", "PUT_ASSIGNMENT"].includes(event.strategy)).map((event) => event.realizedPnl));
     const stockTradingPnl = sum(monthlyEvents.filter((event) => event.strategy === "SWING_TRADE" || event.strategy === "COVERED_CALL_ASSIGNMENT_STOCK").map((event) => event.realizedPnl));
     const assignmentPnl = sum(monthlyEvents.filter((event) => event.strategy === "COVERED_CALL_ASSIGNMENT").map((event) => event.realizedPnl));
     const strategyCapital = {
-      coveredCallCapital: averageCapitalByStrategy(usage, year, month, asOfDate, "COVERED_CALL"),
-      cashSecuredPutCollateral: averageCapitalByStrategy(usage, year, month, asOfDate, "CASH_SECURED_PUT"),
-      swingTradeCapital: averageCapitalByStrategy(usage, year, month, asOfDate, "SWING_TRADE"),
-      assignmentCapital: averageCapitalByStrategy(usage, year, month, asOfDate, "COVERED_CALL_ASSIGNMENT") + averageCapitalByStrategy(usage, year, month, asOfDate, "PUT_ASSIGNMENT"),
-      peakCoveredCallCapital: peakCapitalByStrategy(usage, year, month, asOfDate, "COVERED_CALL"),
-      peakCashSecuredPutCollateral: peakCapitalByStrategy(usage, year, month, asOfDate, "CASH_SECURED_PUT"),
-      peakSwingTradeCapital: peakCapitalByStrategy(usage, year, month, asOfDate, "SWING_TRADE"),
-      peakAssignmentCapital: peakCapitalByStrategy(usage, year, month, asOfDate, "COVERED_CALL_ASSIGNMENT") + peakCapitalByStrategy(usage, year, month, asOfDate, "PUT_ASSIGNMENT")
+      coveredCallCapital: peakConcurrentCapital(monthlyRealizedUsage, { strategies: ["COVERED_CALL"] }) || largestEventCapital(monthlyEvents, "COVERED_CALL"),
+      cashSecuredPutCollateral: peakConcurrentCapital(monthlyRealizedUsage, { strategies: ["CASH_SECURED_PUT"] }) || largestEventCapital(monthlyEvents, "CASH_SECURED_PUT"),
+      swingTradeCapital: peakConcurrentCapital(monthlyRealizedUsage, { strategies: ["SWING_TRADE"] }) || largestEventCapital(monthlyEvents, "SWING_TRADE"),
+      assignmentCapital: peakConcurrentCapital(monthlyRealizedUsage, { strategies: ["COVERED_CALL_ASSIGNMENT", "PUT_ASSIGNMENT"] }) || largestEventCapital(monthlyEvents, "COVERED_CALL_ASSIGNMENT", "PUT_ASSIGNMENT")
     };
     const rowWarnings: string[] = [];
-    if (realizedPnl !== 0 && capital.averageDeployedCapital === 0) {
-      rowWarnings.push("Average deployed capital is zero, so ROI is unavailable.");
-      warnings.push("Average deployed capital is zero");
+    if (realizedPnl !== 0 && returnCapital === 0) {
+      rowWarnings.push("Realized capital is zero, so RoC is unavailable.");
+      warnings.push("Realized capital is zero");
     }
     return {
       month,
       year,
-      startingCapitalDeployed: pointInTimeCapital(usage, `${key}-01`),
-      endingCapitalDeployed: pointInTimeCapital(usage, capital.endDate),
+      startingCapitalDeployed: cappedCapital(pointInTimeCapital(monthlyCapitalUsage, `${key}-01`), maxCapital),
+      endingCapitalDeployed: cappedCapital(pointInTimeCapital(monthlyCapitalUsage, capital.endDate), maxCapital),
       averageDeployedCapital: capital.averageDeployedCapital,
-      peakDeployedCapital: capital.peakDeployedCapital,
+      returnCapital,
       capitalDays: capital.capitalDays,
       periodDays: capital.days,
       realizedPnl,
-      realizedRoiPercent: capital.averageDeployedCapital > 0 ? (realizedPnl / capital.averageDeployedCapital) * 100 : null,
+      realizedRoiPercent: returnCapital > 0 ? (realizedPnl / returnCapital) * 100 : null,
       closedTradeCapital,
+      capitalWeightedTradeRoiPercent: closedTradeCapital > 0 ? (realizedPnl / closedTradeCapital) * 100 : null,
       optionsPremiumPnl,
       stockTradingPnl,
       assignmentPnl,
@@ -776,7 +796,14 @@ export function calculateMonthlyReturns(
   });
 }
 
-function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapitalReturn[], warnings: string[], asOfDate: string): DashboardAggregates {
+function calculateAggregates(
+  events: RealizedPnLEvent[],
+  monthly: MonthlyCapitalReturn[],
+  warnings: string[],
+  asOfDate: string,
+  usage: CapitalUsage[],
+  maxCapital?: number,
+): DashboardAggregates {
   const totalRealizedPnl = sum(events.map((event) => event.realizedPnl));
   const currentYear = Number(asOfDate.slice(0, 4));
   const currentYearRealizedPnl = sum(events.filter((event) => Number(event.date.slice(0, 4)) === currentYear).map((event) => event.realizedPnl));
@@ -787,8 +814,9 @@ function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapital
   });
   const wins = events.filter((event) => event.realizedPnl > 0);
   const losses = events.filter((event) => event.realizedPnl < 0);
-  const strategyBreakdown = groupBreakdown(events, "strategy");
-  const symbolBreakdown = groupBreakdown(events, "symbol").map((row) => ({
+  const realizedUsage = closedCapitalUsage(usage);
+  const strategyBreakdown = groupBreakdown(events, "strategy", realizedUsage);
+  const symbolBreakdown = groupBreakdown(events, "symbol", realizedUsage).map((row) => ({
     symbol: row.symbol,
     pnl: row.pnl,
     capital: row.capital,
@@ -797,7 +825,8 @@ function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapital
     winRate: row.winRate
   }));
   const monthlyWithRoi = monthly.filter((row) => row.realizedRoiPercent !== null);
-  const roc = portfolioReturnOnCapital(monthly);
+  const roc = portfolioReturnOnCapital(monthly, usage, maxCapital);
+  const closedTradeCapital = sum(monthly.map((row) => row.closedTradeCapital));
   return {
     totalRealizedPnl,
     currentYearRealizedPnl,
@@ -815,18 +844,18 @@ function calculateAggregates(events: RealizedPnLEvent[], monthly: MonthlyCapital
     worstStrategy: [...strategyBreakdown].sort((a, b) => a.pnl - b.pnl)[0]?.strategy ?? null,
     averageMonthlyRoi: monthlyWithRoi.length ? sum(monthlyWithRoi.map((row) => row.realizedRoiPercent ?? 0)) / monthlyWithRoi.length : null,
     returnOnCapital: roc.roc,
-    annualizedReturnOnCapital: roc.annualizedRoc,
+    returnCapital: roc.capital,
+    capitalWeightedTradeRoi: closedTradeCapital > 0 ? (totalRealizedPnl / closedTradeCapital) * 100 : null,
     averageDeployedCapital: roc.avgDeployed,
-    peakDeployedCapital: Math.max(0, ...monthly.map((row) => row.peakDeployedCapital)),
     strategyBreakdown,
     symbolBreakdown,
     warnings: unique(warnings)
   };
 }
 
-function groupBreakdown(events: RealizedPnLEvent[], key: "strategy"): Array<{ strategy: Strategy; pnl: number; capital: number; roiPercent: number | null; trades: number; winRate: number | null }>;
-function groupBreakdown(events: RealizedPnLEvent[], key: "symbol"): Array<{ symbol: string; pnl: number; capital: number; roiPercent: number | null; trades: number; winRate: number | null }>;
-function groupBreakdown(events: RealizedPnLEvent[], key: "strategy" | "symbol") {
+function groupBreakdown(events: RealizedPnLEvent[], key: "strategy", usage: CapitalUsage[]): Array<{ strategy: Strategy; pnl: number; capital: number; roiPercent: number | null; trades: number; winRate: number | null }>;
+function groupBreakdown(events: RealizedPnLEvent[], key: "symbol", usage: CapitalUsage[]): Array<{ symbol: string; pnl: number; capital: number; roiPercent: number | null; trades: number; winRate: number | null }>;
+function groupBreakdown(events: RealizedPnLEvent[], key: "strategy" | "symbol", usage: CapitalUsage[]) {
   const map = new Map<string, RealizedPnLEvent[]>();
   for (const event of events) {
     const group = event[key];
@@ -835,7 +864,10 @@ function groupBreakdown(events: RealizedPnLEvent[], key: "strategy" | "symbol") 
   return [...map.entries()]
     .map(([group, rows]) => {
       const pnl = sum(rows.map((row) => row.realizedPnl));
-      const capital = sum(rows.map((row) => row.capitalDeployed ?? 0));
+      const capital = peakConcurrentCapital(
+        key === "symbol" ? portfolioCapitalUsage(usage) : usage,
+        key === "symbol" ? { symbol: group } : { strategies: [group] },
+      );
       const wins = rows.filter((row) => row.realizedPnl > 0).length;
       return {
         [key]: group,
@@ -941,7 +973,7 @@ function eventToPosition(event: RealizedPnLEvent, openDate: string): PositionCap
   };
 }
 
-function capitalForMonth(usage: CapitalUsage[], year: number, month: number, asOfDate?: string) {
+function capitalForMonth(usage: CapitalUsage[], year: number, month: number, asOfDate?: string, maxCapital?: number) {
   const monthKey = `${year}-${String(month).padStart(2, "0")}`;
   const monthDays = daysInMonth(year, month);
   const asOfMonth = asOfDate?.slice(0, 7);
@@ -953,36 +985,26 @@ function capitalForMonth(usage: CapitalUsage[], year: number, month: number, asO
         ? Math.min(monthDays, Math.max(1, asOfDay))
         : 0;
   let capitalDays = 0;
-  let peakDeployedCapital = 0;
   for (let day = 1; day <= days; day += 1) {
     const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const deployed = pointInTimeCapital(usage, date);
+    const deployed = cappedCapital(pointInTimeCapital(usage, date), maxCapital);
     capitalDays += deployed;
-    peakDeployedCapital = Math.max(peakDeployedCapital, deployed);
   }
   return {
     endDate: `${monthKey}-${String(days || monthDays).padStart(2, "0")}`,
     capitalDays,
     days,
-    averageDeployedCapital: days > 0 ? capitalDays / days : 0,
-    peakDeployedCapital
+    averageDeployedCapital: days > 0 ? capitalDays / days : 0
   };
-}
-
-function averageCapitalByStrategy(usage: CapitalUsage[], year: number, month: number, asOfDate: string | undefined, ...strategies: Strategy[]) {
-  const strategyUsage = usage.filter((row) => strategies.includes(row.strategy));
-  return capitalForMonth(strategyUsage, year, month, asOfDate).averageDeployedCapital;
-}
-
-function peakCapitalByStrategy(usage: CapitalUsage[], year: number, month: number, asOfDate: string | undefined, ...strategies: Strategy[]) {
-  const strategyUsage = usage.filter((row) => strategies.includes(row.strategy));
-  return capitalForMonth(strategyUsage, year, month, asOfDate).peakDeployedCapital;
 }
 
 function pointInTimeCapital(usage: CapitalUsage[], date: string) {
   return sum(
     usage
-      .filter((row) => row.startDate <= date && row.endDate >= date)
+      .filter((row) =>
+        (row.startDate <= date && row.endDate > date) ||
+        (row.id.endsWith("-open") && row.startDate <= date && row.endDate === date)
+      )
       .map((row) => row.amount)
   );
 }
@@ -990,7 +1012,20 @@ function pointInTimeCapital(usage: CapitalUsage[], date: string) {
 function ratioForStrategy(events: RealizedPnLEvent[], capital: number, ...strategies: Strategy[]) {
   if (capital <= 0) return null;
   const pnl = sum(events.filter((event) => strategies.includes(event.strategy)).map((event) => event.realizedPnl));
-  return pnl === 0 ? null : (pnl / capital) * 100;
+  return (pnl / capital) * 100;
+}
+
+function cappedCapital(capital: number, maxCapital?: number) {
+  return maxCapital && maxCapital > 0 ? Math.min(capital, maxCapital) : capital;
+}
+
+function largestEventCapital(events: RealizedPnLEvent[], ...strategies: Strategy[]) {
+  return Math.max(
+    0,
+    ...events
+      .filter((event) => strategies.includes(event.strategy))
+      .map((event) => event.capitalDeployed ?? 0),
+  );
 }
 
 function monthsBetween(start: string, end: string) {

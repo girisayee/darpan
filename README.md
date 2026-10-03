@@ -5,8 +5,8 @@
 Darpan is a hosted, multi-user dashboard for short-term traders who track their own
 performance. It imports your broker activity — Robinhood, Fidelity, Schwab, E*TRADE,
 Vanguard, and IBKR CSV exports are auto-detected — reconstructs realized
-P&L, option income, and capital usage, and shows it back to you across four focused views:
-**Home**, **Performance**, **Tickers**, and **Positions**.
+P&L, option income, and capital usage, and shows it back to you across five focused views:
+**Home**, **Monthly**, **Tickers**, **Positions**, and **Taxes**.
 
 Sign-in is Google SSO, and every trader's data is isolated per account. Who can sign in is
 governed entirely by your Google OAuth configuration (while the OAuth app is in "Testing",
@@ -51,21 +51,24 @@ to open sign-in to any Google account).
 
 ## What it does
 
-A short-term trader's "game tape." The four tabs:
+A short-term trader's "game tape." The five tabs:
 
-- **Home** — year-to-date verdict at a glance: Net P&L, Expectancy, Profit factor, Win
-  rate, a daily-P&L calendar heatmap (year or month), your capital deployed vs. your
-  configured max, your open option positions, and a by-strategy snapshot.
-- **Performance** — equity curve, capital-matched benchmark vs. SPY / QQQ / VTI, annual
-  goal pacing, capital-deployed metrics (return on capital, utilization, turnover,
-  income/day, concentration), and a monthly P&L breakdown (chart + by-strategy ROI table).
-- **Tickers** — a per-symbol leaderboard ("Money makers" / "Account killers") plus a full
-  sortable, searchable table of every symbol you've traded.
-- **Positions** — your book organized by strategy (Cash-secured puts, Covered calls, Long
-  options, Swing), each with its own metrics and an Active / Closed / All drill-down. Click
-  any position for a full P&L breakdown.
+- **Home** — year-to-date realized P&L with an additive Options/Stocks breakdown,
+  realized RoC beside adjusted SPY / VTI / QQQ market returns, a cumulative P&L chart
+  with optional goal pace, and trading quality metrics.
+- **Monthly** — pick a month to review its realized P&L, RoC, closed-trade count, and
+  Options/Stocks figures. The default Trades view has a searchable, sortable ledger;
+  Daily view has a calendar and selected-day trades. Open any trade for its detail drawer.
+- **Tickers** — clickable top-five Biggest wins and Biggest losses, a sortable All symbols
+  directory, Losses, and search across every symbol in the selected year.
+- **Positions** — open options first, closed trade history below, and Stock trades with
+  still-open lots opened in the selected year plus trades closed that year. Search works
+  across options and stocks; strategy and status filters organize the normal board.
+- **Taxes** — a planning estimate from imported realized activity, with federal, NIIT, and
+  state/local components, editable assumptions, a disposition audit, open lots, and potential
+  wash-sale review.
 
-Import and Settings live behind the **⋯** menu in the top bar. On a phone, the four tabs
+Import and Settings live behind the **⋯** menu in the top bar. On a phone, the five tabs
 become a bottom tab bar.
 
 ## How it computes P&L
@@ -80,6 +83,14 @@ become a bottom tab bar.
 
 ROI is shown as `—` when the capital base is unknown or zero. Annualized ROI is the simple
 `ROI × (365 / holding days)`.
+
+Portfolio equity and complete external cash flows are not available, so the app does not
+claim to calculate Modified Dietz or a standard portfolio return. Its headline **Realized
+RoC** is realized P&L divided by peak concurrent capital behind realized positions. Inferred
+open positions remain exposure only. Covered-call basis is de-duplicated when the underlying
+shares also realize, and the portfolio denominator is capped at configured max buying power.
+A separate capital-weighted
+trade ROI divides P&L by summed capital across closed trades.
 
 ## Data & privacy
 
@@ -100,6 +111,7 @@ ROI is shown as `—` when the capital base is unknown or zero. Annualized ROI i
 
 - No broker API integration — data comes from imported CSVs only.
 - No live prices, option marks, or Greeks — only realized results from your imported data.
-- No wash-sale handling or tax filing. Verify against official brokerage and tax documents.
+- Potential wash-sale candidates are flagged for review; no automatic wash-sale adjustment
+  or tax filing is provided. Verify estimates against official brokerage and tax documents.
 
 Darpan is for personal tracking and analysis only.

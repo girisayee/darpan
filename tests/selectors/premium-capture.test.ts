@@ -42,3 +42,25 @@ test("zero premium and empty -> nulls, no NaN", () => {
   expect(out.captureRate).toBeNull();
   expect(out.assignmentRate).toBeNull(); // no terminal lifecycles
 });
+
+test("open lifecycles do not affect realized premium metrics", () => {
+  const out = premiumStats([
+    lc({ status: "closed", premiumReceived: 100, netOptionPnl: 60 }),
+    lc({ status: "open", premiumReceived: 900, netOptionPnl: 900 }),
+  ]);
+  expect(out.premiumCollected).toBe(100);
+  expect(out.netOptionPnl).toBe(60);
+  expect(out.captureRate).toBeCloseTo(0.6, 5);
+  expect(out.counts.total).toBe(1);
+});
+
+test("assigned-put premium is deferred into stock basis", () => {
+  const out = premiumStats([
+    lc({ status: "assigned", optionType: "put", strategy: "CASH_SECURED_PUT", premiumReceived: 500, netOptionPnl: 500 }),
+    lc({ status: "assigned", optionType: "call", strategy: "COVERED_CALL", premiumReceived: 200, netOptionPnl: 200 }),
+  ]);
+  expect(out.premiumCollected).toBe(200);
+  expect(out.netOptionPnl).toBe(200);
+  expect(out.counts.total).toBe(1);
+  expect(out.assignmentRate).toBe(1);
+});

@@ -5,5 +5,14 @@ import { useDashboard } from "@/components/dashboard/DashboardShell";
 
 export default function PerformancePage() {
   const d = useDashboard();
-  return <PerformanceTab result={d.result} settings={d.settings} />;
+  return (
+    <PerformanceTab
+      result={d.result}
+      settings={d.settings}
+      year={d.year}
+      dataLoaded={d.dataLoaded}
+      onSelectEvent={d.onSelectEvent}
+      onSelectLifecycle={d.onSelectLifecycle}
+    />
+  );
 }

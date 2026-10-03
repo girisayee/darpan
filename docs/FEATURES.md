@@ -10,9 +10,9 @@ management. Everything below is computed from your imported activity.
    auto-detected, and a column-mapping step handles anything it can't map on its own.
 2. Rows are normalized into stock, option, cash, fee, dividend, transfer, and unknown
    transactions; anything uninterpretable is kept as **unresolved**, not discarded.
-3. Imported transactions and settings persist in local SQLite.
+3. Imported transactions and settings persist in per-user Postgres records.
 4. The dashboard reconstructs realized P&L, option lifecycles, tax lots, capital usage, and
-   monthly returns, and presents them across four tabs.
+   monthly returns, and presents them across five tabs.
 5. Resolve gaps (e.g. a sale missing its opening buy) through **Review & fix**.
 
 Sample data is on by default so the dashboard is populated before you import; disable it in
@@ -20,59 +20,84 @@ Settings.
 
 ## Navigation
 
-Four primary tabs. On desktop they sit in the top bar; on a phone they become a fixed bottom
+Five primary tabs. On desktop they sit in the top bar; on a phone they become a fixed bottom
 tab bar. Import, Settings, account switch, theme toggle, and backup export live behind the
 **⋯** overflow menu.
 
 ### Home
 
-At-a-glance, year-to-date by default:
-- **Verdict KPIs:** Net P&L · YTD (with return on capital), Expectancy, Profit factor,
-  Win rate.
-- **Daily P&L calendar** — a heatmap of daily realized P&L, toggling between a full year and
-  a single month; click any day to see that day's trades.
-- **Capital deployed** — a gauge of current deployed capital against your configured max
-  buying power.
-- **Open positions** — your active option plays (roll-soon first); click one for its detail
-  drawer, or jump to the full Positions tab.
-- **By strategy** — a P&L / RoC / win-rate snapshot per strategy; tap to open that strategy
-  in Positions.
+Realized results for the selected year and accounts:
+- **Paired summaries:** realized net P&L with its additive Options and Stocks amounts;
+  realized RoC with SPY, VTI, and QQQ adjusted returns beside it as market context.
+  RoC uses peak concurrent capital behind positions realized in the period, while ETF
+  returns use a different basis. Empty years show no breakdown or market comparison.
+- **Cumulative realized P&L** — a close-date step line with an optional elapsed-year goal
+  pace overlay. The actual line stops at the last realized close; it is not an equity curve.
+- **Annual goal** — progress against the configured realized P&L target, shown only while
+  goal tracking is enabled.
+- **Quality:** expectancy, profit factor, and win rate over realized events. Assignment
+  legs can be grouped into one trade in the Monthly ledger, so these units differ.
 
-### Performance
+### Monthly
 
-- **You vs. the market** — capital-matched return against SPY / QQQ / VTI.
-- **Annual goal** — progress, pacing, projection, and required monthly run-rate.
-- **Equity curve** — cumulative realized P&L over the year vs. goal pace.
-- **Capital deployed** — average and peak deployed, return on capital, capital utilization,
-  capital turnover, income per day, and concentration (HHI).
-- **Monthly P&L** — a bar chart plus a breakdown table (P&L, RoC, average capital, and RoC by
-  strategy: CSP / CC / Swing).
+- **Month strip and summary** — the scrollable year strip shows each month's signed realized
+  P&L and a zero-centered magnitude bar. The selected month's total is prominent, followed
+  by an additive Options + Stocks breakdown; realized RoC and grouped closed-trade count
+  are separate metrics. The compact summary remains visible in Trades and Daily views.
+- **Trades (default)** — the grouped ledger supports symbol/strategy search, close-date
+  filtering, and P&L sorting.
+  A covered-call assignment appears once in the ledger while its option and stock P&L
+  appear in their respective category totals. Select a trade for its detail drawer.
+- **Daily view** — a weekday-aligned monthly calendar and selected-day grouped trades.
+  There is no additional daily bar chart or full ledger in this view.
+- Month and view persist in the URL alongside year/account filters, so links and browser
+  Back/Forward restore the selected view.
 
 ### Tickers
 
-- **Leaderboard** — "Money makers" and "Account killers": your symbols ranked by net P&L,
-  annotated with win rate and trade count so a single lucky trade can't top the board.
-- **Full symbol table** — every symbol you've traded, sortable and searchable (net P&L, RoC,
-  trades, win rate).
+- **Highlights** opens with the five Biggest wins and five Biggest losses ranked by realized
+  P&L. Compact bars show relative magnitude within each list and disappear when amounts
+  are masked. **All symbols** opens the sortable directory;
+  **Losses** shows all negative-result symbols. Search finds any symbol in the selected
+  year regardless of the active view. Zero-result symbols remain in All symbols.
+- Rows show realized P&L, realized RoC, closed-event count, and win rate. Phone rows keep
+  these measures visible without horizontal scrolling. Selecting a symbol opens its
+  detail drawer.
 
 ### Positions
 
-Your book organized **by strategy**: All strategies, Cash-secured puts, Covered calls, Long
-options, Swing.
-- The **All strategies** board lists option plays (CSP/CC/Long) with an Active / Closed / All
-  filter (default All) and a per-strategy summary tile row.
-- Each **strategy drill-down** shows its own metric set — e.g. premium collected, capture
-  rate, and assignment rate for options; profit factor and avg win/loss for swing — plus an
-  Active / Closed / All table.
-- Tables carry strategy-appropriate columns (Premium + Capital for CSP/CC, Cost for long
-  options, Qty + Cost basis for swing) along with **Opened** and **Closed** dates.
-- **Swing** shows closed positions only (open share lots aren't tracked as positions).
-- Click any position for a full P&L breakdown drawer.
+**Options** and **Stock trades** have separate boards. Options / All is the default and
+lists open option plays before closed history. Strategy chips filter CSP, CC, and Long;
+All / Active / Closed controls which groups appear.
+- A compact **inferred open exposure** line compares reconstructed open capital with
+  configured max buying power. It is not a live broker balance; an overage is stated in text.
+- Open option rows show expiry, days to expiry, and received premium or long-option cost.
+  Closed rows show realized P&L and trade ROI where valid. Open cashflows are not labeled
+  as realized P&L.
+- Closed-trade results show realized P&L, win rate, and closed count together. More
+  strategy-specific metrics are available on demand rather than occupying the top of the page.
+- Stock trades lists lots that are still open and were opened in the selected year,
+  then trades closed in that year. Open lots show shares and cost basis, without
+  invented unrealized P&L or a historical holdings snapshot.
+- The page-level search finds matching open and closed positions across both Options
+  and Stock trades, regardless of the currently selected board.
+- Phone rows present the key values without horizontal table scrolling. Selecting a row
+  opens its existing detail drawer.
+
+### Taxes
+
+- **Tax reserve snapshot** — estimated short-term and long-term federal components,
+  NIIT, and state/local tax using editable planning assumptions.
+- **Realized activity** — disposition rows with proceeds, adjusted basis, gain/loss,
+  holding term, and a detail audit.
+- **Open lots** — reconstructed stock lots for the selected taxable accounts.
+- **Review** — missing-basis and unsupported activity is excluded from the estimate;
+  potential exact-ticker wash sales are flagged for broker-record review.
 
 ## Goal tracking
 
 The annual realized P&L goal (`annualRealizedPnlGoal`, default `$40,000`) drives the
-Performance goal card and the equity-curve goal-pace line.
+Home goal card and elapsed-year pace overlay on the cumulative realized P&L chart.
 
 ## Capital & collateral
 
@@ -83,6 +108,17 @@ Performance goal card and the equity-curve goal-pace line.
 - **Swing trades** use cost basis while open.
 
 Cost-basis method and the put-collateral denominator are configurable in Settings.
+
+Realized RoC uses realized P&L divided by peak concurrent capital behind positions realized in
+the selected period. Sequential rolls and trades reuse the same capital; genuinely overlapping
+positions add. Inferred open positions stay in exposure metrics only because no authoritative
+holdings/equity snapshot is available. Covered-call stock basis is de-duplicated when its
+underlying stock or assignment interval also realizes in scope. Portfolio and monthly capital
+are capped at configured max buying power when notional intervals imply leverage. Time-weighted
+average realized capital uses those scoped realized rows and the same cap. Capital-weighted
+trade ROI is shown separately and sums capital on closed
+trades. Because the app lacks portfolio equity and complete external cash flows, neither metric
+is presented as Modified Dietz or a standard portfolio return.
 
 ## Import support
 
@@ -102,8 +138,9 @@ is generated by the app and is not part of the backup.
 
 ## Product boundaries
 
-- No broker API, cloud sync, or multi-user support.
+- No broker API or live broker sync.
 - No live prices, option marks, or Greeks.
 - No max-drawdown / Sortino / Calmar / payoff-ratio surfacing, no discipline streak, and no
   social leaderboard — deliberately out of scope.
-- No wash-sale handling or tax filing. Verify against official brokerage and tax documents.
+- Potential wash sales are screening flags only; no automatic wash-sale adjustment or
+  tax filing. Verify estimates against official brokerage and tax documents.

@@ -8,7 +8,9 @@ export default function PositionsPage() {
   return (
     <PositionsTab
       result={d.result}
+      allYearsResult={d.allYearsResult}
       settings={d.settings}
+      year={d.year}
       onReviewFix={d.openReviewFix}
       onSelectEvent={d.onSelectEvent}
       onSelectLifecycle={d.onSelectLifecycle}
